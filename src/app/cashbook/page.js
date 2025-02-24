@@ -27,7 +27,11 @@ export default function CashBookPage() {
     deleteTransaction,
   } = useData();
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(() => {
+    const today = new Date();
+    // Keep YYYY-MM-DD format for the input field
+    return today.toISOString().split("T")[0];
+  });
 
   const handleAddTransaction = (transaction) => {
     addDailyCashTransaction(transaction);
