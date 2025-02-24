@@ -1,101 +1,238 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Home() {
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AddCustomerDialog } from "@/components/AddCustomerDialog";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+
+import { useData } from "./data-context";
+
+const AddSampleDataButton = () => {
+  if (process.env.NODE_ENV !== "development") return null;
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={async () => {
+        const { addSampleData } = await import("@/utils/addSampleData");
+        await addSampleData();
+      }}
+    >
+      Add Sample Data (Dev Only)
+    </Button>
+  );
+};
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+export default function Dashboard() {
+  const router = useRouter();
+  const { customers, loading, error, deleteCustomer, getCustomerDue } =
+    useData();
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (mounted) {
+      console.log("Customers data:", customers);
+    }
+  }, [mounted, customers]);
+
+  const handleAddCustomer = async (customerData) => {
+    try {
+      await addCustomer(customerData);
+      setIsAddingCustomer(false);
+    } catch (error) {
+      console.error("Error adding customer:", error);
+    }
+  };
+
+  const handleRowClick = (customerId) => {
+    router.push(`/customers/${customerId}`);
+  };
+
+  const handleDeleteCustomer = async (customerId) => {
+    if (window.confirm("Are you sure you want to delete this customer?")) {
+      try {
+        await deleteCustomer(customerId);
+      } catch (error) {
+        console.error("Error deleting customer:", error);
+      }
+    }
+  };
+
+  if (loading || !mounted) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-500">Error: {error}</p>
+      </div>
+    );
+  }
+
+  const filteredCustomers = (customers || []).filter((customer) => {
+    if (!customer) return false;
+
+    const matchesSearch =
+      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone?.includes(searchTerm);
+    const currentDue = getCustomerDue(customer.id);
+    const matchesFilter =
+      selectedFilter === "all" ||
+      (selectedFilter === "due" && currentDue > 0) ||
+      (selectedFilter === "paid" && currentDue === 0);
+    return matchesSearch && matchesFilter;
+  });
+
+  if (!customers?.length) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center gap-4">
+        <p className="text-gray-500">No customers found</p>
+        <Button onClick={() => setIsAddingCustomer(true)}>
+          Add Your First Customer
+        </Button>
+        <AddSampleDataButton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <Input
+            placeholder="Search customers..."
+            className="w-full md:w-64"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select
+            className="border rounded-md px-4 py-2 w-full md:w-auto"
+            value={selectedFilter}
+            onChange={(e) => setSelectedFilter(e.target.value)}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <option value="all">All Customers</option>
+            <option value="due">With Due Amount</option>
+            <option value="paid">No Due Amount</option>
+          </select>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <AddCustomerDialog
+          isOpen={isAddingCustomer}
+          onClose={() => setIsAddingCustomer(false)}
+          onAddCustomer={handleAddCustomer}
+        />
+      </div>
+
+      <div className="overflow-x-auto -mx-4 md:mx-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Name</TableHead>
+              <TableHead className="whitespace-nowrap hidden md:table-cell">
+                Phone
+              </TableHead>
+              <TableHead className="whitespace-nowrap hidden md:table-cell">
+                Address
+              </TableHead>
+              <TableHead className="whitespace-nowrap hidden md:table-cell">
+                Store ID
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Due Amount
+              </TableHead>
+              <TableHead className="whitespace-nowrap">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredCustomers.map((customer) => {
+              const dueAmount = getCustomerDue(customer.id);
+              return (
+                <TableRow
+                  key={customer.id}
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => handleRowClick(customer.id)}
+                >
+                  <TableCell>
+                    <div>
+                      {customer.name}
+                      <div className="md:hidden text-sm text-gray-500">
+                        <div>{customer.phone}</div>
+                        <div className="truncate max-w-[200px]">
+                          {customer.address}
+                        </div>
+                        <div>{customer.storeId}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {customer.phone}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div
+                      className="truncate max-w-[200px]"
+                      title={customer.address}
+                    >
+                      {customer.address}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {customer.storeId}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right whitespace-nowrap ${
+                      dueAmount > 1000 ? "text-red-500" : ""
+                    }`}
+                  >
+                    ₹{dueAmount.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log("Edit customer", customer.id);
+                        }}
+                      >
+                        <span className="hidden md:inline">Edit</span>
+                        <span className="md:hidden">✏️</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomer(customer.id);
+                        }}
+                      >
+                        <span className="hidden md:inline">Delete</span>
+                        <span className="md:hidden">🗑️</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
