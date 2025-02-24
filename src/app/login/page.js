@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -55,7 +56,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
         <div>
-          <h2 className="text-center text-3xl font-bold">Sky Fabric's </h2>
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/download.png"
+              alt="Sky Fabric Logo"
+              width={50}
+              height={50}
+              className="rounded-md"
+            />
+          </div>
+          <h2 className="text-center text-3xl font-bold">Sky Fabric's</h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           {error && <p className="text-red-500 text-center text-sm">{error}</p>}
