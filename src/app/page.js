@@ -99,18 +99,6 @@ export default function Dashboard() {
     return matchesSearch && matchesFilter;
   });
 
-  if (!customers?.length) {
-    return (
-      <div className="p-8 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-500">No customers found</p>
-        <Button onClick={() => setIsAddingCustomer(true)}>
-          Add Your First Customer
-        </Button>
-        <AddSampleDataButton />
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-8">
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
