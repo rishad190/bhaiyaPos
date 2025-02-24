@@ -198,7 +198,7 @@ export default function Dashboard() {
                       dueAmount > 1000 ? "text-red-500" : ""
                     }`}
                   >
-                    ₹{dueAmount.toLocaleString()}
+                    ৳{dueAmount.toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

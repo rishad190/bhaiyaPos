@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-export function EditTransactionDialog({ transaction, onEditTransaction }) {
+export function EditTransactionDialog({
+  transaction,
+  onEditTransaction,
+  customerName,
+}) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     date: transaction.date,
@@ -86,7 +90,7 @@ export function EditTransactionDialog({ transaction, onEditTransaction }) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Transaction</DialogTitle>
+          <DialogTitle>Edit Transaction for {customerName}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

@@ -1,6 +1,14 @@
 "use client";
 import { createContext, useContext, useState, useEffect } from "react";
-import { ref, onValue, push, set, remove } from "firebase/database";
+import {
+  ref,
+  onValue,
+  push,
+  set,
+  remove,
+  update,
+  serverTimestamp,
+} from "firebase/database";
 import { db } from "@/lib/firebase";
 
 // Create context
@@ -10,6 +18,7 @@ const DataContext = createContext(null);
 export function DataProvider({ children }) {
   const [customers, setCustomers] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [dailyCashTransactions, setDailyCashTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -70,6 +79,24 @@ export function DataProvider({ children }) {
         }
       );
       unsubscribers.push(unsubTransactions);
+
+      // Subscribe to dailyCash data
+      const dailyCashRef = ref(db, "dailyCash");
+      const unsubDailyCash = onValue(dailyCashRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const transactions = Object.entries(data).map(
+            ([id, transaction]) => ({
+              id,
+              ...transaction,
+            })
+          );
+          setDailyCashTransactions(transactions);
+        } else {
+          setDailyCashTransactions([]);
+        }
+      });
+      unsubscribers.push(unsubDailyCash);
     } catch (err) {
       console.error("Error setting up Firebase listeners:", err);
       setError(err.message);
@@ -98,6 +125,8 @@ export function DataProvider({ children }) {
     try {
       const transactionRef = ref(db, `transactions/${transactionId}`);
       await remove(transactionRef);
+      // Update local state immediately for better UX
+      setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
     } catch (error) {
       console.error("Error deleting transaction:", error);
       throw error;
@@ -125,15 +154,54 @@ export function DataProvider({ children }) {
     }
   };
 
-  const updateTransaction = async (updatedTransaction) => {
+  const updateTransaction = async (transactionId, updatedData) => {
     try {
-      const transactionRef = ref(db, `transactions/${updatedTransaction.id}`);
-      await set(transactionRef, {
-        ...updatedTransaction,
-        updatedAt: new Date().toISOString(),
-      });
+      const transactionRef = ref(db, `transactions/${transactionId}`);
+      await update(transactionRef, updatedData);
     } catch (error) {
       console.error("Error updating transaction:", error);
+      throw error;
+    }
+  };
+
+  const addDailyCashTransaction = async (transaction) => {
+    try {
+      // Generate a new push ID
+      const newTransactionRef = push(ref(db, "dailyCash"));
+      const newId = newTransactionRef.key;
+
+      // Add the transaction with the generated ID
+      await set(newTransactionRef, {
+        ...transaction,
+        id: newId, // Include the push ID in the data
+        createdAt: serverTimestamp(),
+      });
+
+      return newId; // Return the new ID for potential use
+    } catch (error) {
+      console.error("Error adding transaction:", error);
+      throw error;
+    }
+  };
+
+  const updateDailyCashTransaction = async (transactionId, updates) => {
+    try {
+      const transactionRef = ref(db, `dailyCash/${transactionId}`);
+      await update(transactionRef, updates);
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      throw error;
+    }
+  };
+
+  const deleteDailyCashTransaction = async (transactionId) => {
+    console.log(transactionId);
+
+    try {
+      const transactionRef = ref(db, `dailyCash/${transactionId}`);
+      await remove(transactionRef);
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
       throw error;
     }
   };
@@ -141,6 +209,7 @@ export function DataProvider({ children }) {
   const contextValue = {
     customers,
     transactions,
+    dailyCashTransactions,
     loading,
     error,
     getCustomerDue: (customerId) => {
@@ -166,6 +235,9 @@ export function DataProvider({ children }) {
     deleteTransaction,
     deleteCustomer,
     updateTransaction,
+    addDailyCashTransaction,
+    updateDailyCashTransaction,
+    deleteDailyCashTransaction,
   };
 
   return (

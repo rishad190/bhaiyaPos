@@ -123,7 +123,7 @@ export default function CustomerDetail() {
                 totalDue > 0 ? "text-red-500" : "text-green-500"
               }`}
             >
-              Total Due: ₹{totalDue.toLocaleString()}
+              Total Due: ৳{totalDue.toLocaleString()}
             </p>
           </div>
         </div>
@@ -174,13 +174,13 @@ export default function CustomerDetail() {
               <TableCell>{transaction.memoNumber}</TableCell>
               <TableCell>{transaction.details}</TableCell>
               <TableCell className="text-right">
-                ₹{transaction.total.toLocaleString()}
+                ৳{transaction.total.toLocaleString()}
               </TableCell>
               <TableCell className="text-right">
-                ₹{transaction.deposit.toLocaleString()}
+                ৳{transaction.deposit.toLocaleString()}
               </TableCell>
               <TableCell className="text-right">
-                ₹{transaction.due.toLocaleString()}
+                ৳{transaction.due.toLocaleString()}
               </TableCell>
               <TableCell
                 className={`text-right font-medium ${
@@ -189,7 +189,7 @@ export default function CustomerDetail() {
                     : "text-green-500"
                 }`}
               >
-                ₹{transaction.cumulativeBalance.toLocaleString()}
+                ৳{transaction.cumulativeBalance.toLocaleString()}
               </TableCell>
               <TableCell>{transaction.storeId}</TableCell>
               <TableCell>
@@ -224,7 +224,7 @@ export default function CustomerDetail() {
               totalDue > 0 ? "text-red-500" : "text-green-500"
             }`}
           >
-            ₹{totalDue.toLocaleString()}
+            ৳{totalDue.toLocaleString()}
           </span>
         </div>
       </div>
