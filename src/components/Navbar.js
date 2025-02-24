@@ -61,6 +61,12 @@ export function Navbar() {
             <Link href="/" className="text-gray-700 hover:text-gray-900">
               Dashboard
             </Link>
+            <Link
+              href="/cashbook"
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Cash Book
+            </Link>
             <Button variant="outline">Export Data</Button>
             <Button>Settings</Button>
             <Button variant="ghost" onClick={handleLogout}>
@@ -87,6 +93,12 @@ export function Navbar() {
               className="block px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/cashbook"
+              className="block px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+            >
+              Cash Book
             </Link>
             <Button variant="outline" className="w-full justify-start">
               Export Data

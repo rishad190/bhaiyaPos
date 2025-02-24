@@ -55,7 +55,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
         <div>
-          <h2 className="text-center text-3xl font-bold">POS System Login</h2>
+          <h2 className="text-center text-3xl font-bold">Sky Fabric's </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           {error && <p className="text-red-500 text-center text-sm">{error}</p>}

@@ -15,6 +15,7 @@ import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { EditTransactionDialog } from "@/components/EditTransactionDialog";
 import { exportToCSV } from "@/utils/export";
 import { useData } from "@/app/data-context";
+import { formatDate } from "@/lib/utils";
 
 export default function CustomerDetail() {
   const params = useParams();
@@ -90,7 +91,7 @@ export default function CustomerDetail() {
 
   const handleExportCSV = () => {
     const data = customerTransactionsWithBalance.map((t) => ({
-      Date: t.date,
+      Date: formatDate(t.date),
       Memo: t.memoNumber,
       Details: t.details,
       Total: `${t.total.toLocaleString()}`,
@@ -169,7 +170,7 @@ export default function CustomerDetail() {
         <TableBody>
           {customerTransactionsWithBalance.map((transaction) => (
             <TableRow key={transaction.id}>
-              <TableCell>{transaction.date}</TableCell>
+              <TableCell>{formatDate(transaction.date)}</TableCell>
               <TableCell>{transaction.memoNumber}</TableCell>
               <TableCell>{transaction.details}</TableCell>
               <TableCell className="text-right">
