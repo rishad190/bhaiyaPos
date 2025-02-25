@@ -79,13 +79,40 @@ export default function CustomerDetail() {
     }
   };
 
-  const handleEditTransaction = async (updatedTransaction) => {
+  const handleEditTransaction = async (transactionId, updatedData) => {
     try {
-      await updateTransaction(updatedTransaction);
-      // Optional: Add success message
+      // Add basic validation checks
+      if (!transactionId) {
+        throw new Error("Transaction ID is required");
+      }
+
+      // Trim and validate memo number first
+      console.log(transactionId, updatedData);
+
+      const trimmedMemo = updatedData.memoNumber?.trim();
+
+      // Parse numeric values with validation
+      const totalAmount = parseFloat(updatedData.total);
+      const depositAmount = parseFloat(updatedData.deposit);
+
+      // Prepare processed data with validated values
+      const processedData = {
+        ...updatedData,
+        memoNumber: trimmedMemo,
+        total: totalAmount,
+        deposit: depositAmount,
+        due: totalAmount - depositAmount,
+        customerId: params.id,
+        id: transactionId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update transaction with validated data
+
+      await updateTransaction(transactionId, processedData);
     } catch (error) {
       console.error("Error updating transaction:", error);
-      // Optional: Show error message
+      alert(error.message || "Failed to update transaction. Please try again.");
     }
   };
 
@@ -196,7 +223,9 @@ export default function CustomerDetail() {
                 <div className="flex gap-2">
                   <EditTransactionDialog
                     transaction={transaction}
-                    onEditTransaction={handleEditTransaction}
+                    onEditTransaction={(updatedData) =>
+                      handleEditTransaction(transaction.id, updatedData)
+                    }
                   />
                   <Button
                     variant="ghost"

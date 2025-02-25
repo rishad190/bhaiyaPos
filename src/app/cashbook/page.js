@@ -39,7 +39,7 @@ export default function CashBookPage() {
 
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
-      await updateDailyCashTransaction(transactionId, updatedData);
+      await updateTransaction(transactionId, updatedData);
     } catch (error) {
       console.error("Error updating transaction:", error);
       alert("Failed to update transaction. Please try again.");

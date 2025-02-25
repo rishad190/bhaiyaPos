@@ -155,9 +155,16 @@ export function DataProvider({ children }) {
   };
 
   const updateTransaction = async (transactionId, updatedData) => {
+    console.log("Updating transaction:", transactionId, updatedData);
+
     try {
+      if (!transactionId) throw new Error("Transaction ID is required");
+
       const transactionRef = ref(db, `transactions/${transactionId}`);
-      await update(transactionRef, updatedData);
+      await update(transactionRef, {
+        ...updatedData,
+        updatedAt: serverTimestamp(),
+      });
     } catch (error) {
       console.error("Error updating transaction:", error);
       throw error;
@@ -206,6 +213,19 @@ export function DataProvider({ children }) {
     }
   };
 
+  const updateCustomer = async (customerId, updatedData) => {
+    try {
+      const customerRef = ref(db, `customers/${customerId}`);
+      await update(customerRef, {
+        ...updatedData,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      throw error;
+    }
+  };
+
   const contextValue = {
     customers,
     transactions,
@@ -238,6 +258,7 @@ export function DataProvider({ children }) {
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
+    updateCustomer,
   };
 
   return (

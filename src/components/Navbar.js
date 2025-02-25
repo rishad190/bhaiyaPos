@@ -53,7 +53,7 @@ export function Navbar() {
                 className="rounded-md"
               />
               <span className="text-xl font-bold text-gray-900">
-                Sky Fabric
+                Sky Fabric's
               </span>
             </Link>
           </div>

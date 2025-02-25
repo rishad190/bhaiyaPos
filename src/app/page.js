@@ -16,39 +16,24 @@ import { AddCustomerDialog } from "@/components/AddCustomerDialog";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 import { useData } from "./data-context";
-
-const AddSampleDataButton = () => {
-  if (process.env.NODE_ENV !== "development") return null;
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={async () => {
-        const { addSampleData } = await import("@/utils/addSampleData");
-        await addSampleData();
-      }}
-    >
-      Add Sample Data (Dev Only)
-    </Button>
-  );
-};
+import { EditCustomerDialog } from "@/components/EditCustomerDialog";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { customers, loading, error, deleteCustomer, getCustomerDue } =
-    useData();
+  const {
+    customers,
+    loading,
+    error,
+    deleteCustomer,
+    getCustomerDue,
+    transactions,
+    updateCustomer,
+  } = useData();
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    if (mounted) {
-      console.log("Customers data:", customers);
-    }
-  }, [mounted, customers]);
+  const [editingCustomer, setEditingCustomer] = useState(null);
 
   const handleAddCustomer = async (customerData) => {
     try {
@@ -56,6 +41,15 @@ export default function Dashboard() {
       setIsAddingCustomer(false);
     } catch (error) {
       console.error("Error adding customer:", error);
+    }
+  };
+
+  const handleEditCustomer = async (customerId, updatedData) => {
+    try {
+      await updateCustomer(customerId, updatedData);
+      setEditingCustomer(null);
+    } catch (error) {
+      console.error("Error updating customer:", error);
     }
   };
 
@@ -72,6 +66,31 @@ export default function Dashboard() {
       }
     }
   };
+
+  // Calculate totals
+  const totals = (customers || []).reduce(
+    (acc, customer) => {
+      const customerTransactions =
+        transactions?.filter((t) => t.customerId === customer.id) || [];
+      return {
+        totalBill:
+          acc.totalBill +
+          customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
+        totalDeposit:
+          acc.totalDeposit +
+          customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
+        totalDue: acc.totalDue + getCustomerDue(customer.id),
+      };
+    },
+    { totalBill: 0, totalDeposit: 0, totalDue: 0 }
+  );
+
+  useEffect(() => {
+    setMounted(true);
+    if (mounted) {
+      // Empty if block
+    }
+  }, [mounted, customers]);
 
   if (loading || !mounted) {
     return <LoadingSpinner />;
@@ -101,6 +120,33 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Total Bill Amount</h3>
+          <p className="text-2xl font-bold text-blue-600">
+            ৳{totals.totalBill.toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Total Deposit</h3>
+          <p className="text-2xl font-bold text-green-600">
+            ৳{totals.totalDeposit.toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm text-gray-500">Total Due Amount</h3>
+          <p
+            className={`text-2xl font-bold ${
+              totals.totalDue > 0 ? "text-red-600" : "text-green-600"
+            }`}
+          >
+            ৳{totals.totalDue.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Existing search and filter controls */}
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <Input
@@ -124,8 +170,15 @@ export default function Dashboard() {
           onClose={() => setIsAddingCustomer(false)}
           onAddCustomer={handleAddCustomer}
         />
+        <EditCustomerDialog
+          customer={editingCustomer}
+          isOpen={!!editingCustomer}
+          onClose={() => setEditingCustomer(null)}
+          onEditCustomer={handleEditCustomer}
+        />
       </div>
 
+      {/* Existing table */}
       <div className="overflow-x-auto -mx-4 md:mx-0">
         <Table>
           <TableHeader>
@@ -195,7 +248,7 @@ export default function Dashboard() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log("Edit customer", customer.id);
+                          setEditingCustomer(customer);
                         }}
                       >
                         <span className="hidden md:inline">Edit</span>

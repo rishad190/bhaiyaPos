@@ -16,41 +16,54 @@ export function EditTransactionDialog({
   customerName,
 }) {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    date: transaction.date,
-    memoNumber: transaction.memoNumber,
-    details: transaction.details || "",
-    total: transaction.total.toString(),
-    deposit: transaction.deposit.toString(),
-    storeId: transaction.storeId,
-  });
+
+  // Initialize formData with proper null checks and defaults
+  const [formData, setFormData] = useState(() => ({
+    date: transaction?.date || new Date().toISOString().split("T")[0],
+    memoNumber: transaction?.memoNumber || "",
+    details: transaction?.details || "",
+    total:
+      typeof transaction?.total === "number"
+        ? transaction.total.toString()
+        : "0",
+    deposit:
+      typeof transaction?.deposit === "number"
+        ? transaction.deposit.toString()
+        : "0",
+    storeId: transaction?.storeId || "STORE1",
+    customerId: transaction?.customerId || "",
+  }));
+
   const [errors, setErrors] = useState({});
 
   const validate = () => {
     const newErrors = {};
 
-    // Required field validations
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.memoNumber) newErrors.memoNumber = "Memo number is required";
-
-    // Total amount validation (optional but must be valid if provided)
-    if (formData.total && formData.total.trim() !== "") {
-      const totalAmount = parseFloat(formData.total);
-      if (isNaN(totalAmount)) {
-        newErrors.total = "Please enter a valid amount";
-      } else if (totalAmount < 0) {
-        newErrors.total = "Amount cannot be negative";
-      }
+    // Required field validations with proper trim checks
+    if (!formData.date) {
+      newErrors.date = "Date is required";
     }
 
-    // Deposit amount validation
-    if (formData.deposit && formData.deposit.trim() !== "") {
-      const depositAmount = parseFloat(formData.deposit);
-      if (isNaN(depositAmount)) {
-        newErrors.deposit = "Please enter a valid amount";
-      } else if (depositAmount < 0) {
-        newErrors.deposit = "Deposit cannot be negative";
-      }
+    // Explicit trim check for memo number
+    const trimmedMemo = formData.memoNumber?.trim();
+    if (!trimmedMemo) {
+      newErrors.memoNumber = "Memo number is required";
+    }
+
+    // Amount validations with better type checking
+    const totalAmount = parseFloat(formData.total);
+    const depositAmount = parseFloat(formData.deposit);
+
+    if (isNaN(totalAmount) || totalAmount < 0) {
+      newErrors.total = "Please enter a valid amount";
+    }
+
+    if (isNaN(depositAmount) || depositAmount < 0) {
+      newErrors.deposit = "Please enter a valid deposit amount";
+    }
+
+    if (depositAmount > totalAmount) {
+      newErrors.deposit = "Deposit cannot be greater than total amount";
     }
 
     setErrors(newErrors);
@@ -59,25 +72,44 @@ export function EditTransactionDialog({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!validate()) return;
 
     try {
-      const totalAmount = formData.total ? parseFloat(formData.total) : 0;
-      const depositAmount = formData.deposit ? parseFloat(formData.deposit) : 0;
+      // Sanitize and validate data before submission
+      const totalAmount = parseFloat(formData.total);
+      const depositAmount = parseFloat(formData.deposit);
 
-      const updatedTransaction = {
-        ...transaction,
-        ...formData,
+      if (isNaN(totalAmount) || isNaN(depositAmount)) {
+        throw new Error("Invalid amount values");
+      }
+
+      const sanitizedData = {
+        date: formData.date,
+        memoNumber: formData.memoNumber.trim() || transaction.memoNumber, // Fallback to original
+        details: formData.details.trim(),
         total: totalAmount,
         deposit: depositAmount,
         due: totalAmount - depositAmount,
+        storeId: formData.storeId,
+        customerId: transaction.customerId,
+        id: transaction.id,
+        updatedAt: new Date().toISOString(),
       };
 
-      await onEditTransaction(updatedTransaction);
+      // Additional validation
+      if (!sanitizedData.memoNumber) {
+        throw new Error("Memo number is required");
+      }
+
+      await onEditTransaction(sanitizedData);
       setOpen(false);
     } catch (error) {
       console.error("Error updating transaction:", error);
-      setErrors({ submit: "Failed to update transaction. Please try again." });
+      setErrors({
+        submit:
+          error.message || "Failed to update transaction. Please try again.",
+      });
     }
   };
 
