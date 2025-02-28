@@ -18,13 +18,9 @@ import { EditTransactionDialog } from "@/components/EditTransactionDialog";
 export default function CashBookPage() {
   const {
     dailyCashTransactions,
-    transactions,
-    customers,
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
-    updateTransaction,
-    deleteTransaction,
   } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState(() => {
@@ -39,7 +35,7 @@ export default function CashBookPage() {
 
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
-      await updateTransaction(transactionId, updatedData);
+      await updateDailyCashTransaction(transactionId, updatedData);
     } catch (error) {
       console.error("Error updating transaction:", error);
       alert("Failed to update transaction. Please try again.");
@@ -59,68 +55,26 @@ export default function CashBookPage() {
     }
   };
 
-  const handleEditCustomerTransaction = async (transactionId, updatedData) => {
-    try {
-      await updateTransaction(transactionId, updatedData);
-    } catch (error) {
-      console.error("Error updating customer transaction:", error);
-      alert("Failed to update transaction. Please try again.");
+  // Calculate daily totals for cash transactions only
+  const dailySummary = dailyCashTransactions.reduce((acc, item) => {
+    const date = item.date;
+    if (!acc[date]) {
+      acc[date] = {
+        date,
+        cashIn: 0,
+        cashOut: 0,
+        balance: 0,
+        dailyCash: [],
+      };
     }
-  };
 
-  const handleDeleteCustomerTransaction = async (transactionId) => {
-    if (!window.confirm("Are you sure you want to delete this transaction?")) {
-      return;
-    }
+    acc[date].cashIn += item.cashIn || 0;
+    acc[date].cashOut += item.cashOut || 0;
+    acc[date].balance = acc[date].cashIn - acc[date].cashOut;
+    acc[date].dailyCash.push(item);
 
-    try {
-      await deleteTransaction(transactionId);
-    } catch (error) {
-      console.error("Error deleting customer transaction:", error);
-      alert("Failed to delete transaction. Please try again.");
-    }
-  };
-
-  // Calculate combined daily totals
-  const dailySummary = [...dailyCashTransactions, ...transactions].reduce(
-    (acc, item) => {
-      const date = item.date;
-      if (!acc[date]) {
-        acc[date] = {
-          date,
-          cashIn: 0,
-          cashOut: 0,
-          balance: 0,
-          transactions: [],
-          dailyCash: [],
-        };
-      }
-
-      // Handle different types of transactions
-      if ("deposit" in item) {
-        // This is a customer transaction
-        acc[date].cashIn += item.deposit || 0;
-        acc[date].cashOut += 0;
-        acc[date].transactions.push({
-          ...item,
-          type: "transaction",
-          description: `${item.memoNumber} - ${item.details}`,
-        });
-      } else {
-        // This is a daily cash transaction
-        acc[date].cashIn += item.cashIn || 0;
-        acc[date].cashOut += item.cashOut || 0;
-        acc[date].dailyCash.push({
-          ...item,
-          type: "dailyCash",
-        });
-      }
-
-      acc[date].balance = acc[date].cashIn - acc[date].cashOut;
-      return acc;
-    },
-    {}
-  );
+    return acc;
+  }, {});
 
   const dailyCash = Object.values(dailySummary).sort(
     (a, b) => new Date(b.date) - new Date(a.date)
@@ -128,20 +82,16 @@ export default function CashBookPage() {
 
   // Update financial summary calculation
   const financials = {
-    totalCashIn: Object.values(dailySummary).reduce(
-      (sum, day) => sum + day.cashIn,
+    totalCashIn: dailyCashTransactions.reduce(
+      (sum, t) => sum + (t.cashIn || 0),
       0
     ),
-    totalCashOut: Object.values(dailySummary).reduce(
-      (sum, day) => sum + day.cashOut,
+    totalCashOut: dailyCashTransactions.reduce(
+      (sum, t) => sum + (t.cashOut || 0),
       0
     ),
-    availableCash: Object.values(dailySummary).reduce(
-      (sum, day) => sum + (day.cashIn - day.cashOut),
-      0
-    ),
-    totalReceivables: transactions.reduce(
-      (sum, t) => sum + ((t.total || 0) - (t.deposit || 0)),
+    availableCash: dailyCashTransactions.reduce(
+      (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
       0
     ),
   };
@@ -149,7 +99,7 @@ export default function CashBookPage() {
   // Filter transactions
   const filteredCash = dailyCash.filter((day) => {
     const matchesSearch = searchTerm
-      ? day.transactions.some((t) =>
+      ? day.dailyCash.some((t) =>
           t.description.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : true;
@@ -158,11 +108,6 @@ export default function CashBookPage() {
 
     return matchesSearch && matchesDate;
   });
-
-  const getCustomerName = (customerId) => {
-    const customer = customers.find((c) => c.id === customerId);
-    return customer ? customer.name : "";
-  };
 
   return (
     <div className="p-8">
@@ -200,8 +145,8 @@ export default function CashBookPage() {
         )}
       </div>
 
-      {/* Add Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm text-gray-500">Total Cash In</h3>
           <p className="text-2xl font-bold text-green-600">
@@ -222,12 +167,6 @@ export default function CashBookPage() {
             }`}
           >
             ৳{financials.availableCash.toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-sm text-gray-500">Total Receivables</h3>
-          <p className="text-2xl font-bold text-blue-600">
-            ৳{financials.totalReceivables.toLocaleString()}
           </p>
         </div>
       </div>
@@ -257,7 +196,6 @@ export default function CashBookPage() {
                 ৳{day.balance.toLocaleString()}
               </TableCell>
               <TableCell>
-                {/* Daily Cash Transactions */}
                 {day.dailyCash.map((t) => (
                   <div
                     key={t.id}
@@ -268,7 +206,6 @@ export default function CashBookPage() {
                       {t.cashIn > 0 && ` ৳+${t.cashIn.toLocaleString()}`}
                       {t.cashOut > 0 && ` ৳-${t.cashOut.toLocaleString()}`}
                     </div>
-
                     <div className="flex gap-2">
                       <EditCashTransactionDialog
                         transaction={t}
@@ -283,49 +220,6 @@ export default function CashBookPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteTransaction(t.id);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Customer Transactions */}
-                {day.transactions.map((t) => (
-                  <div
-                    key={t.id}
-                    className="text-sm flex items-center justify-between border-b border-gray-100 py-1 bg-gray-50"
-                  >
-                    <div>
-                      <span className="font-medium text-blue-600">
-                        {getCustomerName(t.customerId)}
-                      </span>
-                      <span className="ml-2">{t.description}</span>
-                      <span className="ml-2 text-green-600">
-                        ৳+{t.deposit?.toLocaleString() || 0}
-                      </span>
-                      {t.due > 0 && (
-                        <span className="ml-2 text-red-600">
-                          ৳-{t.due.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <EditTransactionDialog
-                        transaction={t}
-                        onEditTransaction={(updated) =>
-                          handleEditCustomerTransaction(t.id, updated)
-                        }
-                        customerName={getCustomerName(t.customerId)}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCustomerTransaction(t.id);
                         }}
                       >
                         Delete

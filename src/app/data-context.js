@@ -19,6 +19,9 @@ export function DataProvider({ children }) {
   const [customers, setCustomers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [dailyCashTransactions, setDailyCashTransactions] = useState([]);
+  const [fabricBatches, setFabricBatches] = useState([]);
+  const [fabrics, setFabrics] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -97,6 +100,54 @@ export function DataProvider({ children }) {
         }
       });
       unsubscribers.push(unsubDailyCash);
+
+      // Subscribe to fabricBatches data
+      const fabricBatchesRef = ref(db, "fabricBatches");
+      const unsubFabricBatches = onValue(fabricBatchesRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const batchesData = snapshot.val();
+          const batchesList = Object.entries(batchesData).map(([id, data]) => ({
+            id,
+            ...data,
+          }));
+          setFabricBatches(batchesList);
+        }
+      });
+      unsubscribers.push(unsubFabricBatches);
+
+      // Subscribe to fabrics data
+      const fabricsRef = ref(db, "fabrics");
+      const unsubFabrics = onValue(fabricsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const fabricsData = snapshot.val();
+          const fabricsList = Object.entries(fabricsData).map(([id, data]) => ({
+            id,
+            ...data,
+          }));
+          setFabrics(fabricsList);
+        } else {
+          setFabrics([]);
+        }
+      });
+      unsubscribers.push(unsubFabrics);
+
+      // Subscribe to suppliers data
+      const suppliersRef = ref(db, "suppliers");
+      const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const suppliersData = snapshot.val();
+          const suppliersList = Object.entries(suppliersData).map(
+            ([id, data]) => ({
+              id,
+              ...data,
+            })
+          );
+          setSuppliers(suppliersList);
+        } else {
+          setSuppliers([]);
+        }
+      });
+      unsubscribers.push(unsubSuppliers);
     } catch (err) {
       console.error("Error setting up Firebase listeners:", err);
       setError(err.message);
@@ -226,10 +277,69 @@ export function DataProvider({ children }) {
     }
   };
 
+  const addFabric = async (fabricData) => {
+    try {
+      const fabricRef = ref(db, "fabrics");
+      await push(fabricRef, fabricData);
+    } catch (error) {
+      console.error("Error adding fabric:", error);
+      throw error;
+    }
+  };
+
+  const addFabricBatch = async (batchData) => {
+    try {
+      const batchRef = ref(db, "fabricBatches");
+      await push(batchRef, {
+        ...batchData,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error adding fabric batch:", error);
+      throw error;
+    }
+  };
+
+  const addSupplier = async (supplierData) => {
+    try {
+      const supplierRef = ref(db, "suppliers");
+      await push(supplierRef, supplierData);
+    } catch (error) {
+      console.error("Error adding supplier:", error);
+      throw error;
+    }
+  };
+
+  const deleteSupplier = async (supplierId) => {
+    try {
+      const supplierRef = ref(db, `suppliers/${supplierId}`);
+      await remove(supplierRef);
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      throw error;
+    }
+  };
+
+  const updateSupplier = async (supplierId, updates) => {
+    try {
+      const supplierRef = ref(db, `suppliers/${supplierId}`);
+      await update(supplierRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      throw error;
+    }
+  };
+
   const contextValue = {
     customers,
     transactions,
     dailyCashTransactions,
+    fabricBatches,
+    fabrics,
+    suppliers,
     loading,
     error,
     getCustomerDue: (customerId) => {
@@ -259,6 +369,32 @@ export function DataProvider({ children }) {
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
     updateCustomer,
+    addFabric,
+    addFabricBatch,
+    addSupplier,
+    deleteSupplier,
+    updateFabric: async (fabricId, updatedData) => {
+      try {
+        const fabricRef = ref(db, `fabrics/${fabricId}`);
+        await update(fabricRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Error updating fabric:", error);
+        throw error;
+      }
+    },
+    deleteFabric: async (fabricId) => {
+      try {
+        const fabricRef = ref(db, `fabrics/${fabricId}`);
+        await remove(fabricRef);
+      } catch (error) {
+        console.error("Error deleting fabric:", error);
+        throw error;
+      }
+    },
+    updateSupplier,
   };
 
   return (

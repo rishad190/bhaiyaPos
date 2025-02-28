@@ -67,7 +67,19 @@ export function Navbar() {
             >
               Cash Book
             </Link>
-            <Button variant="outline">Export Data</Button>
+            <Link
+              href="/suppliers"
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Suppliers
+            </Link>
+            <Link
+              href="/inventory"
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Inventory
+            </Link>
+
             <Button>Settings</Button>
             <Button variant="ghost" onClick={handleLogout}>
               Logout
@@ -100,9 +112,19 @@ export function Navbar() {
             >
               Cash Book
             </Link>
-            <Button variant="outline" className="w-full justify-start">
-              Export Data
-            </Button>
+            <Link
+              href="/suppliers"
+              className="block px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+            >
+              Suppliers
+            </Link>
+            <Link
+              href="/inventory"
+              className="block px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+            >
+              Inventory
+            </Link>
+
             <Button className="w-full justify-start">Settings</Button>
             <Button
               variant="ghost"
