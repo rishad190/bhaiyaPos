@@ -79,6 +79,12 @@ export function Navbar() {
             >
               Inventory
             </Link>
+            <Link
+              href="/cashmemo"
+              className="text-gray-700 hover:text-gray-900"
+            >
+              Cash Memo
+            </Link>
 
             <Button>Settings</Button>
             <Button variant="ghost" onClick={handleLogout}>

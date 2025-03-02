@@ -120,6 +120,8 @@ export default function InventoryPage() {
   const handleDeleteFabric = async (fabricId) => {
     try {
       if (window.confirm("Are you sure you want to delete this fabric?")) {
+        console.log(fabricId);
+
         await deleteFabric(fabricId);
       }
     } catch (error) {
@@ -176,7 +178,11 @@ export default function InventoryPage() {
         </TableHeader>
         <TableBody>
           {stockValues?.map((stock) => (
-            <TableRow key={stock.id}>
+            <TableRow
+              key={stock.id}
+              className="cursor-pointer hover:bg-gray-50"
+              onClick={() => router.push(`/inventory/${stock.id}`)}
+            >
               <TableCell>{stock.code}</TableCell>
               <TableCell>{stock.name}</TableCell>
               <TableCell className="text-right">
@@ -197,20 +203,14 @@ export default function InventoryPage() {
                   ))}
                 </TableCell>
               )}
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <div className="flex gap-2">
                   <EditFabricDialog
                     fabric={stock}
                     onSave={handleEditFabric}
                     onDelete={handleDeleteFabric}
                   />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push(`/inventory/${stock.id}`)}
-                  >
-                    View
-                  </Button>
+
                   <SellFabricDialog
                     fabric={stock}
                     onSellFabric={handleSellFabric}

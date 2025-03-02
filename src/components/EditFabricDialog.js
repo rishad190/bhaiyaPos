@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,113 +23,157 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
     code: fabric?.code || "",
     name: fabric?.name || "",
     description: fabric?.description || "",
-    unit: fabric?.unit || "Meter",
-    category: fabric?.category || "Cotton",
+    unit: fabric?.unit || "METER",
+    category: fabric?.category || "COTTON",
   });
+  const [errors, setErrors] = useState({});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.code?.trim()) newErrors.code = "Code is required";
+    if (!formData.name?.trim()) newErrors.name = "Name is required";
+    if (!formData.unit) newErrors.unit = "Unit is required";
+    if (!formData.category) newErrors.category = "Category is required";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave(fabric.id, formData);
-    setOpen(false);
+    if (!validate()) return;
+
+    try {
+      await onSave(fabric.id, {
+        ...formData,
+        code: formData.code.toUpperCase(),
+        updatedAt: new Date().toISOString(),
+      });
+      setOpen(false);
+    } catch (error) {
+      setErrors({ submit: error.message });
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm("Are you sure you want to delete this fabric?")) {
-      onDelete(fabric.id);
-      setOpen(false);
+      try {
+        await onDelete(fabric.id);
+        setOpen(false);
+      } catch (error) {
+        setErrors({ submit: error.message });
+      }
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) setErrors({});
+      }}
+    >
+      <DialogTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="sm">
           Edit
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Edit Fabric Details</DialogTitle>
         </DialogHeader>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="code">Fabric Code</Label>
+            <label className="text-sm font-medium">Fabric Code *</label>
             <Input
-              id="code"
-              name="code"
               value={formData.code}
-              onChange={handleChange}
-              required
+              onChange={(e) =>
+                setFormData({ ...formData, code: e.target.value })
+              }
+              className={errors.code ? "border-red-500" : ""}
+              placeholder="Enter fabric code"
             />
+            {errors.code && (
+              <p className="text-sm text-red-500">{errors.code}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Fabric Name</Label>
+            <label className="text-sm font-medium">Name *</label>
             <Input
-              id="name"
-              name="name"
               value={formData.name}
-              onChange={handleChange}
-              required
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className={errors.name ? "border-red-500" : ""}
+              placeholder="Enter fabric name"
             />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <label className="text-sm font-medium">Description</label>
             <Input
-              id="description"
-              name="description"
               value={formData.description}
-              onChange={handleChange}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              placeholder="Enter description"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Unit of Measurement</Label>
+            <label className="text-sm font-medium">Unit *</label>
             <Select
               value={formData.unit}
               onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, unit: value }))
+                setFormData({ ...formData, unit: value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className={errors.unit ? "border-red-500" : ""}>
                 <SelectValue placeholder="Select unit" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Meter">Meter</SelectItem>
-                <SelectItem value="Yard">Yard</SelectItem>
-                <SelectItem value="Roll">Roll</SelectItem>
-                <SelectItem value="Piece">Piece</SelectItem>
+                <SelectItem value="METER">Meter</SelectItem>
+                <SelectItem value="YARD">Yard</SelectItem>
+                <SelectItem value="PIECE">Piece</SelectItem>
               </SelectContent>
             </Select>
+            {errors.unit && (
+              <p className="text-sm text-red-500">{errors.unit}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <label className="text-sm font-medium">Category *</label>
             <Select
               value={formData.category}
               onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, category: value }))
+                setFormData({ ...formData, category: value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger
+                className={errors.category ? "border-red-500" : ""}
+              >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Cotton">Cotton</SelectItem>
-                <SelectItem value="Polyester">Polyester</SelectItem>
-                <SelectItem value="Silk">Silk</SelectItem>
-                <SelectItem value="Linen">Linen</SelectItem>
-                <SelectItem value="Wool">Wool</SelectItem>
+                <SelectItem value="COTTON">Cotton</SelectItem>
+                <SelectItem value="POLYESTER">Polyester</SelectItem>
+                <SelectItem value="MIXED">Mixed</SelectItem>
               </SelectContent>
             </Select>
+            {errors.category && (
+              <p className="text-sm text-red-500">{errors.category}</p>
+            )}
           </div>
+
+          {errors.submit && (
+            <p className="text-sm text-red-500">{errors.submit}</p>
+          )}
 
           <div className="flex justify-between">
             <Button type="button" variant="destructive" onClick={handleDelete}>
