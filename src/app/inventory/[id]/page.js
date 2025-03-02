@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EditBatchDialog } from "@/components/EditBatchDialog";
 
 export default function FabricViewPage() {
   const router = useRouter();
@@ -99,6 +100,26 @@ export default function FabricViewPage() {
     }
   };
 
+  const handleEditBatch = async (batchId, updates) => {
+    try {
+      await updateFabricBatch(batchId, updates);
+    } catch (error) {
+      console.error("Error updating batch:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteBatch = async (batchId) => {
+    if (window.confirm("Are you sure you want to delete this batch?")) {
+      try {
+        await deleteFabricBatch(batchId);
+      } catch (error) {
+        console.error("Error deleting batch:", error);
+        alert("Failed to delete batch. Please try again.");
+      }
+    }
+  };
+
   return (
     <div className="p-8 space-y-6">
       {/* Header Section */}
@@ -166,6 +187,7 @@ export default function FabricViewPage() {
                 <TableHead>Purchase Price</TableHead>
                 <TableHead>Quantity</TableHead>
                 <TableHead>Supplier</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -179,6 +201,23 @@ export default function FabricViewPage() {
                     {batch.quantity} {fabric.unit}
                   </TableCell>
                   <TableCell>{batch.supplierId}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <EditBatchDialog
+                        batch={batch}
+                        fabric={fabric}
+                        onSave={handleEditBatch}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500"
+                        onClick={() => handleDeleteBatch(batch.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

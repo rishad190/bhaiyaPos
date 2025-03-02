@@ -26,12 +26,6 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
     if (!formData.date) newErrors.date = "Date is required";
     if (!formData.invoiceNumber?.trim())
       newErrors.invoiceNumber = "Invoice number is required";
-    if (!formData.totalAmount || formData.totalAmount <= 0) {
-      newErrors.totalAmount = "Total amount must be greater than 0";
-    }
-    if (formData.paidAmount > formData.totalAmount) {
-      newErrors.paidAmount = "Paid amount cannot exceed total amount";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

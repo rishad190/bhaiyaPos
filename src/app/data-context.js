@@ -206,6 +206,27 @@ export function DataProvider({ children }) {
         createdAt: serverTimestamp(),
       });
     },
+
+    deleteFabricBatch: async (batchId) => {
+      try {
+        // Get the batch data first to update fabric totals
+        const batchRef = ref(
+          db,
+          `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
+        );
+        const batchSnapshot = await get(batchRef);
+
+        if (!batchSnapshot.exists()) {
+          throw new Error("Batch not found");
+        }
+
+        // Delete the batch
+        await remove(batchRef);
+      } catch (error) {
+        console.error("Error deleting fabric batch:", error);
+        throw error;
+      }
+    },
   };
 
   // Supplier Operations
