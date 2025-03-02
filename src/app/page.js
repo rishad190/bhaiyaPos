@@ -15,19 +15,20 @@ import {
 import { AddCustomerDialog } from "@/components/AddCustomerDialog";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
-import { useData } from "./data-context";
+import { useData } from "@/app/data-context";
 import { EditCustomerDialog } from "@/components/EditCustomerDialog";
 
 export default function Dashboard() {
   const router = useRouter();
   const {
     customers,
+    transactions,
     loading,
     error,
+    addCustomer,
+    updateCustomer,
     deleteCustomer,
     getCustomerDue,
-    transactions,
-    updateCustomer,
   } = useData();
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,10 +92,6 @@ export default function Dashboard() {
       // Empty if block
     }
   }, [mounted, customers]);
-
-  if (loading || !mounted) {
-    return <LoadingSpinner />;
-  }
 
   if (error) {
     return (

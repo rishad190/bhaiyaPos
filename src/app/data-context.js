@@ -8,393 +8,391 @@ import {
   remove,
   update,
   serverTimestamp,
+  get,
 } from "firebase/database";
 import { db } from "@/lib/firebase";
 
 // Create context
 const DataContext = createContext(null);
 
+// Firebase References
+const COLLECTION_REFS = {
+  CUSTOMERS: "customers",
+  TRANSACTIONS: "transactions",
+  DAILY_CASH: "dailyCash",
+  FABRIC_BATCHES: "fabricBatches",
+  FABRICS: "fabrics",
+  SUPPLIERS: "suppliers",
+  SUPPLIER_TRANSACTIONS: "supplierTransactions",
+};
+
 // Export the provider component
 export function DataProvider({ children }) {
-  const [customers, setCustomers] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [dailyCashTransactions, setDailyCashTransactions] = useState([]);
-  const [fabricBatches, setFabricBatches] = useState([]);
-  const [fabrics, setFabrics] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // State Management
+  const [state, setState] = useState({
+    customers: [],
+    transactions: [],
+    dailyCashTransactions: [],
+    fabricBatches: [],
+    fabrics: [],
+    suppliers: [],
+    supplierTransactions: [],
+    loading: true,
+    error: null,
+  });
 
+  // Firebase Subscriptions
   useEffect(() => {
     const unsubscribers = [];
+    const collections = [
+      {
+        path: COLLECTION_REFS.CUSTOMERS,
+        setter: (data) => setState((prev) => ({ ...prev, customers: data })),
+      },
+      {
+        path: COLLECTION_REFS.TRANSACTIONS,
+        setter: (data) => setState((prev) => ({ ...prev, transactions: data })),
+      },
+      {
+        path: COLLECTION_REFS.DAILY_CASH,
+        setter: (data) =>
+          setState((prev) => ({ ...prev, dailyCashTransactions: data })),
+      },
+      {
+        path: COLLECTION_REFS.FABRIC_BATCHES,
+        setter: (data) =>
+          setState((prev) => ({ ...prev, fabricBatches: data })),
+      },
+      {
+        path: COLLECTION_REFS.FABRICS,
+        setter: (data) => setState((prev) => ({ ...prev, fabrics: data })),
+      },
+      {
+        path: COLLECTION_REFS.SUPPLIERS,
+        setter: (data) => setState((prev) => ({ ...prev, suppliers: data })),
+      },
+    ];
 
     try {
-      // Subscribe to customers data
-      const customersRef = ref(db, "customers");
-      const unsubCustomers = onValue(
-        customersRef,
-        (snapshot) => {
-          try {
-            const data = snapshot.val();
-            const customersArray = data
-              ? Object.entries(data).map(([id, value]) => ({
-                  id,
-                  ...value,
-                }))
-              : [];
-            setCustomers(customersArray);
-          } catch (err) {
-            console.error("Error processing customers data:", err);
-            setError(err.message);
-          }
-        },
-        (error) => {
-          console.error("Customers subscription error:", error);
-          setError(error.message);
-        }
-      );
-      unsubscribers.push(unsubCustomers);
-
-      // Subscribe to transactions data
-      const transactionsRef = ref(db, "transactions");
-      const unsubTransactions = onValue(
-        transactionsRef,
-        (snapshot) => {
-          try {
-            const data = snapshot.val();
-            const transactionsArray = data
-              ? Object.entries(data).map(([id, value]) => ({
-                  id,
-                  ...value,
-                }))
-              : [];
-            setTransactions(transactionsArray);
-          } catch (err) {
-            console.error("Error processing transactions data:", err);
-            setError(err.message);
-          }
-          setLoading(false);
-        },
-        (error) => {
-          console.error("Transactions subscription error:", error);
-          setError(error.message);
-          setLoading(false);
-        }
-      );
-      unsubscribers.push(unsubTransactions);
-
-      // Subscribe to dailyCash data
-      const dailyCashRef = ref(db, "dailyCash");
-      const unsubDailyCash = onValue(dailyCashRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const transactions = Object.entries(data).map(
-            ([id, transaction]) => ({
+      collections.forEach(({ path, setter }) => {
+        const collectionRef = ref(db, path);
+        const unsubscribe = onValue(collectionRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const data = Object.entries(snapshot.val()).map(([id, value]) => ({
               id,
-              ...transaction,
-            })
-          );
-          setDailyCashTransactions(transactions);
-        } else {
-          setDailyCashTransactions([]);
-        }
+              ...value,
+            }));
+            setter(data);
+          } else {
+            setter([]);
+          }
+        });
+        unsubscribers.push(unsubscribe);
       });
-      unsubscribers.push(unsubDailyCash);
-
-      // Subscribe to fabricBatches data
-      const fabricBatchesRef = ref(db, "fabricBatches");
-      const unsubFabricBatches = onValue(fabricBatchesRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const batchesData = snapshot.val();
-          const batchesList = Object.entries(batchesData).map(([id, data]) => ({
-            id,
-            ...data,
-          }));
-          setFabricBatches(batchesList);
-        }
-      });
-      unsubscribers.push(unsubFabricBatches);
-
-      // Subscribe to fabrics data
-      const fabricsRef = ref(db, "fabrics");
-      const unsubFabrics = onValue(fabricsRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const fabricsData = snapshot.val();
-          const fabricsList = Object.entries(fabricsData).map(([id, data]) => ({
-            id,
-            ...data,
-          }));
-          setFabrics(fabricsList);
-        } else {
-          setFabrics([]);
-        }
-      });
-      unsubscribers.push(unsubFabrics);
-
-      // Subscribe to suppliers data
-      const suppliersRef = ref(db, "suppliers");
-      const unsubSuppliers = onValue(suppliersRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const suppliersData = snapshot.val();
-          const suppliersList = Object.entries(suppliersData).map(
-            ([id, data]) => ({
-              id,
-              ...data,
-            })
-          );
-          setSuppliers(suppliersList);
-        } else {
-          setSuppliers([]);
-        }
-      });
-      unsubscribers.push(unsubSuppliers);
     } catch (err) {
       console.error("Error setting up Firebase listeners:", err);
-      setError(err.message);
-      setLoading(false);
+      setState((prev) => ({ ...prev, error: err.message, loading: false }));
     }
+
+    const supplierTransactionsRef = ref(
+      db,
+      COLLECTION_REFS.SUPPLIER_TRANSACTIONS
+    );
+    const unsubscribe = onValue(supplierTransactionsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
+          id,
+          ...value,
+        }));
+        setState((prev) => ({ ...prev, supplierTransactions: data }));
+      } else {
+        setState((prev) => ({ ...prev, supplierTransactions: [] }));
+      }
+    });
+    unsubscribers.push(unsubscribe);
 
     return () => unsubscribers.forEach((unsub) => unsub());
   }, []);
 
-  const addTransaction = async (transactionData) => {
-    try {
-      const transactionsRef = ref(db, "transactions");
+  // Customer Operations
+  const customerOperations = {
+    addCustomer: async (customerData) => {
+      const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
+      const newCustomerRef = push(customersRef);
+      await set(newCustomerRef, {
+        ...customerData,
+        createdAt: new Date().toISOString(),
+      });
+      return newCustomerRef.key;
+    },
+
+    updateCustomer: async (customerId, updatedData) => {
+      const customerRef = ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
+      await update(customerRef, {
+        ...updatedData,
+        updatedAt: serverTimestamp(),
+      });
+    },
+
+    deleteCustomer: async (customerId) => {
+      // First delete associated transactions
+      const customerTransactions = state.transactions.filter(
+        (t) => t.customerId === customerId
+      );
+      for (const transaction of customerTransactions) {
+        await remove(
+          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+        );
+      }
+      // Then delete the customer
+      await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
+    },
+
+    getCustomerDue: (customerId) => {
+      return state.transactions
+        .filter((t) => t.customerId === customerId)
+        .reduce((total, t) => total + (parseFloat(t.due) || 0), 0);
+    },
+  };
+
+  // Transaction Operations
+  const transactionOperations = {
+    addTransaction: async (transactionData) => {
+      const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
       const newTransactionRef = push(transactionsRef);
       await set(newTransactionRef, {
         ...transactionData,
         createdAt: new Date().toISOString(),
       });
       return newTransactionRef.key;
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-      throw error;
-    }
-  };
+    },
 
-  const deleteTransaction = async (transactionId) => {
-    try {
-      const transactionRef = ref(db, `transactions/${transactionId}`);
-      await remove(transactionRef);
-      // Update local state immediately for better UX
-      setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
-    } catch (error) {
-      console.error("Error deleting transaction:", error);
-      throw error;
-    }
-  };
-
-  const deleteCustomer = async (customerId) => {
-    try {
-      // First, delete all transactions associated with this customer
-      const customerTransactions = transactions.filter(
-        (t) => t.customerId === customerId
+    updateTransaction: async (transactionId, updatedData) => {
+      const transactionRef = ref(
+        db,
+        `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
       );
-
-      for (const transaction of customerTransactions) {
-        const transactionRef = ref(db, `transactions/${transaction.id}`);
-        await remove(transactionRef);
-      }
-
-      // Then delete the customer
-      const customerRef = ref(db, `customers/${customerId}`);
-      await remove(customerRef);
-    } catch (error) {
-      console.error("Error deleting customer:", error);
-      throw error;
-    }
-  };
-
-  const updateTransaction = async (transactionId, updatedData) => {
-    console.log("Updating transaction:", transactionId, updatedData);
-
-    try {
-      if (!transactionId) throw new Error("Transaction ID is required");
-
-      const transactionRef = ref(db, `transactions/${transactionId}`);
       await update(transactionRef, {
         ...updatedData,
         updatedAt: serverTimestamp(),
       });
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      throw error;
-    }
+    },
+
+    deleteTransaction: async (transactionId) => {
+      await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
+    },
   };
 
-  const addDailyCashTransaction = async (transaction) => {
-    try {
-      // Generate a new push ID
-      const newTransactionRef = push(ref(db, "dailyCash"));
-      const newId = newTransactionRef.key;
+  // Fabric Operations
+  const fabricOperations = {
+    addFabric: async (fabricData) => {
+      await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
+    },
 
-      // Add the transaction with the generated ID
-      await set(newTransactionRef, {
-        ...transaction,
-        id: newId, // Include the push ID in the data
-        createdAt: serverTimestamp(),
-      });
-
-      return newId; // Return the new ID for potential use
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-      throw error;
-    }
-  };
-
-  const updateDailyCashTransaction = async (transactionId, updates) => {
-    try {
-      const transactionRef = ref(db, `dailyCash/${transactionId}`);
-      await update(transactionRef, updates);
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      throw error;
-    }
-  };
-
-  const deleteDailyCashTransaction = async (transactionId) => {
-    console.log(transactionId);
-
-    try {
-      const transactionRef = ref(db, `dailyCash/${transactionId}`);
-      await remove(transactionRef);
-    } catch (error) {
-      console.error("Error deleting transaction:", error);
-      throw error;
-    }
-  };
-
-  const updateCustomer = async (customerId, updatedData) => {
-    try {
-      const customerRef = ref(db, `customers/${customerId}`);
-      await update(customerRef, {
+    updateFabric: async (fabricId, updatedData) => {
+      await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
         ...updatedData,
         updatedAt: serverTimestamp(),
       });
-    } catch (error) {
-      console.error("Error updating customer:", error);
-      throw error;
-    }
-  };
+    },
 
-  const addFabric = async (fabricData) => {
-    try {
-      const fabricRef = ref(db, "fabrics");
-      await push(fabricRef, fabricData);
-    } catch (error) {
-      console.error("Error adding fabric:", error);
-      throw error;
-    }
-  };
+    deleteFabric: async (fabricId) => {
+      await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+    },
 
-  const addFabricBatch = async (batchData) => {
-    try {
-      const batchRef = ref(db, "fabricBatches");
-      await push(batchRef, {
+    addFabricBatch: async (batchData) => {
+      await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
         ...batchData,
         createdAt: serverTimestamp(),
       });
-    } catch (error) {
-      console.error("Error adding fabric batch:", error);
-      throw error;
-    }
-  };
-
-  const addSupplier = async (supplierData) => {
-    try {
-      const supplierRef = ref(db, "suppliers");
-      await push(supplierRef, supplierData);
-    } catch (error) {
-      console.error("Error adding supplier:", error);
-      throw error;
-    }
-  };
-
-  const deleteSupplier = async (supplierId) => {
-    try {
-      const supplierRef = ref(db, `suppliers/${supplierId}`);
-      await remove(supplierRef);
-    } catch (error) {
-      console.error("Error deleting supplier:", error);
-      throw error;
-    }
-  };
-
-  const updateSupplier = async (supplierId, updates) => {
-    try {
-      const supplierRef = ref(db, `suppliers/${supplierId}`);
-      await update(supplierRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("Error updating supplier:", error);
-      throw error;
-    }
-  };
-
-  const contextValue = {
-    customers,
-    transactions,
-    dailyCashTransactions,
-    fabricBatches,
-    fabrics,
-    suppliers,
-    loading,
-    error,
-    getCustomerDue: (customerId) => {
-      return transactions
-        .filter((t) => t.customerId === customerId)
-        .reduce((total, t) => total + (parseFloat(t.due) || 0), 0);
     },
-    addCustomer: async (customerData) => {
+  };
+
+  // Supplier Operations
+  const supplierOperations = {
+    addSupplier: async (supplierData) => {
       try {
-        const customersRef = ref(db, "customers");
-        const newCustomerRef = push(customersRef);
-        await set(newCustomerRef, {
-          ...customerData,
-          createdAt: new Date().toISOString(),
+        const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
+        const newSupplierRef = push(suppliersRef);
+        await set(newSupplierRef, {
+          ...supplierData,
+          totalDue: 0,
+          createdAt: serverTimestamp(),
         });
-        return newCustomerRef.key;
+        return newSupplierRef.key;
       } catch (error) {
-        console.error("Error adding customer:", error);
+        console.error("Error adding supplier:", error);
         throw error;
       }
     },
-    addTransaction,
-    deleteTransaction,
-    deleteCustomer,
-    updateTransaction,
-    addDailyCashTransaction,
-    updateDailyCashTransaction,
-    deleteDailyCashTransaction,
-    updateCustomer,
-    addFabric,
-    addFabricBatch,
-    addSupplier,
-    deleteSupplier,
-    updateFabric: async (fabricId, updatedData) => {
+
+    updateSupplier: async (supplierId, updatedData) => {
       try {
-        const fabricRef = ref(db, `fabrics/${fabricId}`);
-        await update(fabricRef, {
+        const supplierRef = ref(
+          db,
+          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+        );
+        await update(supplierRef, {
           ...updatedData,
           updatedAt: serverTimestamp(),
         });
       } catch (error) {
-        console.error("Error updating fabric:", error);
+        console.error("Error updating supplier:", error);
         throw error;
       }
     },
-    deleteFabric: async (fabricId) => {
+
+    deleteSupplier: async (supplierId) => {
       try {
-        const fabricRef = ref(db, `fabrics/${fabricId}`);
-        await remove(fabricRef);
+        // First delete associated transactions
+        const supplierTransactions = state.transactions.filter(
+          (t) => t.supplierId === supplierId
+        );
+
+        for (const transaction of supplierTransactions) {
+          await remove(
+            ref(
+              db,
+              `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
+            )
+          );
+        }
+
+        // Then delete the supplier
+        await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
       } catch (error) {
-        console.error("Error deleting fabric:", error);
+        console.error("Error deleting supplier:", error);
         throw error;
       }
     },
-    updateSupplier,
+
+    addSupplierTransaction: async (transaction) => {
+      try {
+        const transactionsRef = ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS);
+        const newTransactionRef = push(transactionsRef);
+
+        const newTransaction = {
+          ...transaction,
+          id: newTransactionRef.key,
+          due: transaction.totalAmount - (transaction.paidAmount || 0),
+          createdAt: serverTimestamp(),
+        };
+
+        await set(newTransactionRef, newTransaction);
+
+        // Update supplier's total due
+        const supplierRef = ref(
+          db,
+          `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
+        );
+        const supplierSnapshot = await get(supplierRef);
+
+        if (supplierSnapshot.exists()) {
+          const currentDue = supplierSnapshot.val().totalDue || 0;
+          await update(supplierRef, {
+            totalDue: currentDue + newTransaction.due,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        return newTransactionRef.key;
+      } catch (error) {
+        console.error("Error adding supplier transaction:", error);
+        throw error;
+      }
+    },
+
+    deleteSupplierTransaction: async (
+      transactionId,
+      supplierId,
+      amount,
+      paidAmount
+    ) => {
+      try {
+        // Delete transaction
+        await remove(
+          ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
+        );
+
+        // Update supplier's total due
+        const supplierRef = ref(
+          db,
+          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+        );
+        const supplierSnapshot = await get(supplierRef);
+
+        if (supplierSnapshot.exists()) {
+          const currentDue =
+            supplierSnapshot.val().totalDue - (amount - (paidAmount || 0));
+
+          await update(supplierRef, {
+            totalDue: currentDue - amount,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        console.error("Error deleting supplier transaction:", error);
+        throw error;
+      }
+    },
+  };
+
+  const dailyCashOperations = {
+    addDailyCashTransaction: async (transaction) => {
+      try {
+        const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
+        const newTransactionRef = push(dailyCashRef);
+        await set(newTransactionRef, {
+          ...transaction,
+          id: newTransactionRef.key,
+          createdAt: serverTimestamp(),
+        });
+        return newTransactionRef.key;
+      } catch (error) {
+        console.error("Error adding daily cash transaction:", error);
+        throw error;
+      }
+    },
+
+    deleteDailyCashTransaction: async (transactionId) => {
+      try {
+        const transactionRef = ref(
+          db,
+          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+        );
+        await remove(transactionRef);
+      } catch (error) {
+        console.error("Error deleting daily cash transaction:", error);
+        throw error;
+      }
+    },
+
+    updateDailyCashTransaction: async (transactionId, updatedData) => {
+      try {
+        const transactionRef = ref(
+          db,
+          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+        );
+        await update(transactionRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Error updating daily cash transaction:", error);
+        throw error;
+      }
+    },
+  };
+
+  const contextValue = {
+    // State
+    ...state,
+    // Operations
+    ...customerOperations,
+    ...transactionOperations,
+    ...fabricOperations,
+    ...supplierOperations,
+    ...dailyCashOperations, // Make sure this is included
   };
 
   return (

@@ -14,41 +14,43 @@ import { Label } from "@/components/ui/label";
 
 export function AddCashTransactionDialog({ onAddTransaction }) {
   const [open, setOpen] = useState(false);
-  const [transactionType, setTransactionType] = useState("cashOut");
+  const [transactionType, setTransactionType] = useState("cashIn");
+  const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
     amount: "",
   });
-  const [errors, setErrors] = useState({});
 
-  const validate = () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     const newErrors = {};
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.description)
+    if (!formData.description?.trim()) {
       newErrors.description = "Description is required";
+    }
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = "Please enter a valid amount";
     }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validate()) return;
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
-    const amount = parseFloat(formData.amount);
-    onAddTransaction({
-      id: Date.now().toString(),
-      date: formData.date,
-      description: formData.description,
-      cashIn: transactionType === "cashIn" ? amount : 0,
-      cashOut: transactionType === "cashOut" ? amount : 0,
-    });
-
-    setOpen(false);
-    resetForm();
+    try {
+      const amount = parseFloat(formData.amount) || 0;
+      await onAddTransaction({
+        ...formData,
+        cashIn: transactionType === "cashIn" ? amount : 0,
+        cashOut: transactionType === "cashOut" ? amount : 0,
+      });
+      setOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      setErrors({ submit: error.message });
+    }
   };
 
   const resetForm = () => {
@@ -57,11 +59,18 @@ export function AddCashTransactionDialog({ onAddTransaction }) {
       description: "",
       amount: "",
     });
+    setTransactionType("cashIn");
     setErrors({});
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) resetForm();
+      }}
+    >
       <DialogTrigger asChild>
         <Button>Add Cash Transaction</Button>
       </DialogTrigger>
@@ -138,6 +147,10 @@ export function AddCashTransactionDialog({ onAddTransaction }) {
               <p className="text-red-500 text-sm">{errors.amount}</p>
             )}
           </div>
+
+          {errors.submit && (
+            <p className="text-red-500 text-sm">{errors.submit}</p>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

@@ -25,6 +25,7 @@ export default function CustomerDetail() {
     addTransaction,
     deleteTransaction,
     updateTransaction,
+    getCustomerDue,
   } = useData();
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [storeFilter, setStoreFilter] = useState("all");

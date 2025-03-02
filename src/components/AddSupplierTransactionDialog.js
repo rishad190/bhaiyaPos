@@ -38,11 +38,11 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
       const transaction = {
         ...formData,
         supplierId,
-        totalAmount: parseFloat(formData.totalAmount),
+        totalAmount: parseFloat(formData.totalAmount) || 0,
         paidAmount: parseFloat(formData.paidAmount) || 0,
         due:
           parseFloat(formData.totalAmount) -
-          (parseFloat(formData.paidAmount) || 0),
+            (parseFloat(formData.paidAmount) || 0) || 0,
         createdAt: new Date().toISOString(),
       };
 
@@ -52,8 +52,8 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
         date: new Date().toISOString().split("T")[0],
         invoiceNumber: "",
         details: "",
-        totalAmount: "",
-        paidAmount: "",
+        totalAmount: 0,
+        paidAmount: 0,
       });
     } catch (error) {
       setErrors({ submit: error.message });

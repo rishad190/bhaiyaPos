@@ -13,14 +13,13 @@ import {
 import { formatDate } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
-import { EditTransactionDialog } from "@/components/EditTransactionDialog";
 
 export default function CashBookPage() {
   const {
     dailyCashTransactions,
     addDailyCashTransaction,
     updateDailyCashTransaction,
-    deleteDailyCashTransaction,
+    deleteDailyCashTransaction, // Make sure this is included
   } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState(() => {
@@ -29,8 +28,13 @@ export default function CashBookPage() {
     return today.toISOString().split("T")[0];
   });
 
-  const handleAddTransaction = (transaction) => {
-    addDailyCashTransaction(transaction);
+  const handleAddTransaction = async (transaction) => {
+    try {
+      await addDailyCashTransaction(transaction);
+    } catch (error) {
+      console.error("Error adding transaction:", error);
+      alert("Failed to add transaction. Please try again.");
+    }
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
@@ -46,6 +50,7 @@ export default function CashBookPage() {
     if (!window.confirm("Are you sure you want to delete this transaction?")) {
       return;
     }
+    console.log(transactionId);
 
     try {
       await deleteDailyCashTransaction(transactionId);

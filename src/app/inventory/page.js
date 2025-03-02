@@ -22,9 +22,22 @@ import { SellFabricDialog } from "@/components/SellFabricDialog";
 import { calculateFifoSale } from "@/lib/inventory-utils";
 import { AddFabricDialog } from "@/components/AddFabricDialog";
 import { PurchaseStockDialog } from "@/components/PurchaseStockDialog";
+import { EditFabricDialog } from "@/components/EditFabricDialog";
+import { useRouter } from "next/navigation";
 
 export default function InventoryPage() {
-  const { fabrics, fabricBatches, addFabric, addFabricBatch } = useData();
+  const router = useRouter();
+  const {
+    fabrics,
+    fabricBatches,
+    addFabric,
+    updateFabric,
+    deleteFabric,
+    addFabricBatch,
+    updateFabricBatch,
+    deleteFabricBatch,
+    addTransaction,
+  } = useData();
   const [viewMode, setViewMode] = useState("average");
 
   // Calculate stock values
@@ -52,19 +65,28 @@ export default function InventoryPage() {
       const fabric = stockValues.find((f) => f.id === fabricId);
       if (!fabric) throw new Error("Fabric not found");
 
+      // Calculate FIFO sale
       const result = calculateFifoSale(fabric.batches, quantity);
-      // Update your database here with result.updatedBatches
 
-      // Add transaction record
+      // Update batches in database
+      for (const batch of result.updatedBatches) {
+        if (batch.quantity > 0) {
+          await updateFabricBatch(batch.id, { quantity: batch.quantity });
+        } else {
+          await deleteFabricBatch(batch.id);
+        }
+      }
+
+      // Record sale transaction
       const saleTransaction = {
         fabricId,
         quantity,
         totalCost: result.totalCost,
         date: new Date().toISOString(),
-        type: "SALE",
+        type: "FABRIC_SALE",
         batches: result.costOfGoodsSold,
       };
-      // Save sale transaction to database
+      await addTransaction(saleTransaction);
     } catch (error) {
       console.error("Error selling fabric:", error);
       throw error;
@@ -73,27 +95,45 @@ export default function InventoryPage() {
 
   const handleAddFabric = async (fabricData) => {
     try {
-      // Add to your database
-      const newFabric = {
+      await addFabric({
         ...fabricData,
-        id: `FAB${Date.now()}`, // Generate a unique ID
-      };
-
-      await addFabric(newFabric); // Implement this in your data context
+        createdAt: new Date().toISOString(),
+      });
     } catch (error) {
       console.error("Error adding fabric:", error);
       throw error;
     }
   };
 
+  const handleEditFabric = async (fabricId, updatedData) => {
+    try {
+      await updateFabric(fabricId, {
+        ...updatedData,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error updating fabric:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteFabric = async (fabricId) => {
+    try {
+      if (window.confirm("Are you sure you want to delete this fabric?")) {
+        await deleteFabric(fabricId);
+      }
+    } catch (error) {
+      console.error("Error deleting fabric:", error);
+      throw error;
+    }
+  };
+
   const handlePurchaseStock = async (purchaseData) => {
     try {
-      const newBatch = {
-        id: `BAT${Date.now()}`,
+      await addFabricBatch({
         ...purchaseData,
-      };
-
-      await addFabricBatch(newBatch); // Implement this in your data context
+        createdAt: new Date().toISOString(),
+      });
     } catch (error) {
       console.error("Error purchasing stock:", error);
       throw error;
@@ -159,10 +199,16 @@ export default function InventoryPage() {
               )}
               <TableCell>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm">
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm">
+                  <EditFabricDialog
+                    fabric={stock}
+                    onSave={handleEditFabric}
+                    onDelete={handleDeleteFabric}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push(`/inventory/${stock.id}`)}
+                  >
                     View
                   </Button>
                   <SellFabricDialog

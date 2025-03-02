@@ -18,29 +18,14 @@ import { db } from "@/lib/firebase";
 
 export default function SuppliersPage() {
   const router = useRouter();
-  const { suppliers, addSupplier, deleteSupplier } = useData();
+  const {
+    suppliers,
+    supplierTransactions, // Change this from transactions
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
-  const [transactions, setTransactions] = useState([]);
-
-  useEffect(() => {
-    const transactionsRef = ref(db, "supplierTransactions");
-    const unsubTransactions = onValue(transactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const transactionsData = snapshot.val();
-        const transactionsList = Object.entries(transactionsData).map(
-          ([id, data]) => ({
-            id,
-            ...data,
-          })
-        );
-        setTransactions(transactionsList);
-      } else {
-        setTransactions([]);
-      }
-    });
-
-    return () => unsubTransactions();
-  }, []);
 
   const filteredSuppliers =
     suppliers?.filter(
@@ -49,24 +34,21 @@ export default function SuppliersPage() {
         supplier.phone.includes(searchTerm)
     ) || [];
 
+  // Update the totals calculation
   const totals = filteredSuppliers.reduce(
     (acc, supplier) => {
-      const supplierTransactions = transactions.filter(
-        (t) => t.supplierId === supplier.id
-      );
+      // Get all transactions for this supplier
+      const supplierTxns =
+        supplierTransactions?.filter((t) => t.supplierId === supplier.id) || [];
 
-      const supplierTotals = supplierTransactions.reduce(
-        (total, transaction) => {
-          total.totalAmount += transaction.totalAmount || 0;
-          total.paidAmount += transaction.paidAmount || 0;
-          return total;
-        },
-        { totalAmount: 0, paidAmount: 0 }
-      );
+      // Calculate totals for this supplier's transactions
+      supplierTxns.forEach((transaction) => {
+        acc.totalAmount += parseFloat(transaction.totalAmount) || 0;
+        acc.paidAmount += parseFloat(transaction.paidAmount) || 0;
+      });
 
-      acc.totalAmount += supplierTotals.totalAmount;
-      acc.paidAmount += supplierTotals.paidAmount;
-      acc.dueAmount += supplier.totalDue || 0;
+      // Due amount is the difference between total and paid
+      acc.dueAmount = acc.totalAmount - acc.paidAmount;
 
       return acc;
     },

@@ -27,9 +27,10 @@ const formatDate = (dateString) => {
 export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
+  const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
+
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const { updateSupplier } = useData();
 
   // Fetch supplier and transactions data
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function SupplierDetail() {
         supplierId: params.id,
         createdAt: new Date().toISOString(),
       };
+      console.log(newTransaction);
 
       await update(newTransactionRef, newTransaction);
 
@@ -93,15 +95,12 @@ export default function SupplierDetail() {
 
   const handleDeleteTransaction = async (transactionId, amount, paidAmount) => {
     try {
-      const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
-      await remove(transactionRef);
-
-      // Update supplier's total due
-      const newTotalDue = supplier.totalDue - (amount - (paidAmount || 0));
-      await updateSupplier(params.id, {
-        totalDue: newTotalDue,
-        updatedAt: new Date().toISOString(),
-      });
+      await deleteSupplierTransaction(
+        transactionId,
+        params.id,
+        amount,
+        paidAmount
+      );
     } catch (error) {
       console.error("Error deleting transaction:", error);
       throw error;
