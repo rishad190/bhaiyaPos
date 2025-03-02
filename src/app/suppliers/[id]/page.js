@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog";
 import { formatDate } from "@/lib/utils";
+import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog";
 
 export default function SupplierDetail() {
   const params = useParams();
@@ -106,9 +107,39 @@ export default function SupplierDetail() {
     }
   };
 
+  const handleEditTransaction = async (transactionId, updatedData) => {
+    try {
+      const oldTransaction = transactions.find((t) => t.id === transactionId);
+      const oldDue =
+        oldTransaction.totalAmount - (oldTransaction.paidAmount || 0);
+      const newDue = updatedData.totalAmount - (updatedData.paidAmount || 0);
+      const dueDifference = newDue - oldDue;
+
+      // Update transaction
+      const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
+      await update(transactionRef, updatedData);
+
+      // Update supplier's total due
+      await updateSupplier(params.id, {
+        totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      throw error;
+    }
+  };
+
   if (!supplier) {
     return <div>Loading...</div>;
   }
+
+  // Sort transactions by date (newest first)
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateA - dateB;
+  });
 
   return (
     <div className="p-8">
@@ -160,8 +191,7 @@ export default function SupplierDetail() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {/* Add transaction rows here */}
-          {transactions.map((transaction) => (
+          {sortedTransactions.map((transaction) => (
             <TableRow key={transaction.id}>
               <TableCell>{formatDate(transaction.date)}</TableCell>
               <TableCell>{transaction.invoiceNumber}</TableCell>
@@ -177,9 +207,10 @@ export default function SupplierDetail() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm">
-                    Edit
-                  </Button>
+                  <EditSupplierTransactionDialog
+                    transaction={transaction}
+                    onSave={handleEditTransaction}
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
