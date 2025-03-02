@@ -16,18 +16,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function PurchaseStockDialog({ fabrics, onPurchaseStock }) {
+// Update the component props to include suppliers
+export function PurchaseStockDialog({
+  fabrics,
+  suppliers = [],
+  onPurchaseStock,
+}) {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     fabricId: "",
     quantity: "",
     unitCost: "",
     supplierId: "",
+    supplierName: "",
+    supplierPhone: "",
     invoiceNumber: "",
     purchaseDate: new Date().toISOString().split("T")[0],
   });
   const [errors, setErrors] = useState({});
+  const [isNewSupplier, setIsNewSupplier] = useState(false);
 
+  // Update validate function to include supplier validation
   const validate = () => {
     const newErrors = {};
     if (!formData.fabricId) newErrors.fabricId = "Please select a fabric";
@@ -40,6 +49,17 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock }) {
     if (!formData.invoiceNumber?.trim()) {
       newErrors.invoiceNumber = "Invoice number is required";
     }
+    if (!isNewSupplier && !formData.supplierId) {
+      newErrors.supplierId = "Please select a supplier";
+    }
+    if (isNewSupplier) {
+      if (!formData.supplierName?.trim()) {
+        newErrors.supplierName = "Supplier name is required";
+      }
+      if (!formData.supplierPhone?.trim()) {
+        newErrors.supplierPhone = "Supplier phone is required";
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -50,20 +70,33 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock }) {
     if (!validate()) return;
 
     try {
+      // Find selected supplier if using existing supplier
+      const selectedSupplier = !isNewSupplier
+        ? suppliers.find((s) => s.id === formData.supplierId)
+        : null;
+
       await onPurchaseStock({
         ...formData,
+        // Include supplier name from either selected supplier or new supplier input
+        supplierName: !isNewSupplier
+          ? selectedSupplier?.name
+          : formData.supplierName,
         quantity: parseFloat(formData.quantity),
         unitCost: parseFloat(formData.unitCost),
         totalCost:
           parseFloat(formData.quantity) * parseFloat(formData.unitCost),
         createdAt: new Date().toISOString(),
       });
+
+      // Reset form
       setOpen(false);
       setFormData({
         fabricId: "",
         quantity: "",
         unitCost: "",
         supplierId: "",
+        supplierName: "",
+        supplierPhone: "",
         invoiceNumber: "",
         purchaseDate: new Date().toISOString().split("T")[0],
       });
@@ -120,6 +153,95 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock }) {
             />
             {errors.invoiceNumber && (
               <p className="text-sm text-red-500">{errors.invoiceNumber}</p>
+            )}
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Supplier Details</h3>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsNewSupplier(!isNewSupplier);
+                  setFormData((prev) => ({
+                    ...prev,
+                    supplierId: "",
+                    supplierName: "",
+                    supplierPhone: "",
+                  }));
+                }}
+              >
+                {isNewSupplier ? "Select Existing" : "Add New"}
+              </Button>
+            </div>
+
+            {!isNewSupplier ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Supplier *</label>
+                <Select
+                  value={formData.supplierId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, supplierId: value })
+                  }
+                >
+                  <SelectTrigger
+                    className={errors.supplierId ? "border-red-500" : ""}
+                  >
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers?.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name} - {supplier.phone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.supplierId && (
+                  <p className="text-sm text-red-500">{errors.supplierId}</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Supplier Name *</label>
+                  <Input
+                    value={formData.supplierName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supplierName: e.target.value })
+                    }
+                    className={errors.supplierName ? "border-red-500" : ""}
+                    placeholder="Enter supplier name"
+                  />
+                  {errors.supplierName && (
+                    <p className="text-sm text-red-500">
+                      {errors.supplierName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone Number *</label>
+                  <Input
+                    value={formData.supplierPhone}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        supplierPhone: e.target.value,
+                      })
+                    }
+                    className={errors.supplierPhone ? "border-red-500" : ""}
+                    placeholder="Enter phone number"
+                  />
+                  {errors.supplierPhone && (
+                    <p className="text-sm text-red-500">
+                      {errors.supplierPhone}
+                    </p>
+                  )}
+                </div>
+              </>
             )}
           </div>
 

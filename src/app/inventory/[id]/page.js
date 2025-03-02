@@ -200,7 +200,7 @@ export default function FabricViewPage() {
                   <TableCell>
                     {batch.quantity} {fabric.unit}
                   </TableCell>
-                  <TableCell>{batch.supplierId}</TableCell>
+                  <TableCell>{batch.supplierName}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <EditBatchDialog

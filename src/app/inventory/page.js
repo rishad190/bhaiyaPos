@@ -37,6 +37,7 @@ export default function InventoryPage() {
     updateFabricBatch,
     deleteFabricBatch,
     addTransaction,
+    suppliers, // Make sure you're getting suppliers from your data context
   } = useData();
   const [viewMode, setViewMode] = useState("average");
 
@@ -150,6 +151,7 @@ export default function InventoryPage() {
           <AddFabricDialog onAddFabric={handleAddFabric} />
           <PurchaseStockDialog
             fabrics={fabrics}
+            suppliers={suppliers} // Add this prop
             onPurchaseStock={handlePurchaseStock}
           />
           <Select value={viewMode} onValueChange={setViewMode}>
