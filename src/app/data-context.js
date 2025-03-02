@@ -322,11 +322,12 @@ export function DataProvider({ children }) {
         const supplierSnapshot = await get(supplierRef);
 
         if (supplierSnapshot.exists()) {
-          const currentDue =
-            supplierSnapshot.val().totalDue - (amount - (paidAmount || 0));
+          const supplier = supplierSnapshot.val();
+          const dueAmount = amount - (paidAmount || 0);
+          const newTotalDue = Math.max(0, (supplier.totalDue || 0) - dueAmount);
 
           await update(supplierRef, {
-            totalDue: currentDue - amount,
+            totalDue: newTotalDue,
             updatedAt: serverTimestamp(),
           });
         }

@@ -87,15 +87,22 @@ export default function SupplierDetail() {
 
   const handleDeleteTransaction = async (transactionId, amount, paidAmount) => {
     try {
-      await deleteSupplierTransaction(
-        transactionId,
-        params.id,
-        amount,
-        paidAmount
-      );
+      const dueAmount = amount - (paidAmount || 0);
+      if (
+        window.confirm(
+          `Are you sure you want to delete this transaction?\nThis will reduce the total due by ৳${dueAmount.toLocaleString()}`
+        )
+      ) {
+        await deleteSupplierTransaction(
+          transactionId,
+          params.id,
+          amount,
+          paidAmount
+        );
+      }
     } catch (error) {
       console.error("Error deleting transaction:", error);
-      throw error;
+      alert("Failed to delete transaction. Please try again.");
     }
   };
 
