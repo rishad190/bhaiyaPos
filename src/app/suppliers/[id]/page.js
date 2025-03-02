@@ -14,15 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog";
-
-const formatDate = (dateString) => {
-  if (!dateString) return "";
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
+import { formatDate } from "@/lib/utils";
 
 export default function SupplierDetail() {
   const params = useParams();
