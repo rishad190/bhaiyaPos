@@ -11,15 +11,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function EditSupplierTransactionDialog({ transaction, onSave }) {
+  const [errors, setErrors] = useState({});
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     date: transaction.date,
     invoiceNumber: transaction.invoiceNumber,
     details: transaction.details || "",
-    totalAmount: transaction.totalAmount || 0,
-    paidAmount: transaction.paidAmount || 0,
+    totalAmount: transaction.totalAmount?.toString() || "0",
+    paidAmount: transaction.paidAmount?.toString() || "0",
   });
-  const [errors, setErrors] = useState({});
+
+  // Add handler for number inputs
+  const handleNumberInput = (field, value) => {
+    const numberValue = value === "" ? "0" : value;
+    setFormData((prev) => ({
+      ...prev,
+      [field]: numberValue,
+    }));
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -38,7 +47,11 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
     try {
       const updatedTransaction = {
         ...formData,
-        due: formData.totalAmount - (formData.paidAmount || 0),
+        totalAmount: parseFloat(formData.totalAmount) || 0,
+        paidAmount: parseFloat(formData.paidAmount) || 0,
+        due:
+          parseFloat(formData.totalAmount) -
+          (parseFloat(formData.paidAmount) || 0),
         updatedAt: new Date().toISOString(),
       };
       await onSave(transaction.id, updatedTransaction);
@@ -112,12 +125,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
               min="0"
               step="0.01"
               value={formData.totalAmount}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  totalAmount: parseFloat(e.target.value),
-                })
-              }
+              onChange={(e) => handleNumberInput("totalAmount", e.target.value)}
               className={errors.totalAmount ? "border-red-500" : ""}
             />
             {errors.totalAmount && (
@@ -132,12 +140,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
               min="0"
               step="0.01"
               value={formData.paidAmount}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  paidAmount: parseFloat(e.target.value),
-                })
-              }
+              onChange={(e) => handleNumberInput("paidAmount", e.target.value)}
               className={errors.paidAmount ? "border-red-500" : ""}
             />
             {errors.paidAmount && (
