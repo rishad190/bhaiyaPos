@@ -155,19 +155,20 @@ export default function SupplierDetail() {
     }, []);
 
   return (
-    <div className="p-8">
-      <div className="bg-gray-50 p-6 rounded-lg mb-6">
-        <div className="grid grid-cols-2 gap-4 mb-4">
+    <div className="p-4 md:p-8">
+      {/* Header Card */}
+      <div className="bg-gray-50 p-4 md:p-6 rounded-lg mb-4 md:mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <h2 className="text-2xl font-bold">{supplier.name}</h2>
+            <h2 className="text-xl md:text-2xl font-bold">{supplier.name}</h2>
             <p className="text-gray-600">{supplier.phone}</p>
             <p className="text-gray-600">{supplier.email}</p>
             <p className="text-gray-600">{supplier.address}</p>
           </div>
-          <div className="text-right">
-            <p className="text-lg">Store ID: {supplier.storeId}</p>
+          <div className="text-left md:text-right">
+            <p className="text-base md:text-lg">Store ID: {supplier.storeId}</p>
             <p
-              className={`text-2xl font-bold ${
+              className={`text-xl md:text-2xl font-bold ${
                 supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
               }`}
             >
@@ -176,13 +177,21 @@ export default function SupplierDetail() {
           </div>
         </div>
 
-        <div className="flex justify-between items-center">
-          <Button variant="outline" onClick={() => router.back()}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => router.back()}
+            className="w-full md:w-auto"
+          >
             Back to Suppliers
           </Button>
-          <div className="flex gap-4">
-            <Button variant="outline">Export CSV</Button>
-            <Button variant="outline">Print</Button>
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
+            <Button variant="outline" className="w-full md:w-auto">
+              Export CSV
+            </Button>
+            <Button variant="outline" className="w-full md:w-auto">
+              Print
+            </Button>
             <AddSupplierTransactionDialog
               supplierId={params.id}
               onAddTransaction={handleAddTransaction}
@@ -191,70 +200,89 @@ export default function SupplierDetail() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Invoice Number</TableHead>
-            <TableHead>Details</TableHead>
-            <TableHead className="text-right">Total Amount</TableHead>
-            <TableHead className="text-right">Paid Amount</TableHead>
-            <TableHead className="text-right">Due Amount</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactionsWithBalance.map((transaction) => (
-            <TableRow key={transaction.id}>
-              <TableCell>{formatDate(transaction.date)}</TableCell>
-              <TableCell>{transaction.invoiceNumber}</TableCell>
-              <TableCell>{transaction.details}</TableCell>
-              <TableCell className="text-right">
-                ৳{(transaction.totalAmount || 0).toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right">
-                ৳{(transaction.paidAmount || 0).toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right text-red-500">
-                ৳{(transaction.due || 0).toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right font-medium text-red-500">
-                ৳{transaction.cumulativeBalance.toLocaleString()}
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <EditSupplierTransactionDialog
-                    transaction={transaction}
-                    onSave={handleEditTransaction}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (
-                        window.confirm(
-                          "Are you sure you want to delete this transaction?"
-                        )
-                      ) {
-                        handleDeleteTransaction(
-                          transaction.id,
-                          transaction.totalAmount,
-                          transaction.paidAmount
-                        );
-                      }
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </TableCell>
+      {/* Transactions Table */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Date</TableHead>
+              <TableHead className="whitespace-nowrap">
+                Invoice Number
+              </TableHead>
+              <TableHead className="whitespace-nowrap">Details</TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Total Amount
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Paid Amount
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Due Amount
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Balance
+              </TableHead>
+              <TableHead className="whitespace-nowrap">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {transactionsWithBalance.map((transaction) => (
+              <TableRow key={transaction.id}>
+                <TableCell className="whitespace-nowrap">
+                  {formatDate(transaction.date)}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {transaction.invoiceNumber}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {transaction.details}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  ৳{(transaction.totalAmount || 0).toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  ৳{(transaction.paidAmount || 0).toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap text-red-500">
+                  ৳{(transaction.due || 0).toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right font-medium whitespace-nowrap text-red-500">
+                  ৳{transaction.cumulativeBalance.toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col md:flex-row gap-2">
+                    <EditSupplierTransactionDialog
+                      transaction={transaction}
+                      onSave={handleEditTransaction}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (
+                          window.confirm(
+                            "Are you sure you want to delete this transaction?"
+                          )
+                        ) {
+                          handleDeleteTransaction(
+                            transaction.id,
+                            transaction.totalAmount,
+                            transaction.paidAmount
+                          );
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
