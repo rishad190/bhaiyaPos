@@ -41,10 +41,10 @@ export default function CashMemoPage() {
   const grandTotal = products.reduce((sum, product) => sum + product.total, 0);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       {/* Header Card */}
-      <Card className="p-6">
-        <div className="grid grid-cols-2 gap-4">
+      <Card className="p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Date</label>
@@ -101,9 +101,9 @@ export default function CashMemoPage() {
       </Card>
 
       {/* Products Table */}
-      <Card className="p-6">
+      <Card className="p-4 md:p-6">
         <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Input
               placeholder="Product name"
               value={newProduct.name}
@@ -127,49 +127,63 @@ export default function CashMemoPage() {
                 setNewProduct({ ...newProduct, price: e.target.value })
               }
             />
-            <Button onClick={handleAddProduct}>Add Product</Button>
+            <Button onClick={handleAddProduct} className="w-full md:w-auto">
+              Add Product
+            </Button>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Quality</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product, index) => (
-                <TableRow key={index}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell className="text-right">
-                    {product.quality}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">Product</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Quality
+                  </TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Price
+                  </TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Total
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((product, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="whitespace-nowrap">
+                      {product.name}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      {product.quality}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      ৳{parseFloat(product.price).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      ৳{product.total.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right font-bold">
+                    Grand Total:
                   </TableCell>
-                  <TableCell className="text-right">
-                    ৳{parseFloat(product.price).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    ৳{product.total.toLocaleString()}
+                  <TableCell className="text-right font-bold whitespace-nowrap">
+                    ৳{grandTotal.toLocaleString()}
                   </TableCell>
                 </TableRow>
-              ))}
-              <TableRow>
-                <TableCell colSpan={3} className="text-right font-bold">
-                  Grand Total:
-                </TableCell>
-                <TableCell className="text-right font-bold">
-                  ৳{grandTotal.toLocaleString()}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </Card>
 
-      <div className="flex justify-end gap-4">
-        <Button variant="outline">Print Memo</Button>
-        <Button>Save Memo</Button>
+      <div className="flex flex-col sm:flex-row justify-end gap-4">
+        <Button variant="outline" className="w-full sm:w-auto">
+          Print Memo
+        </Button>
+        <Button className="w-full sm:w-auto">Save Memo</Button>
       </div>
     </div>
   );

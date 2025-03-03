@@ -115,16 +115,19 @@ export default function CashBookPage() {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 md:p-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Daily Cash Book</h1>
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
           <AddCashTransactionDialog onAddTransaction={handleAddTransaction} />
-          <Button onClick={() => window.print()}>Print</Button>
+          <Button onClick={() => window.print()} className="w-full md:w-auto">
+            Print
+          </Button>
         </div>
       </div>
 
-      {/* Search and Filter Inputs */}
+      {/* Search and Filter Section */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <input
           type="text"
@@ -133,41 +136,43 @@ export default function CashBookPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full md:w-64 px-4 py-2 border rounded-md"
         />
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="w-full md:w-64 px-4 py-2 border rounded-md"
-        />
-        {dateFilter && (
-          <Button
-            variant="ghost"
-            onClick={() => setDateFilter("")}
-            className="text-sm"
-          >
-            Clear Date
-          </Button>
-        )}
+        <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full md:w-64 px-4 py-2 border rounded-md"
+          />
+          {dateFilter && (
+            <Button
+              variant="ghost"
+              onClick={() => setDateFilter("")}
+              className="w-full md:w-auto text-sm"
+            >
+              Clear Date
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm text-gray-500">Total Cash In</h3>
-          <p className="text-2xl font-bold text-green-600">
+          <p className="text-xl md:text-2xl font-bold text-green-600">
             ৳{financials.totalCashIn.toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm text-gray-500">Total Cash Out</h3>
-          <p className="text-2xl font-bold text-red-600">
+          <p className="text-xl md:text-2xl font-bold text-red-600">
             ৳{financials.totalCashOut.toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-sm text-gray-500">Available Cash</h3>
           <p
-            className={`text-2xl font-bold ${
+            className={`text-xl md:text-2xl font-bold ${
               financials.availableCash >= 0 ? "text-green-600" : "text-red-600"
             }`}
           >
@@ -176,67 +181,90 @@ export default function CashBookPage() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead className="text-right">Cash In</TableHead>
-            <TableHead className="text-right">Cash Out</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead>Details</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredCash.map((day) => (
-            <TableRow key={day.date}>
-              <TableCell>{formatDate(day.date)}</TableCell>
-              <TableCell className="text-right text-green-600">
-                ৳{day.cashIn.toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right text-red-600">
-                ৳{day.cashOut.toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                ৳{day.balance.toLocaleString()}
-              </TableCell>
-              <TableCell>
-                {day.dailyCash.map((t) => (
-                  <div
-                    key={t.id}
-                    className="text-sm flex items-center justify-between border-b border-gray-100 py-1"
-                  >
-                    <div>
-                      <span className="font-medium">{t.description}</span>
-                      {t.cashIn > 0 && ` ৳+${t.cashIn.toLocaleString()}`}
-                      {t.cashOut > 0 && ` ৳-${t.cashOut.toLocaleString()}`}
-                    </div>
-                    <div className="flex gap-2">
-                      <EditCashTransactionDialog
-                        transaction={t}
-                        onEditTransaction={(updated) =>
-                          handleEditTransaction(t.id, updated)
-                        }
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTransaction(t.id);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </TableCell>
+      {/* Transactions Table */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Date</TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Cash In
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Cash Out
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Balance
+              </TableHead>
+              <TableHead className="whitespace-nowrap">Details</TableHead>
+              <TableHead className="whitespace-nowrap">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {filteredCash.map((day) => (
+              <TableRow key={day.date}>
+                <TableCell className="whitespace-nowrap">
+                  {formatDate(day.date)}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap text-green-600">
+                  ৳{day.cashIn.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap text-red-600">
+                  ৳{day.cashOut.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap font-medium">
+                  ৳{day.balance.toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-2">
+                    {day.dailyCash.map((t) => (
+                      <div
+                        key={t.id}
+                        className="text-sm flex flex-col md:flex-row items-start md:items-center justify-between border-b border-gray-100 py-2"
+                      >
+                        <div className="mb-2 md:mb-0">
+                          <span className="font-medium">{t.description}</span>
+                          <div className="text-sm">
+                            {t.cashIn > 0 && (
+                              <span className="text-green-600">
+                                ৳+{t.cashIn.toLocaleString()}
+                              </span>
+                            )}
+                            {t.cashOut > 0 && (
+                              <span className="text-red-600">
+                                ৳-{t.cashOut.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col md:flex-row gap-2">
+                          <EditCashTransactionDialog
+                            transaction={t}
+                            onEditTransaction={(updated) =>
+                              handleEditTransaction(t.id, updated)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 w-full md:w-auto"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTransaction(t.id);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
