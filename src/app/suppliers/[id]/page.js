@@ -134,12 +134,25 @@ export default function SupplierDetail() {
     return <div>Loading...</div>;
   }
 
-  // Sort transactions by date (newest first)
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
-    return dateA - dateB;
-  });
+  // Replace the existing sortedTransactions with this:
+  const transactionsWithBalance = transactions
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .reduce((acc, transaction) => {
+      const previousBalance =
+        acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
+      const currentDue =
+        transaction.totalAmount - (transaction.paidAmount || 0);
+      const currentBalance = previousBalance + currentDue;
+
+      return [
+        ...acc,
+        {
+          ...transaction,
+          due: currentDue,
+          cumulativeBalance: currentBalance,
+        },
+      ];
+    }, []);
 
   return (
     <div className="p-8">
@@ -187,11 +200,12 @@ export default function SupplierDetail() {
             <TableHead className="text-right">Total Amount</TableHead>
             <TableHead className="text-right">Paid Amount</TableHead>
             <TableHead className="text-right">Due Amount</TableHead>
+            <TableHead className="text-right">Balance</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedTransactions.map((transaction) => (
+          {transactionsWithBalance.map((transaction) => (
             <TableRow key={transaction.id}>
               <TableCell>{formatDate(transaction.date)}</TableCell>
               <TableCell>{transaction.invoiceNumber}</TableCell>
@@ -204,6 +218,9 @@ export default function SupplierDetail() {
               </TableCell>
               <TableCell className="text-right text-red-500">
                 ৳{(transaction.due || 0).toLocaleString()}
+              </TableCell>
+              <TableCell className="text-right font-medium text-red-500">
+                ৳{transaction.cumulativeBalance.toLocaleString()}
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
