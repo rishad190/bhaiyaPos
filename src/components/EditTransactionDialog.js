@@ -62,10 +62,6 @@ export function EditTransactionDialog({
       newErrors.deposit = "Please enter a valid deposit amount";
     }
 
-    if (depositAmount > totalAmount) {
-      newErrors.deposit = "Deposit cannot be greater than total amount";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

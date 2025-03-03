@@ -144,18 +144,19 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between mb-6">
+    <div className="p-4 md:p-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">Fabric Inventory</h1>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 md:gap-4">
           <AddFabricDialog onAddFabric={handleAddFabric} />
           <PurchaseStockDialog
             fabrics={fabrics}
-            suppliers={suppliers} // Add this prop
+            suppliers={suppliers}
             onPurchaseStock={handlePurchaseStock}
           />
           <Select value={viewMode} onValueChange={setViewMode}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="View Mode" />
             </SelectTrigger>
             <SelectContent>
@@ -166,63 +167,82 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fabric Code</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead className="text-right">Stock Qty</TableHead>
-            <TableHead className="text-right">Avg. Cost</TableHead>
-            <TableHead className="text-right">Current Value</TableHead>
-            {viewMode === "fifo" && <TableHead>Batch Details</TableHead>}
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {stockValues?.map((stock) => (
-            <TableRow
-              key={stock.id}
-              className="cursor-pointer hover:bg-gray-50"
-              onClick={() => router.push(`/inventory/${stock.id}`)}
-            >
-              <TableCell>{stock.code}</TableCell>
-              <TableCell>{stock.name}</TableCell>
-              <TableCell className="text-right">
-                {stock.totalQuantity.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right">
-                ৳{stock.averageCost.toFixed(2)}
-              </TableCell>
-              <TableCell className="text-right">
-                ৳{stock.currentValue.toFixed(2)}
-              </TableCell>
+      {/* Table Section */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Fabric Code</TableHead>
+              <TableHead className="whitespace-nowrap">Name</TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Stock Qty
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Avg. Cost
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap">
+                Current Value
+              </TableHead>
               {viewMode === "fifo" && (
-                <TableCell>
-                  {stock.batches?.map((batch) => (
-                    <div key={batch.id} className="text-sm">
-                      Qty: {batch.quantity} @ ৳{batch.unitCost}
-                    </div>
-                  ))}
-                </TableCell>
+                <TableHead className="whitespace-nowrap">
+                  Batch Details
+                </TableHead>
               )}
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <div className="flex gap-2">
-                  <EditFabricDialog
-                    fabric={stock}
-                    onSave={handleEditFabric}
-                    onDelete={handleDeleteFabric}
-                  />
-
-                  <SellFabricDialog
-                    fabric={stock}
-                    onSellFabric={handleSellFabric}
-                  />
-                </div>
-              </TableCell>
+              <TableHead className="whitespace-nowrap">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {stockValues?.map((stock) => (
+              <TableRow
+                key={stock.id}
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => router.push(`/inventory/${stock.id}`)}
+              >
+                <TableCell className="whitespace-nowrap">
+                  {stock.code}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {stock.name}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  {stock.totalQuantity.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  ৳{stock.averageCost.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  ৳{stock.currentValue.toFixed(2)}
+                </TableCell>
+                {viewMode === "fifo" && (
+                  <TableCell className="whitespace-nowrap">
+                    {stock.batches?.map((batch) => (
+                      <div key={batch.id} className="text-sm">
+                        Qty: {batch.quantity} @ ৳{batch.unitCost}
+                      </div>
+                    ))}
+                  </TableCell>
+                )}
+                <TableCell
+                  onClick={(e) => e.stopPropagation()}
+                  className="whitespace-nowrap"
+                >
+                  <div className="flex flex-col md:flex-row gap-2">
+                    <EditFabricDialog
+                      fabric={stock}
+                      onSave={handleEditFabric}
+                      onDelete={handleDeleteFabric}
+                    />
+                    <SellFabricDialog
+                      fabric={stock}
+                      onSellFabric={handleSellFabric}
+                    />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

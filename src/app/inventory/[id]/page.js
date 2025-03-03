@@ -121,17 +121,17 @@ export default function FabricViewPage() {
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       {/* Header Section */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
           <Button variant="outline" onClick={() => router.back()}>
             Back to Inventory
           </Button>
-          <h1 className="text-3xl font-bold mt-4">{fabric.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mt-4">{fabric.name}</h1>
           <p className="text-gray-600">{fabric.code}</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
           <EditFabricDialog
             fabric={fabric}
             onSave={(id, updates) => console.log("Save implementation")}
@@ -145,29 +145,33 @@ export default function FabricViewPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card p-6 rounded-lg shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
           <h3 className="text-sm text-muted-foreground">Total Quantity</h3>
-          <p className="text-2xl font-bold">
+          <p className="text-xl md:text-2xl font-bold">
             {totalQuantity.toFixed(2)} {fabric.unit}
           </p>
         </div>
-        <div className="bg-card p-6 rounded-lg shadow">
+        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
           <h3 className="text-sm text-muted-foreground">Average Cost</h3>
-          <p className="text-2xl font-bold">৳{averageCost.toFixed(2)}</p>
+          <p className="text-xl md:text-2xl font-bold">
+            ৳{averageCost.toFixed(2)}
+          </p>
         </div>
-        <div className="bg-card p-6 rounded-lg shadow">
+        <div className="bg-card p-4 md:p-6 rounded-lg shadow">
           <h3 className="text-sm text-muted-foreground">Current Value</h3>
-          <p className="text-2xl font-bold">৳{currentValue.toFixed(2)}</p>
+          <p className="text-xl md:text-2xl font-bold">
+            ৳{currentValue.toFixed(2)}
+          </p>
         </div>
       </div>
 
       {/* Price History Section */}
-      <div className="bg-card p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Price History</h2>
+      <div className="bg-card p-4 md:p-6 rounded-lg shadow">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+          <h2 className="text-lg md:text-xl font-semibold">Price History</h2>
           <Select value={viewMode} onValueChange={(v) => setViewMode(v)}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="View Mode" />
             </SelectTrigger>
             <SelectContent>
@@ -177,89 +181,97 @@ export default function FabricViewPage() {
           </Select>
         </div>
 
-        {viewMode === "chart" ? (
-          <div className="h-64"></div>
-        ) : (
+        <div className="overflow-x-auto">
+          {viewMode === "chart" ? (
+            <div className="h-64"></div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">Date</TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    Purchase Price
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">Quantity</TableHead>
+                  <TableHead className="whitespace-nowrap">Supplier</TableHead>
+                  <TableHead className="whitespace-nowrap">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {batches.map((batch) => (
+                  <TableRow key={batch.id}>
+                    <TableCell>
+                      {new Date(batch.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>৳{batch.unitCost.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {batch.quantity} {fabric.unit}
+                    </TableCell>
+                    <TableCell>{batch.supplierName}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <EditBatchDialog
+                          batch={batch}
+                          fabric={fabric}
+                          onSave={handleEditBatch}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500"
+                          onClick={() => handleDeleteBatch(batch.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Transactions Section */}
+      <div className="bg-card p-4 md:p-6 rounded-lg shadow">
+        <h2 className="text-lg md:text-xl font-semibold mb-4">
+          Recent Stock Movements
+        </h2>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Purchase Price</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="whitespace-nowrap">Date</TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap">Quantity</TableHead>
+                <TableHead className="whitespace-nowrap">Unit Price</TableHead>
+                <TableHead className="whitespace-nowrap">Total Value</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {batches.map((batch) => (
-                <TableRow key={batch.id}>
+              {recentTransactions?.map((transaction) => (
+                <TableRow key={transaction.id}>
                   <TableCell>
-                    {new Date(batch.createdAt).toLocaleDateString()}
+                    {new Date(transaction.date).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>৳{batch.unitCost.toFixed(2)}</TableCell>
+                  <TableCell>{transaction.type}</TableCell>
                   <TableCell>
-                    {batch.quantity} {fabric.unit}
+                    {transaction.quantity} {fabric.unit}
                   </TableCell>
-                  <TableCell>{batch.supplierName}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <EditBatchDialog
-                        batch={batch}
-                        fabric={fabric}
-                        onSave={handleEditBatch}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500"
-                        onClick={() => handleDeleteBatch(batch.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableCell>৳{transaction.unitPrice?.toFixed(2)}</TableCell>
+                  <TableCell>৳{transaction.totalValue?.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
-
-      {/* Recent Transactions Section */}
-      <div className="bg-card p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Recent Stock Movements</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Unit Price</TableHead>
-              <TableHead>Total Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {recentTransactions?.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell>
-                  {new Date(transaction.date).toLocaleDateString()}
-                </TableCell>
-                <TableCell>{transaction.type}</TableCell>
-                <TableCell>
-                  {transaction.quantity} {fabric.unit}
-                </TableCell>
-                <TableCell>৳{transaction.unitPrice?.toFixed(2)}</TableCell>
-                <TableCell>৳{transaction.totalValue?.toFixed(2)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        </div>
       </div>
 
       {/* Sell Fabric Section */}
-      <div className="bg-card p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Sell Stock</h2>
+      <div className="bg-card p-4 md:p-6 rounded-lg shadow">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-lg md:text-xl font-semibold">Sell Stock</h2>
           <SellFabricDialog
             fabric={{ ...fabric, batches, totalQuantity }}
             onSellFabric={handleSellFabric}
