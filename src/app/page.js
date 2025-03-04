@@ -17,6 +17,13 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 import { useData } from "@/app/data-context";
 import { EditCustomerDialog } from "@/components/EditCustomerDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -239,30 +246,39 @@ export default function Dashboard() {
                     ৳{dueAmount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCustomer(customer);
-                        }}
-                      >
-                        <span className="hidden md:inline">Edit</span>
-                        <span className="md:hidden">✏️</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCustomer(customer.id);
-                        }}
-                      >
-                        <span className="hidden md:inline">Delete</span>
-                        <span className="md:hidden">🗑️</span>
-                      </Button>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCustomer(customer);
+                            }}
+                          >
+                            <span className="flex items-center">
+                              <span className="md:hidden mr-2">✏️</span>
+                              Edit
+                            </span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCustomer(customer.id);
+                            }}
+                          >
+                            <span className="flex items-center">
+                              <span className="md:hidden mr-2">🗑️</span>
+                              Delete
+                            </span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>

@@ -5,6 +5,8 @@ import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { useData } from "@/app/data-context";
 import { Button } from "@/components/ui/button";
+import { MoreVertical } from "lucide-react";
+
 import {
   Table,
   TableBody,
@@ -16,6 +18,12 @@ import {
 import { AddSupplierTransactionDialog } from "@/components/AddSupplierTransactionDialog";
 import { formatDate } from "@/lib/utils";
 import { EditSupplierTransactionDialog } from "@/components/EditSupplierTransactionDialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 export default function SupplierDetail() {
   const params = useParams();
@@ -250,32 +258,41 @@ export default function SupplierDetail() {
                   ৳{transaction.cumulativeBalance.toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <EditSupplierTransactionDialog
-                      transaction={transaction}
-                      onSave={handleEditTransaction}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (
-                          window.confirm(
-                            "Are you sure you want to delete this transaction?"
-                          )
-                        ) {
-                          handleDeleteTransaction(
-                            transaction.id,
-                            transaction.totalAmount,
-                            transaction.paidAmount
-                          );
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
+                  <div className="flex justify-end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <EditSupplierTransactionDialog
+                            transaction={transaction}
+                            onSave={handleEditTransaction}
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (
+                              window.confirm(
+                                "Are you sure you want to delete this transaction?"
+                              )
+                            ) {
+                              handleDeleteTransaction(
+                                transaction.id,
+                                transaction.totalAmount,
+                                transaction.paidAmount
+                              );
+                            }
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </TableCell>
               </TableRow>

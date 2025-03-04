@@ -13,6 +13,13 @@ import {
 import { formatDate } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 export default function CashBookPage() {
   const {
@@ -182,88 +189,190 @@ export default function CashBookPage() {
       </div>
 
       {/* Transactions Table */}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Date</TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Cash In
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Cash Out
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap">
-                Balance
-              </TableHead>
-              <TableHead className="whitespace-nowrap">Details</TableHead>
-              <TableHead className="whitespace-nowrap">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCash.map((day) => (
-              <TableRow key={day.date}>
-                <TableCell className="whitespace-nowrap">
-                  {formatDate(day.date)}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap text-green-600">
-                  ৳{day.cashIn.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap text-red-600">
-                  ৳{day.cashOut.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap font-medium">
-                  ৳{day.balance.toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-2">
-                    {day.dailyCash.map((t) => (
-                      <div
-                        key={t.id}
-                        className="text-sm flex flex-col md:flex-row items-start md:items-center justify-between border-b border-gray-100 py-2"
-                      >
-                        <div className="mb-2 md:mb-0">
-                          <span className="font-medium">{t.description}</span>
-                          <div className="text-sm">
-                            {t.cashIn > 0 && (
-                              <span className="text-green-600">
-                                ৳+{t.cashIn.toLocaleString()}
-                              </span>
-                            )}
-                            {t.cashOut > 0 && (
-                              <span className="text-red-600">
-                                ৳-{t.cashOut.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-col md:flex-row gap-2">
-                          <EditCashTransactionDialog
-                            transaction={t}
-                            onEditTransaction={(updated) =>
-                              handleEditTransaction(t.id, updated)
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-700 w-full md:w-auto"
+      <div className="space-y-4">
+        {/* Mobile View */}
+        <div className="block md:hidden">
+          {filteredCash.map((day) => (
+            <div key={day.date} className="bg-white rounded-lg shadow mb-4">
+              {/* Summary Card */}
+              <div className="grid grid-cols-2 gap-2 p-4 border-b">
+                <div>
+                  <div className="text-sm text-gray-500">Date</div>
+                  <div className="font-medium">{formatDate(day.date)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Balance</div>
+                  <div className="font-medium">
+                    ৳{day.balance.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Cash In</div>
+                  <div className="text-green-600">
+                    ৳{day.cashIn.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Cash Out</div>
+                  <div className="text-red-600">
+                    ৳{day.cashOut.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Transactions List */}
+              <div className="p-4 space-y-3">
+                {day.dailyCash.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex flex-col gap-2 py-2 border-b border-gray-100 last:border-0"
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="font-medium">{t.description}</span>
+                      <div className="flex gap-2 text-sm">
+                        {t.cashIn > 0 && (
+                          <span className="text-green-600">
+                            ৳+{t.cashIn.toLocaleString()}
+                          </span>
+                        )}
+                        {t.cashOut > 0 && (
+                          <span className="text-red-600">
+                            ৳-{t.cashOut.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <EditCashTransactionDialog
+                              transaction={t}
+                              onEditTransaction={(updated) =>
+                                handleEditTransaction(t.id, updated)
+                              }
+                            />
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteTransaction(t.id);
                             }}
                           >
                             Delete
-                          </Button>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap min-w-[100px]">
+                  Date
+                </TableHead>
+                <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                  Cash In
+                </TableHead>
+                <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                  Cash Out
+                </TableHead>
+                <TableHead className="text-right whitespace-nowrap min-w-[100px]">
+                  Balance
+                </TableHead>
+                <TableHead className="whitespace-nowrap min-w-[200px]">
+                  Details
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCash.map((day) => (
+                <TableRow key={day.date} className="border-b">
+                  <TableCell className="whitespace-nowrap font-medium">
+                    {formatDate(day.date)}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap text-green-600">
+                    ৳{day.cashIn.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap text-red-600">
+                    ৳{day.cashOut.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap font-medium">
+                    ৳{day.balance.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="space-y-3">
+                    {day.dailyCash.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                      >
+                        <div className="w-full sm:w-auto mb-2 sm:mb-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="font-medium">{t.description}</span>
+                            <div className="flex gap-2 text-sm">
+                              {t.cashIn > 0 && (
+                                <span className="text-green-600">
+                                  ৳+{t.cashIn.toLocaleString()}
+                                </span>
+                              )}
+                              {t.cashOut > 0 && (
+                                <span className="text-red-600">
+                                  ৳-{t.cashOut.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-row gap-2 w-full sm:w-auto justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <EditCashTransactionDialog
+                                  transaction={t}
+                                  onEditTransaction={(updated) =>
+                                    handleEditTransaction(t.id, updated)
+                                  }
+                                />
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTransaction(t.id);
+                                }}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     ))}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

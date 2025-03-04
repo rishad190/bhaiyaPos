@@ -13,8 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddSupplierDialog } from "@/components/AddSupplierDialog";
+import { EditSupplierDialog } from "@/components/EditSupplierDialog";
 import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
+import { MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -26,6 +34,7 @@ export default function SuppliersPage() {
     deleteSupplier,
   } = useData();
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingSupplier, setEditingSupplier] = useState(null);
 
   const filteredSuppliers =
     suppliers?.filter(
@@ -80,6 +89,15 @@ export default function SuppliersPage() {
     }
   };
 
+  const handleEditSupplier = async (supplierId, updatedData) => {
+    try {
+      await updateSupplier(supplierId, updatedData);
+      setEditingSupplier(null);
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -116,6 +134,13 @@ export default function SuppliersPage() {
         />
         <AddSupplierDialog onAddSupplier={handleAddSupplier} />
       </div>
+
+      <EditSupplierDialog
+        supplier={editingSupplier}
+        isOpen={!!editingSupplier}
+        onClose={() => setEditingSupplier(null)}
+        onEditSupplier={handleEditSupplier}
+      />
 
       <Table>
         <TableHeader>
@@ -157,15 +182,47 @@ export default function SuppliersPage() {
                 ৳{(supplier.totalDue || 0).toLocaleString()}
               </TableCell>
               <TableCell>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500"
-                    onClick={(e) => handleDeleteSupplier(e, supplier.id)}
-                  >
-                    Delete
-                  </Button>
+                <div className="flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSupplier(supplier);
+                        }}
+                      >
+                        <span className="flex items-center">
+                          <span className="md:hidden mr-2">✏️</span>
+                          Edit
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/suppliers/${supplier.id}`);
+                        }}
+                      >
+                        <span className="flex items-center">
+                          <span className="md:hidden mr-2">👁️</span>
+                          View Details
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-500"
+                        onClick={(e) => handleDeleteSupplier(e, supplier.id)}
+                      >
+                        <span className="flex items-center">
+                          <span className="md:hidden mr-2">🗑️</span>
+                          Delete
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </TableCell>
             </TableRow>

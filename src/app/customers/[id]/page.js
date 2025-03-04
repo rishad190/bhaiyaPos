@@ -1,7 +1,13 @@
 "use client";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-
+import { MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -248,21 +254,38 @@ export default function CustomerDetail() {
                   {transaction.storeId}
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <EditTransactionDialog
-                      transaction={transaction}
-                      onEditTransaction={(updatedData) =>
-                        handleEditTransaction(transaction.id, updatedData)
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500"
-                      onClick={() => handleDeleteTransaction(transaction.id)}
-                    >
-                      Delete
-                    </Button>
+                  <div className="flex justify-end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <EditTransactionDialog
+                            transaction={transaction}
+                            onEditTransaction={(updatedData) =>
+                              handleEditTransaction(transaction.id, updatedData)
+                            }
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-500"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Are you sure you want to delete this transaction?"
+                              )
+                            ) {
+                              handleDeleteTransaction(transaction.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </TableCell>
               </TableRow>
