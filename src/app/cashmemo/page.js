@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useData } from "@/app/data-context"; // Add this import
 
 import {
   Table,
@@ -14,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export default function CashMemoPage() {
+  const { customers } = useData(); // Add this line
   const [memoData, setMemoData] = useState({
     date: new Date().toISOString().split("T")[0],
     customerName: "",
@@ -39,6 +41,23 @@ export default function CashMemoPage() {
   };
 
   const grandTotal = products.reduce((sum, product) => sum + product.total, 0);
+
+  // Add this function to lookup customer
+  const handlePhoneChange = (e) => {
+    const phoneNumber = e.target.value;
+    setMemoData({ ...memoData, customerPhone: phoneNumber });
+
+    // Look up customer by phone number
+    const customer = customers.find((c) => c.phone === phoneNumber);
+    if (customer) {
+      setMemoData((prev) => ({
+        ...prev,
+        customerPhone: phoneNumber,
+        customerName: customer.name,
+        customerAddress: customer.address || "",
+      }));
+    }
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
@@ -70,9 +89,7 @@ export default function CashMemoPage() {
               <label className="text-sm font-medium">Phone Number</label>
               <Input
                 value={memoData.customerPhone}
-                onChange={(e) =>
-                  setMemoData({ ...memoData, customerPhone: e.target.value })
-                }
+                onChange={handlePhoneChange}
                 placeholder="Enter phone number"
               />
             </div>
