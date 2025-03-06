@@ -34,6 +34,7 @@ export default function CashBookPage() {
     // Keep YYYY-MM-DD format for the input field
     return today.toISOString().split("T")[0];
   });
+  const [editingTransaction, setEditingTransaction] = useState(null);
 
   const handleAddTransaction = async (transaction) => {
     try {
@@ -250,13 +251,13 @@ export default function CashBookPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <EditCashTransactionDialog
-                              transaction={t}
-                              onEditTransaction={(updated) =>
-                                handleEditTransaction(t.id, updated)
-                              }
-                            />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTransaction(t);
+                            }}
+                          >
+                            Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-red-500"
@@ -345,13 +346,13 @@ export default function CashBookPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <EditCashTransactionDialog
-                                  transaction={t}
-                                  onEditTransaction={(updated) =>
-                                    handleEditTransaction(t.id, updated)
-                                  }
-                                />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTransaction(t);
+                                }}
+                              >
+                                Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-500"
@@ -374,6 +375,19 @@ export default function CashBookPage() {
           </Table>
         </div>
       </div>
+      {editingTransaction && (
+        <EditCashTransactionDialog
+          transaction={editingTransaction}
+          open={!!editingTransaction}
+          onOpenChange={(open) => {
+            if (!open) setEditingTransaction(null);
+          }}
+          onEditTransaction={(updated) => {
+            handleEditTransaction(editingTransaction.id, updated);
+            setEditingTransaction(null);
+          }}
+        />
+      )}
     </div>
   );
 }
