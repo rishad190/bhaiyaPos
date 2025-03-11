@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useData } from "@/app/data-context"; // Add this import
+import { CashMemoPrint } from "@/components/CashMemoPrint"; // Updated import path
 
 import {
   Table,
@@ -32,12 +33,56 @@ export default function CashMemoPage() {
     total: 0,
   });
 
-  const handleAddProduct = () => {
-    if (!newProduct.name || !newProduct.quality || !newProduct.price) return;
+  const originalContent = useRef(null);
 
-    const total = parseFloat(newProduct.quality) * parseFloat(newProduct.price);
-    setProducts([...products, { ...newProduct, total }]);
-    setNewProduct({ name: "", quality: "", price: "", total: 0 });
+  const handleAddProduct = () => {
+    // Validation checks
+    if (!newProduct.name.trim()) {
+      alert("Please enter product name");
+      return;
+    }
+
+    if (
+      !newProduct.quality ||
+      isNaN(parseFloat(newProduct.quality)) ||
+      parseFloat(newProduct.quality) <= 0
+    ) {
+      alert("Please enter valid quality");
+      return;
+    }
+
+    if (
+      !newProduct.price ||
+      isNaN(parseFloat(newProduct.price)) ||
+      parseFloat(newProduct.price) <= 0
+    ) {
+      alert("Please enter valid price");
+      return;
+    }
+
+    // Convert strings to numbers and calculate total
+    const quality = parseFloat(newProduct.quality);
+    const price = parseFloat(newProduct.price);
+    const total = quality * price;
+
+    // Add new product to the list
+    setProducts([
+      ...products,
+      {
+        name: newProduct.name.trim(),
+        quality,
+        price,
+        total,
+      },
+    ]);
+
+    // Reset form
+    setNewProduct({
+      name: "",
+      quality: "",
+      price: "",
+      total: 0,
+    });
   };
 
   const grandTotal = products.reduce((sum, product) => sum + product.total, 0);
@@ -57,6 +102,121 @@ export default function CashMemoPage() {
         customerAddress: customer.address || "",
       }));
     }
+  };
+
+  // Add this function inside CashMemoPage component
+  const handlePrint = () => {
+    const printContent = document.getElementById("print-section");
+    if (!printContent) return;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Print Memo</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 1cm;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              font-family: 'Arial', sans-serif;
+            }
+            body {
+              padding: 1.5rem;
+              color: #333;
+              line-height: 1.6;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 3rem;
+              padding-bottom: 1rem;
+              border-bottom: 2px solid #eaeaea;
+            }
+            .logo {
+              max-width: 120px;
+              margin-bottom: 1rem;
+            }
+            .company-name {
+              font-size: 24px;
+              font-weight: bold;
+              color: #1a1a1a;
+              margin-bottom: 0.5rem;
+            }
+            .memo-info {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 2rem;
+            }
+            .customer-details, .memo-details {
+              flex: 1;
+              max-width: 300px;
+            }
+            .memo-details {
+              text-align: right;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 2rem 0;
+            }
+            th, td {
+              padding: 12px;
+              text-align: left;
+              border-bottom: 1px solid #eaeaea;
+            }
+            th {
+              background-color: #f8f8f8;
+              font-weight: bold;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .grand-total {
+              margin-top: 2rem;
+              text-align: right;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: 4rem;
+              text-align: center;
+              color: #666;
+              font-size: 14px;
+            }
+            .footer-line {
+              margin-top: 2rem;
+              padding-top: 1rem;
+              border-top: 1px solid #eaeaea;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+          <div class="footer">
+            <p>Thank you for your business!</p>
+            <div class="footer-line">
+              <p>Sky Fabric's - Quality Fabrics, Trusted Service</p>
+              <p>Mobile: 01713-458086, 01738-732971</p>
+            </div>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              window.onafterprint = () => window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
   };
 
   return (
@@ -127,22 +287,29 @@ export default function CashMemoPage() {
               onChange={(e) =>
                 setNewProduct({ ...newProduct, name: e.target.value })
               }
+              required
             />
             <Input
               type="number"
+              min="0"
+              step="any"
               placeholder="Quality"
               value={newProduct.quality}
               onChange={(e) =>
                 setNewProduct({ ...newProduct, quality: e.target.value })
               }
+              required
             />
             <Input
               type="number"
+              min="0"
+              step="any"
               placeholder="Price"
               value={newProduct.price}
               onChange={(e) =>
                 setNewProduct({ ...newProduct, price: e.target.value })
               }
+              required
             />
             <Button onClick={handleAddProduct} className="w-full md:w-auto">
               Add Product
@@ -197,10 +364,22 @@ export default function CashMemoPage() {
       </Card>
 
       <div className="flex flex-col sm:flex-row justify-end gap-4">
-        <Button variant="outline" className="w-full sm:w-auto">
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto print:hidden"
+          onClick={handlePrint}
+        >
           Print Memo
         </Button>
-        <Button className="w-full sm:w-auto">Save Memo</Button>
+        <Button className="w-full sm:w-auto print:hidden">Save Memo</Button>
+      </div>
+
+      <div id="print-section" className="hidden print:block">
+        <CashMemoPrint
+          memoData={memoData}
+          products={products}
+          grandTotal={grandTotal}
+        />
       </div>
     </div>
   );
