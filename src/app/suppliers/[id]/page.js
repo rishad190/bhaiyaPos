@@ -173,10 +173,22 @@ export default function SupplierDetail() {
             <p className="text-gray-600">{supplier.email}</p>
             <p className="text-gray-600">{supplier.address}</p>
           </div>
-          <div className="text-left md:text-right">
+          <div className="text-left md:text-right space-y-2">
             <p className="text-base md:text-lg">Store ID: {supplier.storeId}</p>
+            <p className="text-xl md:text-xl font-bold text-gray-900">
+              Total Amount: ৳
+              {transactions
+                .reduce((sum, t) => sum + (t.totalAmount || 0), 0)
+                .toLocaleString()}
+            </p>
+            <p className="text-xl md:text-xl font-bold text-green-600">
+              Total Paid: ৳
+              {transactions
+                .reduce((sum, t) => sum + (t.paidAmount || 0), 0)
+                .toLocaleString()}
+            </p>
             <p
-              className={`text-xl md:text-2xl font-bold ${
+              className={`text-xl md:text-xl font-bold ${
                 supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
               }`}
             >

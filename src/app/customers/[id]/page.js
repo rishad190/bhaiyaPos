@@ -151,10 +151,22 @@ export default function CustomerDetail() {
             <p className="text-gray-600">{customer.phone}</p>
             <p className="text-gray-600">{customer.email}</p>
           </div>
-          <div className="text-left md:text-right">
+          <div className="text-left md:text-right space-y-2">
             <p className="text-base md:text-lg">Store ID: {customer.storeId}</p>
+            <p className="text-xl md:text-xl font-bold text-gray-900">
+              Total Bill: ৳
+              {customerTransactionsWithBalance
+                .reduce((sum, t) => sum + (t.total || 0), 0)
+                .toLocaleString()}
+            </p>
+            <p className="text-xl md:text-xl font-bold text-green-600">
+              Total Deposit: ৳
+              {customerTransactionsWithBalance
+                .reduce((sum, t) => sum + (t.deposit || 0), 0)
+                .toLocaleString()}
+            </p>
             <p
-              className={`text-xl md:text-2xl font-bold ${
+              className={`text-xl md:text-xl font-bold ${
                 totalDue > 0 ? "text-red-500" : "text-green-500"
               }`}
             >

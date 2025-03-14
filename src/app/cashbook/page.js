@@ -221,58 +221,101 @@ export default function CashBookPage() {
                 </div>
               </div>
 
-              {/* Transactions List */}
+              {/* Mobile View - Transactions List */}
               <div className="p-4 space-y-3">
-                {day.dailyCash.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex flex-col gap-2 py-2 border-b border-gray-100 last:border-0"
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="font-medium">{t.description}</span>
-                      <div className="flex gap-2 text-sm">
-                        {t.cashIn > 0 && (
+                {/* Cash In Transactions */}
+                {day.dailyCash
+                  .filter((t) => t.cashIn > 0)
+                  .map((t) => (
+                    <div
+                      key={`in-${t.id}`}
+                      className="flex flex-col gap-2 py-2 border-b border-gray-100"
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium">{t.description}</span>
+                        <div className="flex gap-2 text-sm">
                           <span className="text-green-600">
                             ৳+{t.cashIn.toLocaleString()}
                           </span>
-                        )}
-                        {t.cashOut > 0 && (
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTransaction(t);
+                              }}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTransaction(t.id);
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
+
+                {/* Cash Out Transactions */}
+                {day.dailyCash
+                  .filter((t) => t.cashOut > 0)
+                  .map((t) => (
+                    <div
+                      key={`out-${t.id}`}
+                      className="flex flex-col gap-2 py-2 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium">{t.description}</span>
+                        <div className="flex gap-2 text-sm">
                           <span className="text-red-600">
                             ৳-{t.cashOut.toLocaleString()}
                           </span>
-                        )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTransaction(t);
+                              }}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-500"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTransaction(t.id);
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                    <div className="flex gap-2 justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTransaction(t);
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteTransaction(t.id);
-                            }}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           ))}
@@ -316,29 +359,20 @@ export default function CashBookPage() {
                     ৳{day.balance.toLocaleString()}
                   </TableCell>
                   <TableCell className="space-y-3">
-                    {day.dailyCash.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                      >
-                        <div className="w-full sm:w-auto mb-2 sm:mb-0">
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    {/* Show all Cash In transactions first */}
+                    {day.dailyCash
+                      .filter((t) => t.cashIn > 0)
+                      .map((t) => (
+                        <div
+                          key={`in-${t.id}`}
+                          className="flex items-center justify-between py-2 border-b border-gray-100"
+                        >
+                          <div className="flex items-center gap-2">
                             <span className="font-medium">{t.description}</span>
-                            <div className="flex gap-2 text-sm">
-                              {t.cashIn > 0 && (
-                                <span className="text-green-600">
-                                  ৳+{t.cashIn.toLocaleString()}
-                                </span>
-                              )}
-                              {t.cashOut > 0 && (
-                                <span className="text-red-600">
-                                  ৳-{t.cashOut.toLocaleString()}
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-green-600 text-sm">
+                              ৳+{t.cashIn.toLocaleString()}
+                            </span>
                           </div>
-                        </div>
-                        <div className="flex flex-row gap-2 w-full sm:w-auto justify-end">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
@@ -366,8 +400,50 @@ export default function CashBookPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+
+                    {/* Show all Cash Out transactions next */}
+                    {day.dailyCash
+                      .filter((t) => t.cashOut > 0)
+                      .map((t) => (
+                        <div
+                          key={`out-${t.id}`}
+                          className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{t.description}</span>
+                            <span className="text-red-600 text-sm">
+                              ৳-{t.cashOut.toLocaleString()}
+                            </span>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTransaction(t);
+                                }}
+                              >
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTransaction(t.id);
+                                }}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
                   </TableCell>
                 </TableRow>
               ))}
