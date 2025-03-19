@@ -1,7 +1,19 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+
 import { useState } from "react";
-import { MoreVertical } from "lucide-react";
+import {
+  MoreVertical,
+  ArrowLeft,
+  ArrowDownToLine,
+  Phone,
+  Mail,
+  Store,
+  DollarSign,
+  CreditCard,
+  FileText,
+  Printer,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,11 +32,23 @@ import {
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { EditTransactionDialog } from "@/components/EditTransactionDialog";
 import { exportToCSV } from "@/utils/export";
+import { exportToPDF } from "@/utils/export";
 import { useData } from "@/app/data-context";
 import { formatDate } from "@/lib/utils";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 export default function CustomerDetail() {
   const params = useParams();
+  const router = useRouter();
   const {
     customers,
     transactions,
@@ -33,7 +57,7 @@ export default function CustomerDetail() {
     updateTransaction,
     getCustomerDue,
   } = useData();
-  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+
   const [storeFilter, setStoreFilter] = useState("all");
 
   const customer = customers.find((c) => c.id === params.id);
@@ -142,70 +166,191 @@ export default function CustomerDetail() {
   }
 
   return (
-    <div className="p-4 md:p-8">
-      {/* Customer Info Card */}
-      <div className="bg-gray-50 p-4 md:p-6 rounded-lg mb-4 md:mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold">{customer.name}</h2>
-            <p className="text-gray-600">{customer.phone}</p>
-            <p className="text-gray-600">{customer.email}</p>
-          </div>
-          <div className="text-left md:text-right space-y-2">
-            <p className="text-base md:text-lg">Store ID: {customer.storeId}</p>
-            <p className="text-xl md:text-xl font-bold text-gray-900">
-              Total Bill: ৳
-              {customerTransactionsWithBalance
-                .reduce((sum, t) => sum + (t.total || 0), 0)
-                .toLocaleString()}
-            </p>
-            <p className="text-xl md:text-xl font-bold text-green-600">
-              Total Deposit: ৳
-              {customerTransactionsWithBalance
-                .reduce((sum, t) => sum + (t.deposit || 0), 0)
-                .toLocaleString()}
-            </p>
-            <p
-              className={`text-xl md:text-xl font-bold ${
-                totalDue > 0 ? "text-red-500" : "text-green-500"
-              }`}
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => router.back()}
             >
-              Total Due: ৳{totalDue.toLocaleString()}
-            </p>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Customer Details
+            </h1>
           </div>
+          <p className="text-muted-foreground">
+            View and manage customer information and transactions
+          </p>
         </div>
+      </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <select
-            className="w-full md:w-auto border rounded-md px-4 py-2"
-            value={storeFilter}
-            onChange={(e) => setStoreFilter(e.target.value)}
-          >
-            <option value="all">All Stores</option>
-            <option value="STORE1">Store 1</option>
-            <option value="STORE2">Store 2</option>
-          </select>
-          <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-            <Button
-              variant="outline"
-              onClick={handleExportCSV}
-              className="w-full md:w-auto"
-            >
-              Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-              className="w-full md:w-auto"
-            >
-              Print
-            </Button>
-            <AddTransactionDialog
-              customerId={params.id}
-              onAddTransaction={handleAddTransaction}
-            />
-          </div>
-        </div>
+      {/* Customer Info and Financial Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Customer Info Card */}
+        <Card className="lg:col-span-1 overflow-hidden border-none shadow-md">
+          <CardHeader className="bg-primary text-primary-foreground pb-4">
+            <div className="flex justify-between items-start">
+              <CardTitle>Customer Profile</CardTitle>
+              <Badge
+                variant="secondary"
+                className="bg-primary-foreground text-primary"
+              >
+                ID: {params.id}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center mb-6">
+              <Avatar className="h-24 w-24 mb-4">
+                <AvatarFallback className="text-xl">
+                  {customer.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-2xl font-bold text-center">
+                {customer.name}
+              </h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span>{customer.phone}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>{customer.email}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Store className="h-4 w-4 text-muted-foreground" />
+                <span>Store ID: {customer.storeId}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Financial Summary Card */}
+        <Card className="lg:col-span-2 border-none shadow-md">
+          <CardHeader className="bg-muted pb-4">
+            <CardTitle>Financial Summary</CardTitle>
+            <CardDescription>
+              Overview of customer's financial status
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-blue-50 border-none shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-blue-600">
+                      Total Bill
+                    </span>
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    ৳
+                    {customerTransactionsWithBalance
+                      .reduce((sum, t) => sum + (t.total || 0), 0)
+                      .toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-green-50 border-none shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-green-600">
+                      Total Deposit
+                    </span>
+                    <CreditCard className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-green-700">
+                    ৳
+                    {customerTransactionsWithBalance
+                      .reduce((sum, t) => sum + (t.deposit || 0), 0)
+                      .toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`${
+                  totalDue > 0 ? "bg-red-50" : "bg-green-50"
+                } border-none shadow-sm`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span
+                      className={`text-sm font-medium ${
+                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    >
+                      Total Due
+                    </span>
+                    <FileText
+                      className={`h-4 w-4 ${
+                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    />
+                  </div>
+                  <div
+                    className={`text-2xl font-bold ${
+                      totalDue > 0 ? "text-red-700" : "text-green-700"
+                    }`}
+                  >
+                    ৳{totalDue.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
+              <select
+                className="w-full sm:w-[180px] border rounded-md px-4 py-2"
+                value={storeFilter}
+                onChange={(e) => setStoreFilter(e.target.value)}
+              >
+                <option value="all">All Stores</option>
+                <option value="STORE1">Store 1</option>
+                <option value="STORE2">Store 2</option>
+              </select>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={handleExportCSV}>
+                  <ArrowDownToLine className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    exportToPDF(
+                      customer,
+                      customerTransactionsWithBalance,
+                      "customer"
+                    )
+                  }
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export PDF
+                </Button>
+                <Button variant="outline" onClick={() => window.print()}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
+                <AddTransactionDialog
+                  customerId={params.id}
+                  onAddTransaction={handleAddTransaction}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Transactions Table */}
