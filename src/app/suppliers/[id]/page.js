@@ -270,7 +270,7 @@ export default function SupplierDetail() {
           <CardHeader className="bg-muted pb-4">
             <CardTitle>Financial Summary</CardTitle>
             <CardDescription>
-              Overview of supplier's financial status
+              Overview of suppliers financial status
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">

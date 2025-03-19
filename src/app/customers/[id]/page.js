@@ -241,7 +241,7 @@ export default function CustomerDetail() {
           <CardHeader className="bg-muted pb-4">
             <CardTitle>Financial Summary</CardTitle>
             <CardDescription>
-              Overview of customer's financial status
+              Overview of customers financial status
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
