@@ -38,7 +38,6 @@ export default function Dashboard() {
   const {
     customers,
     transactions,
-    loading,
     error,
     addCustomer,
     updateCustomer,
@@ -50,6 +49,7 @@ export default function Dashboard() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [mounted, setMounted] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleAddCustomer = async (customerData) => {
     try {
@@ -103,8 +103,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     setMounted(true);
-    if (mounted) {
-      // Empty if block
+    if (mounted && customers) {
+      setIsLoading(false);
     }
   }, [mounted, customers]);
 
@@ -112,6 +112,22 @@ export default function Dashboard() {
     return (
       <div className="p-8 text-center">
         <p className="text-red-500">Error: {error}</p>
+      </div>
+    );
+  }
+
+  if (isLoading || !customers) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Customer Management
+            </h1>
+            <p className="text-muted-foreground">Loading customer data...</p>
+          </div>
+        </div>
+        <LoadingSpinner />
       </div>
     );
   }

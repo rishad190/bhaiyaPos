@@ -261,6 +261,47 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
       },
     });
 
+    // After the transactions table, add a final summary
+    doc.setDrawColor(41, 128, 185);
+    doc.setLineWidth(0.5);
+    doc.line(
+      doc.internal.pageSize.width - 80,
+      doc.internal.pageSize.height - 40,
+      doc.internal.pageSize.width - 10,
+      doc.internal.pageSize.height - 40
+    );
+
+    // Add total due summary
+    doc.setFontSize(12);
+    doc.setTextColor(41, 128, 185);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      "Total Outstanding:",
+      doc.internal.pageSize.width - 80,
+      doc.internal.pageSize.height - 30
+    );
+
+    doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      formatCurrency(totalDue),
+      doc.internal.pageSize.width - 10,
+      doc.internal.pageSize.height - 30,
+      { align: "right" }
+    );
+
+    // Add a note if there's due amount
+    if (totalDue > 0) {
+      doc.setFontSize(8);
+      doc.setTextColor(128);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        "* Please clear outstanding dues at your earliest convenience",
+        doc.internal.pageSize.width - 80,
+        doc.internal.pageSize.height - 25
+      );
+    }
+
     // Save PDF
     const fileName = `${entity.name.replace(
       /\s+/g,
