@@ -14,9 +14,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
+import { Printer, FileDown, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 export default function CashMemoPage() {
   const { customers } = useData(); // Add this line
+  // After your existing state declarations
+  const [openPhonePopover, setOpenPhonePopover] = useState(false);
+  const [phoneSearchValue, setPhoneSearchValue] = useState("");
   const [memoData, setMemoData] = useState({
     date: new Date().toISOString().split("T")[0],
     customerName: "",
@@ -219,6 +236,16 @@ export default function CashMemoPage() {
     printWindow.document.close();
   };
 
+  const handleSelectCustomer = (customer) => {
+    setMemoData({
+      ...memoData,
+      customerPhone: customer.phone,
+      customerName: customer.name,
+      customerAddress: customer.address || "",
+    });
+    setOpenPhonePopover(false);
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       {/* Header Card */}
@@ -247,11 +274,79 @@ export default function CashMemoPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Phone Number</label>
-              <Input
-                value={memoData.customerPhone}
-                onChange={handlePhoneChange}
-                placeholder="Enter phone number"
-              />
+              <div className="relative">
+                <Popover
+                  open={openPhonePopover}
+                  onOpenChange={setOpenPhonePopover}
+                >
+                  <PopoverTrigger asChild>
+                    <div className="flex items-center">
+                      <Input
+                        value={memoData.customerPhone}
+                        onChange={(e) => {
+                          handlePhoneChange(e);
+                          setPhoneSearchValue(e.target.value);
+                        }}
+                        placeholder="Enter phone number"
+                        className="w-full"
+                      />
+                      <Button
+                        variant="ghost"
+                        role="combobox"
+                        aria-expanded={openPhonePopover}
+                        className="absolute right-0 h-full px-3"
+                        onClick={() => setOpenPhonePopover(!openPhonePopover)}
+                      >
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search customers..."
+                        value={phoneSearchValue}
+                        onValueChange={setPhoneSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandGroup>
+                          {customers
+                            ?.filter(
+                              (customer) =>
+                                customer.phone.includes(phoneSearchValue) ||
+                                customer.name
+                                  .toLowerCase()
+                                  .includes(phoneSearchValue.toLowerCase())
+                            )
+                            .map((customer) => (
+                              <CommandItem
+                                key={customer.id}
+                                value={customer.phone}
+                                onSelect={() => handleSelectCustomer(customer)}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    memoData.customerPhone === customer.phone
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{customer.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer.phone}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
           <div className="space-y-4">
@@ -259,7 +354,10 @@ export default function CashMemoPage() {
               <label className="text-sm font-medium">Memo Number</label>
               <Input
                 value={memoData.memoNumber}
-                readOnly
+                onChange={(e) =>
+                  setMemoData({ ...memoData, memoNumber: e.target.value })
+                }
+                placeholder="Enter memo number"
                 className="bg-gray-50"
               />
             </div>
@@ -369,7 +467,16 @@ export default function CashMemoPage() {
           className="w-full sm:w-auto print:hidden"
           onClick={handlePrint}
         >
+          <Printer className="mr-2 h-4 w-4" />
           Print Memo
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto print:hidden"
+          onClick={handlePrint}
+        >
+          <FileDown className="mr-2 h-4 w-4" />
+          Export PDF
         </Button>
         <Button className="w-full sm:w-auto print:hidden">Save Memo</Button>
       </div>

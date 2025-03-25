@@ -355,10 +355,6 @@ export default function SupplierDetail() {
                 <option value="STORE2">Store 2</option>
               </select>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" onClick={handleExportCSV}>
-                  <ArrowDownToLine className="mr-2 h-4 w-4" />
-                  Export CSV
-                </Button>
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -368,10 +364,7 @@ export default function SupplierDetail() {
                   <FileText className="mr-2 h-4 w-4" />
                   Export PDF
                 </Button>
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print
-                </Button>
+
                 <AddSupplierTransactionDialog
                   supplierId={params.id}
                   onAddTransaction={handleAddTransaction}
