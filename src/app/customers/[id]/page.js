@@ -62,25 +62,27 @@ export default function CustomerDetail() {
 
   const customer = customers.find((c) => c.id === params.id);
 
-  // Calculate cumulative balances for transactions
+  // Update the cumulative balance calculation
   const customerTransactionsWithBalance = transactions
     .filter((t) => t.customerId === params.id)
     .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .reduce((acc, transaction) => {
+      // Use the transaction's due amount directly instead of recalculating
       const previousBalance =
         acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-      const currentBalance = previousBalance + transaction.due;
-
       return [
         ...acc,
         {
           ...transaction,
-          cumulativeBalance: currentBalance,
+          // Use the original due amount from the transaction
+          cumulativeBalance: previousBalance + (transaction.due || 0),
         },
       ];
     }, []);
+  console.log(transactions.filter((t) => t.customerId === params.id));
 
+  // Update the total due calculation
   const totalDue =
     customerTransactionsWithBalance.length > 0
       ? customerTransactionsWithBalance[
@@ -118,7 +120,6 @@ export default function CustomerDetail() {
       }
 
       // Trim and validate memo number first
-      console.log(transactionId, updatedData);
 
       const trimmedMemo = updatedData.memoNumber?.trim();
 

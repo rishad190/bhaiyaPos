@@ -54,8 +54,23 @@ export function CashMemoPrint({ memoData, products, grandTotal }) {
         </tbody>
       </table>
 
-      <div className="grand-total">
-        <p>Grand Total: ৳{grandTotal.toLocaleString()}</p>
+      <div className="grand-total space-y-2">
+        <p>
+          <span className="font-semibold">Grand Total:</span> ৳
+          {grandTotal.toLocaleString()}
+        </p>
+        {memoData.deposit && Number(memoData.deposit) > 0 && (
+          <>
+            <p>
+              <span className="font-semibold">Deposit:</span> ৳
+              {Number(memoData.deposit).toLocaleString()}
+            </p>
+            <p>
+              <span className="font-semibold">Due:</span> ৳
+              {(grandTotal - Number(memoData.deposit)).toLocaleString()}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

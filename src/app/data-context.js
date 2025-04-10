@@ -9,6 +9,9 @@ import {
   update,
   serverTimestamp,
   get,
+  query,
+  orderByChild,
+  equalTo,
 } from "firebase/database";
 import { db } from "@/lib/firebase";
 
@@ -164,6 +167,7 @@ export function DataProvider({ children }) {
         ...transactionData,
         createdAt: new Date().toISOString(),
       });
+
       return newTransactionRef.key;
     },
 
@@ -369,6 +373,30 @@ export function DataProvider({ children }) {
           id: newTransactionRef.key,
           createdAt: serverTimestamp(),
         });
+
+        // Update related customer transaction if it's a sale
+        if (transaction.type === "sale" && transaction.reference) {
+          const customerTransactionRef = query(
+            ref(db, "transactions"),
+            orderByChild("memoNumber"),
+            equalTo(transaction.reference)
+          );
+
+          const snapshot = await get(customerTransactionRef);
+          if (snapshot.exists()) {
+            const [transactionId, transactionData] = Object.entries(
+              snapshot.val()
+            )[0];
+            await update(ref(db, `transactions/${transactionId}`), {
+              deposit:
+                (transactionData.deposit || 0) + (transaction.cashIn || 0),
+              due:
+                transactionData.total -
+                ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
+            });
+          }
+        }
+
         return newTransactionRef.key;
       } catch (error) {
         console.error("Error adding daily cash transaction:", error);

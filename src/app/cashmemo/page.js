@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useData } from "@/app/data-context"; // Add this import
 import { CashMemoPrint } from "@/components/CashMemoPrint"; // Updated import path
 
+import { Toaster } from "@/components/ui/toaster";
 import {
   Table,
   TableBody,
@@ -29,9 +30,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useToast } from "@/hooks/use-toast";
 export default function CashMemoPage() {
-  const { customers } = useData(); // Add this line
-  // After your existing state declarations
+  const { toast } = useToast();
+  const { customers, addTransaction, addDailyCashTransaction } = useData();
+  const [customerId, setCustomerId] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [openPhonePopover, setOpenPhonePopover] = useState(false);
   const [phoneSearchValue, setPhoneSearchValue] = useState("");
   const [memoData, setMemoData] = useState({
@@ -40,6 +45,7 @@ export default function CashMemoPage() {
     customerPhone: "",
     customerAddress: "",
     memoNumber: `MEMO-${Date.now()}`,
+    deposit: "", // Add this new field
   });
 
   const [products, setProducts] = useState([]);
@@ -110,7 +116,7 @@ export default function CashMemoPage() {
     setMemoData({ ...memoData, customerPhone: phoneNumber });
 
     // Look up customer by phone number
-    const customer = customers.find((c) => c.phone === phoneNumber);
+    const customer = customers?.find((c) => c.phone === phoneNumber);
     if (customer) {
       setMemoData((prev) => ({
         ...prev,
@@ -118,6 +124,9 @@ export default function CashMemoPage() {
         customerName: customer.name,
         customerAddress: customer.address || "",
       }));
+      setCustomerId(customer.id); // Add this line
+    } else {
+      setCustomerId(""); // Reset when no customer found
     }
   };
 
@@ -246,8 +255,122 @@ export default function CashMemoPage() {
     setOpenPhonePopover(false);
   };
 
+  const handleSaveMemo = async () => {
+    if (products.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one product",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!memoData.customerName || !memoData.customerPhone) {
+      toast({
+        title: "Error",
+        description: "Please provide customer information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Parse deposit amount properly
+      const deposit = Number(memoData.deposit) || 0;
+
+      // Validate deposit amount
+      if (deposit > grandTotal) {
+        toast({
+          title: "Error",
+          description: "Deposit cannot exceed total amount",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Find customer
+      let customer = customers?.find((c) => c.phone === memoData.customerPhone);
+      const customerId = customer?.id;
+
+      if (!customerId) {
+        toast({
+          title: "Error",
+          description: "Customer not found. Please select a valid customer.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // 1. Create single transaction for customer
+      const customerTransaction = {
+        customerId,
+        date: memoData.date,
+        memoNumber: memoData.memoNumber,
+        total: grandTotal,
+        deposit: deposit,
+        due: grandTotal - deposit,
+        details: products
+          .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
+          .join(", "),
+        type: "sale",
+      };
+
+      // Add transaction to customer history
+      await addTransaction(customerTransaction);
+
+      // 2. Create cashbook entry only if there's a deposit
+      if (deposit > 0) {
+        const cashTransaction = {
+          date: memoData.date,
+          description: `Cash Memo: ${memoData.memoNumber} - ${memoData.customerName}`,
+          cashIn: deposit,
+          cashOut: 0,
+          type: "sale",
+          reference: memoData.memoNumber,
+          details: `Deposit against sale - ${products.length} items`,
+          total: grandTotal,
+          balance: grandTotal - deposit,
+          customer: memoData.customerName,
+          customerPhone: memoData.customerPhone,
+        };
+
+        await addDailyCashTransaction(cashTransaction);
+      }
+
+      toast({
+        title: "Success",
+        description: "Cash memo saved successfully",
+      });
+
+      // Reset form
+      setMemoData({
+        date: new Date().toISOString().split("T")[0],
+        customerName: "",
+        customerPhone: "",
+        customerAddress: "",
+        memoNumber: `MEMO-${Date.now()}`,
+        deposit: "", // Reset deposit
+      });
+      setProducts([]);
+      setCustomerId("");
+    } catch (error) {
+      console.error("Error saving memo:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save memo. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+      <Toaster />
       {/* Header Card */}
       <Card className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -347,6 +470,23 @@ export default function CashMemoPage() {
                   </PopoverContent>
                 </Popover>
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Deposit Amount</label>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={memoData.deposit}
+                onChange={(e) =>
+                  setMemoData({
+                    ...memoData,
+                    deposit: e.target.value,
+                  })
+                }
+                placeholder="Enter deposit amount"
+                className="w-full"
+              />
             </div>
           </div>
           <div className="space-y-4">
@@ -455,6 +595,31 @@ export default function CashMemoPage() {
                     ৳{grandTotal.toLocaleString()}
                   </TableCell>
                 </TableRow>
+                <TableRow>
+                  <TableCell
+                    colSpan={3}
+                    className="text-right font-medium text-green-600"
+                  >
+                    Deposit:
+                  </TableCell>
+                  <TableCell className="text-right font-medium whitespace-nowrap text-green-600">
+                    ৳{Number(memoData.deposit || 0).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell
+                    colSpan={3}
+                    className="text-right font-medium text-red-600"
+                  >
+                    Due Amount:
+                  </TableCell>
+                  <TableCell className="text-right font-medium whitespace-nowrap text-red-600">
+                    ৳
+                    {(
+                      grandTotal - Number(memoData.deposit || 0)
+                    ).toLocaleString()}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
@@ -473,12 +638,25 @@ export default function CashMemoPage() {
         <Button
           variant="outline"
           className="w-full sm:w-auto print:hidden"
-          onClick={handlePrint}
+          // onClick={handleExportPDF}
         >
           <FileDown className="mr-2 h-4 w-4" />
           Export PDF
         </Button>
-        <Button className="w-full sm:w-auto print:hidden">Save Memo</Button>
+        <Button
+          className="w-full sm:w-auto print:hidden"
+          onClick={() => handleSaveMemo()}
+          disabled={isSaving || products.length === 0}
+        >
+          {isSaving ? (
+            <>
+              <LoadingSpinner size="sm" className="mr-2" />
+              Saving...
+            </>
+          ) : (
+            "Save Memo"
+          )}
+        </Button>
       </div>
 
       <div id="print-section" className="hidden print:block">
