@@ -1,5 +1,12 @@
 "use client";
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   ref,
   onValue,
@@ -117,6 +124,24 @@ export function DataProvider({ children }) {
     return () => unsubscribers.forEach((unsub) => unsub());
   }, []);
 
+  // Add memoization for customer dues
+  const customerDues = useMemo(() => {
+    const dues = {};
+    state.customers?.forEach((customer) => {
+      dues[customer.id] = state.transactions
+        ?.filter((t) => t.customerId === customer.id)
+        .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+    });
+    return dues;
+  }, [state.customers, state.transactions]);
+
+  const getCustomerDue = useCallback(
+    (customerId) => {
+      return customerDues[customerId] || 0;
+    },
+    [customerDues]
+  );
+
   // Customer Operations
   const customerOperations = {
     addCustomer: async (customerData) => {
@@ -151,11 +176,7 @@ export function DataProvider({ children }) {
       await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
     },
 
-    getCustomerDue: (customerId) => {
-      return state.transactions
-        .filter((t) => t.customerId === customerId)
-        .reduce((total, t) => total + (parseFloat(t.due) || 0), 0);
-    },
+    getCustomerDue,
   };
 
   // Transaction Operations

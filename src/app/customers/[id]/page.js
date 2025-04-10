@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   MoreVertical,
   ArrowLeft,
@@ -59,28 +59,51 @@ export default function CustomerDetail() {
   } = useData();
 
   const [storeFilter, setStoreFilter] = useState("all");
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [pageTransactions, setPageTransactions] = useState([]);
+  const [page, setPage] = useState(1);
+  const transactionsPerPage = 20;
 
   const customer = customers.find((c) => c.id === params.id);
 
-  // Update the cumulative balance calculation
-  const customerTransactionsWithBalance = transactions
-    .filter((t) => t.customerId === params.id)
-    .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .reduce((acc, transaction) => {
-      // Use the transaction's due amount directly instead of recalculating
-      const previousBalance =
-        acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-      return [
-        ...acc,
-        {
-          ...transaction,
-          // Use the original due amount from the transaction
-          cumulativeBalance: previousBalance + (transaction.due || 0),
-        },
-      ];
-    }, []);
-  console.log(transactions.filter((t) => t.customerId === params.id));
+  // Memoize the filtered and sorted transactions to prevent recalculation on every render
+  const customerTransactionsWithBalance = useMemo(() => {
+    return transactions
+      .filter((t) => t.customerId === params.id)
+      .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .reduce((acc, transaction) => {
+        const previousBalance =
+          acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
+        return [
+          ...acc,
+          {
+            ...transaction,
+            cumulativeBalance: previousBalance + (transaction.due || 0),
+          },
+        ];
+      }, []);
+  }, [transactions, params.id, storeFilter]);
+
+  // Memoize the paginated transactions
+  const getPaginatedTransactions = useCallback(() => {
+    const start = (page - 1) * transactionsPerPage;
+    const end = start + transactionsPerPage;
+    return customerTransactionsWithBalance.slice(start, end);
+  }, [page, customerTransactionsWithBalance, transactionsPerPage]);
+
+  // Update page transactions only when necessary
+  useEffect(() => {
+    setIsLoadingTransactions(true);
+    const paginatedData = getPaginatedTransactions();
+    setPageTransactions(paginatedData);
+    setIsLoadingTransactions(false);
+  }, [getPaginatedTransactions]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [storeFilter]);
 
   // Update the total due calculation
   const totalDue =
@@ -372,7 +395,7 @@ export default function CustomerDetail() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customerTransactionsWithBalance.map((transaction) => (
+            {pageTransactions.map((transaction) => (
               <TableRow key={transaction.id}>
                 <TableCell className="whitespace-nowrap">
                   {formatDate(transaction.date)}
@@ -448,7 +471,7 @@ export default function CustomerDetail() {
       {/* Footer Section */}
       <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-sm text-gray-500">
-          Showing {customerTransactionsWithBalance.length} transactions
+          Showing {pageTransactions.length} transactions
         </div>
         <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
           <span className="font-semibold">Current Balance: </span>

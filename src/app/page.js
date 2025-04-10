@@ -33,6 +33,17 @@ import {
 } from "@/components/ui/card";
 import { Search } from "lucide-react";
 
+function CustomerTableSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-8 bg-gray-200 rounded mb-4" />
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="h-16 bg-gray-100 rounded mb-2" />
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const {
@@ -50,6 +61,10 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const customersPerPage = 10;
 
   const handleAddCustomer = async (customerData) => {
     try {
@@ -108,6 +123,13 @@ export default function Dashboard() {
     }
   }, [mounted, customers]);
 
+  useEffect(() => {
+    if (customers && transactions) {
+      setIsLoadingCustomers(false);
+      setIsLoadingTransactions(false);
+    }
+  }, [customers, transactions]);
+
   if (error) {
     return (
       <div className="p-8 text-center">
@@ -145,6 +167,13 @@ export default function Dashboard() {
       (selectedFilter === "paid" && currentDue === 0);
     return matchesSearch && matchesFilter;
   });
+
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * customersPerPage,
+    currentPage * customersPerPage
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / customersPerPage);
 
   return (
     <div className="p-6">
@@ -255,108 +284,155 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">Name</TableHead>
-                  <TableHead className="whitespace-nowrap hidden md:table-cell">
-                    Phone
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap hidden md:table-cell">
-                    Address
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap hidden md:table-cell">
-                    Store ID
-                  </TableHead>
-                  <TableHead className="text-right whitespace-nowrap">
-                    Due Amount
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => {
-                  const dueAmount = getCustomerDue(customer.id);
-                  return (
-                    <TableRow
-                      key={customer.id}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleRowClick(customer.id)}
-                    >
-                      <TableCell>
-                        <div>
-                          {customer.name}
-                          <div className="md:hidden text-sm text-gray-500">
-                            <div>{customer.phone}</div>
-                            <div className="truncate max-w-[200px]">
-                              {customer.address}
-                            </div>
-                            <div>{customer.storeId}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {customer.phone}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div
-                          className="truncate max-w-[200px]"
-                          title={customer.address}
-                        >
-                          {customer.address}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {customer.storeId}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right whitespace-nowrap ${
-                          dueAmount > 1000 ? "text-red-500" : ""
-                        }`}
+            {isLoadingCustomers ? (
+              <CustomerTableSkeleton />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Name</TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">
+                      Phone
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">
+                      Address
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap hidden md:table-cell">
+                      Store ID
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Due Amount
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCustomers.map((customer) => {
+                    const dueAmount = getCustomerDue(customer.id);
+                    return (
+                      <TableRow
+                        key={customer.id}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleRowClick(customer.id)}
                       >
-                        ৳{dueAmount.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCustomer(customer);
-                                }}
-                              >
-                                <span className="flex items-center">
-                                  <span className="md:hidden mr-2">✏️</span>
-                                  Edit
-                                </span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-red-500"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteCustomer(customer.id);
-                                }}
-                              >
-                                <span className="flex items-center">
-                                  <span className="md:hidden mr-2">🗑️</span>
-                                  Delete
-                                </span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        <TableCell>
+                          <div>
+                            {customer.name}
+                            <div className="md:hidden text-sm text-gray-500">
+                              <div>{customer.phone}</div>
+                              <div className="truncate max-w-[200px]">
+                                {customer.address}
+                              </div>
+                              <div>{customer.storeId}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {customer.phone}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div
+                            className="truncate max-w-[200px]"
+                            title={customer.address}
+                          >
+                            {customer.address}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {customer.storeId}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right whitespace-nowrap ${
+                            dueAmount > 1000 ? "text-red-500" : ""
+                          }`}
+                        >
+                          ৳{dueAmount.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCustomer(customer);
+                                  }}
+                                >
+                                  <span className="flex items-center">
+                                    <span className="md:hidden mr-2">✏️</span>
+                                    Edit
+                                  </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-500"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomer(customer.id);
+                                  }}
+                                >
+                                  <span className="flex items-center">
+                                    <span className="md:hidden mr-2">🗑️</span>
+                                    Delete
+                                  </span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * customersPerPage + 1} to{" "}
+              {Math.min(
+                currentPage * customersPerPage,
+                filteredCustomers.length
+              )}{" "}
+              of {filteredCustomers.length} customers
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-2">
+                {[...Array(totalPages)].map((_, i) => (
+                  <Button
+                    key={i + 1}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(i + 1)}
+                    className="hidden sm:inline-flex"
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
