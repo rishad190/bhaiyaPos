@@ -1,9 +1,9 @@
 "use client";
 import { useState, useRef } from "react";
-import { useData } from "@/app/data-context"; // Add this import
-import { CashMemoPrint } from "@/components/CashMemoPrint"; // Updated import path
+import { useRouter } from "next/navigation";
+import { useData } from "@/app/data-context";
+import { CashMemoPrint } from "@/components/CashMemoPrint";
 
-import { Toaster } from "@/components/ui/toaster";
 import {
   Table,
   TableBody,
@@ -15,7 +15,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Printer, FileDown, Check, ChevronsUpDown } from "lucide-react";
+import {
+  Printer,
+  FileDown,
+  Save,
+  CheckCircle,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react";
+
+import { Toaster } from "@/components/ui/toaster";
 import {
   Command,
   CommandEmpty,
@@ -30,12 +39,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
+
 export default function CashMemoPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const { customers, addTransaction, addDailyCashTransaction } = useData();
   const [customerId, setCustomerId] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [openPhonePopover, setOpenPhonePopover] = useState(false);
   const [phoneSearchValue, setPhoneSearchValue] = useState("");
@@ -45,7 +56,7 @@ export default function CashMemoPage() {
     customerPhone: "",
     customerAddress: "",
     memoNumber: `MEMO-${Date.now()}`,
-    deposit: "", // Add this new field
+    deposit: 0, // Changed from empty string to 0
   });
 
   const [products, setProducts] = useState([]);
@@ -59,7 +70,6 @@ export default function CashMemoPage() {
   const originalContent = useRef(null);
 
   const handleAddProduct = () => {
-    // Validation checks
     if (!newProduct.name.trim()) {
       alert("Please enter product name");
       return;
@@ -83,12 +93,10 @@ export default function CashMemoPage() {
       return;
     }
 
-    // Convert strings to numbers and calculate total
     const quality = parseFloat(newProduct.quality);
     const price = parseFloat(newProduct.price);
     const total = quality * price;
 
-    // Add new product to the list
     setProducts([
       ...products,
       {
@@ -99,7 +107,6 @@ export default function CashMemoPage() {
       },
     ]);
 
-    // Reset form
     setNewProduct({
       name: "",
       quality: "",
@@ -110,27 +117,6 @@ export default function CashMemoPage() {
 
   const grandTotal = products.reduce((sum, product) => sum + product.total, 0);
 
-  // Add this function to lookup customer
-  const handlePhoneChange = (e) => {
-    const phoneNumber = e.target.value;
-    setMemoData({ ...memoData, customerPhone: phoneNumber });
-
-    // Look up customer by phone number
-    const customer = customers?.find((c) => c.phone === phoneNumber);
-    if (customer) {
-      setMemoData((prev) => ({
-        ...prev,
-        customerPhone: phoneNumber,
-        customerName: customer.name,
-        customerAddress: customer.address || "",
-      }));
-      setCustomerId(customer.id); // Add this line
-    } else {
-      setCustomerId(""); // Reset when no customer found
-    }
-  };
-
-  // Add this function inside CashMemoPage component
   const handlePrint = () => {
     const printContent = document.getElementById("print-section");
     if (!printContent) return;
@@ -252,6 +238,7 @@ export default function CashMemoPage() {
       customerName: customer.name,
       customerAddress: customer.address || "",
     });
+    setCustomerId(customer.id);
     setOpenPhonePopover(false);
   };
 
@@ -265,47 +252,21 @@ export default function CashMemoPage() {
       return;
     }
 
-    if (!memoData.customerName || !memoData.customerPhone) {
+    if (!customerId) {
       toast({
         title: "Error",
-        description: "Please provide customer information",
+        description: "Please select a valid customer",
         variant: "destructive",
       });
       return;
     }
 
-    setIsSaving(true);
     try {
-      // Parse deposit amount properly
+      setIsSaving(true);
       const deposit = Number(memoData.deposit) || 0;
 
-      // Validate deposit amount
-      if (deposit > grandTotal) {
-        toast({
-          title: "Error",
-          description: "Deposit cannot exceed total amount",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      // Find customer
-      let customer = customers?.find((c) => c.phone === memoData.customerPhone);
-      const customerId = customer?.id;
-
-      if (!customerId) {
-        toast({
-          title: "Error",
-          description: "Customer not found. Please select a valid customer.",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      // 1. Create single transaction for customer
-      const customerTransaction = {
+      // Log transaction data for debugging
+      console.log("Saving transaction:", {
         customerId,
         date: memoData.date,
         memoNumber: memoData.memoNumber,
@@ -315,52 +276,70 @@ export default function CashMemoPage() {
         details: products
           .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
           .join(", "),
-        type: "sale",
+        type: "SALE",
+        storeId: "STORE1",
+      });
+
+      // Create transaction for customer
+      const transaction = {
+        customerId,
+        date: memoData.date,
+        memoNumber: memoData.memoNumber,
+        total: grandTotal,
+        deposit: deposit,
+        due: grandTotal - deposit,
+        details: products
+          .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
+          .join(", "),
+        type: "SALE",
+        storeId: "STORE1",
+        createdAt: new Date().toISOString(),
       };
 
-      // Add transaction to customer history
-      await addTransaction(customerTransaction);
+      // Wait for transaction to be added
+      const transactionResult = await addTransaction(transaction);
+      console.log("Transaction result:", transactionResult);
 
-      // 2. Create cashbook entry only if there's a deposit
-      if (deposit > 0) {
+      // Only proceed with cash transaction if deposit exists and transaction was successful
+      if (deposit > 0 && transactionResult) {
         const cashTransaction = {
           date: memoData.date,
           description: `Cash Memo: ${memoData.memoNumber} - ${memoData.customerName}`,
           cashIn: deposit,
           cashOut: 0,
-          type: "sale",
-          reference: memoData.memoNumber,
-          details: `Deposit against sale - ${products.length} items`,
-          total: grandTotal,
-          balance: grandTotal - deposit,
-          customer: memoData.customerName,
-          customerPhone: memoData.customerPhone,
+          category: "Sales",
+          createdAt: new Date().toISOString(),
         };
 
         await addDailyCashTransaction(cashTransaction);
       }
 
+      setSaveSuccess(true);
       toast({
         title: "Success",
         description: "Cash memo saved successfully",
       });
 
-      // Reset form
-      setMemoData({
-        date: new Date().toISOString().split("T")[0],
-        customerName: "",
-        customerPhone: "",
-        customerAddress: "",
-        memoNumber: `MEMO-${Date.now()}`,
-        deposit: "", // Reset deposit
-      });
-      setProducts([]);
-      setCustomerId("");
+      // Reset form after delay
+      setTimeout(() => {
+        setMemoData({
+          date: new Date().toISOString().split("T")[0],
+          customerName: "",
+          customerPhone: "",
+          customerAddress: "",
+          memoNumber: `MEMO-${Date.now()}`,
+          deposit: 0,
+        });
+        setProducts([]);
+        setCustomerId("");
+        setSaveSuccess(false);
+        router.push("/cashbook");
+      }, 2000);
     } catch (error) {
       console.error("Error saving memo:", error);
       toast({
         title: "Error",
-        description: "Failed to save memo. Please try again.",
+        description: error.message || "Failed to save memo. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -371,7 +350,6 @@ export default function CashMemoPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       <Toaster />
-      {/* Header Card */}
       <Card className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
@@ -515,7 +493,6 @@ export default function CashMemoPage() {
         </div>
       </Card>
 
-      {/* Products Table */}
       <Card className="p-4 md:p-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -645,16 +622,24 @@ export default function CashMemoPage() {
         </Button>
         <Button
           className="w-full sm:w-auto print:hidden"
-          onClick={() => handleSaveMemo()}
-          disabled={isSaving || products.length === 0}
+          onClick={handleSaveMemo}
+          disabled={isSaving || saveSuccess || products.length === 0}
         >
-          {isSaving ? (
+          {saveSuccess ? (
             <>
-              <LoadingSpinner size="sm" className="mr-2" />
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Saved!
+            </>
+          ) : isSaving ? (
+            <>
+              <span className="mr-2 h-4 w-4 animate-spin">⏳</span>
               Saving...
             </>
           ) : (
-            "Save Memo"
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save Memo
+            </>
           )}
         </Button>
       </div>
