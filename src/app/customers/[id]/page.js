@@ -62,7 +62,6 @@ export default function CustomerDetail() {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [pageTransactions, setPageTransactions] = useState([]);
   const [page, setPage] = useState(1);
-  const transactionsPerPage = 20;
 
   const customer = customers.find((c) => c.id === params.id);
 
@@ -86,19 +85,13 @@ export default function CustomerDetail() {
   }, [transactions, params.id, storeFilter]);
 
   // Memoize the paginated transactions
-  const getPaginatedTransactions = useCallback(() => {
-    const start = (page - 1) * transactionsPerPage;
-    const end = start + transactionsPerPage;
-    return customerTransactionsWithBalance.slice(start, end);
-  }, [page, customerTransactionsWithBalance, transactionsPerPage]);
 
   // Update page transactions only when necessary
   useEffect(() => {
     setIsLoadingTransactions(true);
-    const paginatedData = getPaginatedTransactions();
-    setPageTransactions(paginatedData);
+
     setIsLoadingTransactions(false);
-  }, [getPaginatedTransactions]);
+  }, []);
 
   // Reset page when filter changes
   useEffect(() => {
@@ -395,7 +388,7 @@ export default function CustomerDetail() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pageTransactions.map((transaction) => (
+            {customerTransactionsWithBalance.map((transaction) => (
               <TableRow key={transaction.id}>
                 <TableCell className="whitespace-nowrap">
                   {formatDate(transaction.date)}
