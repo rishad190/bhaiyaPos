@@ -50,14 +50,26 @@ export default function SuppliersPage() {
       const supplierTxns =
         supplierTransactions?.filter((t) => t.supplierId === supplier.id) || [];
 
-      // Calculate totals for this supplier's transactions
-      supplierTxns.forEach((transaction) => {
-        acc.totalAmount += parseFloat(transaction.totalAmount) || 0;
-        acc.paidAmount += parseFloat(transaction.paidAmount) || 0;
-      });
+      // Calculate totals for this supplier
+      const supplierTotal = supplierTxns.reduce(
+        (txnAcc, transaction) => {
+          return {
+            totalAmount:
+              txnAcc.totalAmount + (Number(transaction.totalAmount) || 0),
+            paidAmount:
+              txnAcc.paidAmount + (Number(transaction.paidAmount) || 0),
+          };
+        },
+        { totalAmount: 0, paidAmount: 0 }
+      );
 
-      // Due amount is the difference between total and paid
+      // Add this supplier's totals to accumulator
+      acc.totalAmount += supplierTotal.totalAmount;
+      acc.paidAmount += supplierTotal.paidAmount;
       acc.dueAmount = acc.totalAmount - acc.paidAmount;
+
+      // Update supplier's total due
+      supplier.totalDue = supplierTotal.totalAmount - supplierTotal.paidAmount;
 
       return acc;
     },

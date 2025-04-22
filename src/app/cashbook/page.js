@@ -124,6 +124,28 @@ export default function CashBookPage() {
     ),
   };
 
+  // Add this after your existing financials calculation
+  const getMonthlyTotals = () => {
+    const monthly = dailyCashTransactions.reduce((acc, transaction) => {
+      const month = transaction.date.substring(0, 7); // Gets YYYY-MM format
+      if (!acc[month]) {
+        acc[month] = { cashIn: 0, cashOut: 0 };
+      }
+      acc[month].cashIn += transaction.cashIn || 0;
+      acc[month].cashOut += transaction.cashOut || 0;
+      return acc;
+    }, {});
+
+    // Convert to array and sort by month
+    return Object.entries(monthly)
+      .map(([month, totals]) => ({
+        month,
+        ...totals,
+        balance: totals.cashIn - totals.cashOut,
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month));
+  };
+
   // Filter transactions
   const filteredCash = dailyCash.filter((day) => {
     const matchesSearch = searchTerm
@@ -261,6 +283,52 @@ export default function CashBookPage() {
         </Card>
       </div>
 
+      {/* Monthly Summary */}
+      <Card className="mb-8 border-none shadow-md overflow-hidden">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Monthly Summary</h3>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Month</TableHead>
+                  <TableHead className="text-right">Cash In</TableHead>
+                  <TableHead className="text-right">Cash Out</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {getMonthlyTotals().map(
+                  ({ month, cashIn, cashOut, balance }) => (
+                    <TableRow key={month}>
+                      <TableCell className="font-medium">
+                        {new Date(month).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right text-green-600">
+                        ৳{cashIn.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right text-red-600">
+                        ৳{cashOut.toLocaleString()}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-medium ${
+                          balance >= 0 ? "text-blue-600" : "text-amber-600"
+                        }`}
+                      >
+                        ৳{balance.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Search and Filter Section */}
       <Card className="mb-8 border-none shadow-md">
         <CardContent className="p-6">
@@ -305,6 +373,7 @@ export default function CashBookPage() {
       <Tabs defaultValue="all" className="mb-6">
         <TabsList className="mb-4">
           <TabsTrigger value="all">All Transactions</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly View</TabsTrigger>
           <TabsTrigger value="in">Cash In</TabsTrigger>
           <TabsTrigger value="out">Cash Out</TabsTrigger>
         </TabsList>
