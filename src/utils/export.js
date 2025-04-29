@@ -221,6 +221,7 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
     );
 
     // Transactions Table
+    let finalY = 0; // Add this variable to store the final Y position
     autoTable(doc, {
       startY: yPos,
       head: headers,
@@ -247,6 +248,9 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
       },
       margin: { left: 10 },
       didDrawPage: (data) => {
+        // Store the final Y position
+        finalY = data.cursor.y;
+
         // Add page numbers on each page
         const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
         const pageCount = doc.internal.getNumberOfPages();
@@ -261,14 +265,24 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
       },
     });
 
-    // After the transactions table, add a final summary
+    // Check if there's enough space for the summary
+    const pageHeight = doc.internal.pageSize.height;
+    if (finalY > pageHeight - 50) {
+      doc.addPage();
+      finalY = 20; // Reset Y position on new page
+    }
+
+    // Calculate summary Y position
+    const summaryY = finalY + 20;
+
+    // Add final summary with proper positioning
     doc.setDrawColor(41, 128, 185);
     doc.setLineWidth(0.5);
     doc.line(
       doc.internal.pageSize.width - 80,
-      doc.internal.pageSize.height - 40,
+      summaryY,
       doc.internal.pageSize.width - 10,
-      doc.internal.pageSize.height - 40
+      summaryY
     );
 
     // Add total due summary
@@ -278,7 +292,7 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
     doc.text(
       "Total Outstanding:",
       doc.internal.pageSize.width - 80,
-      doc.internal.pageSize.height - 30
+      summaryY + 10
     );
 
     doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
@@ -286,7 +300,7 @@ export const exportToPDF = (entity, transactions, type = "customer") => {
     doc.text(
       formatCurrency(totalDue),
       doc.internal.pageSize.width - 10,
-      doc.internal.pageSize.height - 30,
+      summaryY + 10,
       { align: "right" }
     );
 
