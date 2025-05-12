@@ -93,6 +93,11 @@ export function Navbar() {
       label: "Cash Memo",
       icon: Receipt,
     },
+    {
+      name: "Settings",
+      href: "/settings",
+      icon: Settings,
+    },
   ];
 
   return (

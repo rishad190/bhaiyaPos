@@ -1,5 +1,7 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -14,218 +16,296 @@ export const formatDate = (dateString) => {
   });
 };
 
-export const exportToCSV = (data, filename) => {
-  // Convert data to CSV string
-  const headers = Object.keys(data[0]);
-  const csvContent = [
-    headers.join(","),
-    ...data.map((row) =>
-      headers
-        .map((header) => {
-          const value = row[header];
-          // Handle values that might contain commas
-          return typeof value === "string" && value.includes(",")
-            ? `"${value}"`
-            : value;
-        })
-        .join(",")
-    ),
-  ].join("\n");
-
-  // Create and trigger download
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+export const formatCurrency = (amount) => {
+  if (amount === undefined || amount === null) return "৳0";
+  return `${amount.toLocaleString("en-IN")}`;
 };
 
-export const exportToPDF = (customer, transactions, type) => {
-  // Create a new window for printing
-  const printWindow = window.open("", "_blank");
+export const exportToCSV = (data, filename) => {
+  try {
+    // Convert data to CSV string
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(","),
+      ...data.map((row) =>
+        headers
+          .map((header) => {
+            const value = row[header];
+            // Handle values that might contain commas
+            return typeof value === "string" && value.includes(",")
+              ? `"${value}"`
+              : value;
+          })
+          .join(",")
+      ),
+    ].join("\n");
 
-  // Create the HTML content
-  const content = `
-    <html>
-      <head>
-        <title>${customer.name} - ${
-    type === "customer" ? "Customer Details" : "Transaction Report"
-  }</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-          }
-          .header { 
-            text-align: center; 
-            margin-bottom: 30px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 20px;
-          }
-          .header h1 {
-            margin: 0;
-            color: #333;
-            font-size: 24px;
-          }
-          .header p {
-            margin: 5px 0;
-            color: #666;
-          }
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-          }
-          .info-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-          }
-          .info-card h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 16px;
-          }
-          .info-card p {
-            margin: 0;
-            color: #666;
-          }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 20px;
-            font-size: 14px;
-          }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 12px 8px; 
-            text-align: left; 
-          }
-          th { 
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #333;
-          }
-          tr:nth-child(even) {
-            background-color: #f8f9fa;
-          }
-          .total { 
-            text-align: right; 
-            font-weight: bold;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-top: 20px;
-          }
-          .total p {
-            margin: 0;
-            font-size: 16px;
-          }
-          .total .amount {
-            color: #2563eb;
-            font-size: 20px;
-          }
-          @media print {
-            body { padding: 0; }
-            .no-print { display: none; }
-            .info-grid {
-              display: block;
-            }
-            .info-card {
-              margin-bottom: 15px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${customer.name}</h1>
-          <p>Customer ID: ${customer.id}</p>
-        </div>
-        
-        <div class="info-grid">
-          <div class="info-card">
-            <h3>Contact Information</h3>
-            <p>Phone: ${customer.phone}</p>
-            <p>Email: ${customer.email}</p>
-          </div>
-          <div class="info-card">
-            <h3>Store Information</h3>
-            <p>Store ID: ${customer.storeId}</p>
-          </div>
-          <div class="info-card">
-            <h3>Transaction Summary</h3>
-            <p>Total Transactions: ${transactions.length}</p>
-            <p>Last Transaction: ${
-              transactions.length > 0 ? formatDate(transactions[0].date) : "N/A"
-            }</p>
-          </div>
-        </div>
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${filename}-${formatDate(new Date())}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (error) {
+    console.error("Error exporting CSV:", error);
+    alert("Failed to export CSV. Please try again.");
+    return false;
+  }
+};
 
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Memo</th>
-              <th>Details</th>
-              <th>Total</th>
-              <th>Deposit</th>
-              <th>Due</th>
-              <th>Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${transactions
-              .map(
-                (t) => `
-              <tr>
-                <td>${formatDate(t.date)}</td>
-                <td>${t.memoNumber}</td>
-                <td>${t.details}</td>
-                <td>৳${t.total.toLocaleString()}</td>
-                <td>৳${t.deposit.toLocaleString()}</td>
-                <td>৳${t.due.toLocaleString()}</td>
-                <td>৳${t.cumulativeBalance.toLocaleString()}</td>
-              </tr>
-            `
-              )
-              .join("")}
-          </tbody>
-        </table>
+export const exportToPDF = (entity, transactions, type = "customer") => {
+  try {
+    // Create new document
+    const doc = new jsPDF();
+    let yPos = 15;
 
-        <div class="total">
-          <p>Total Due: <span class="amount">৳${
-            transactions.length > 0
-              ? transactions[
-                  transactions.length - 1
-                ].cumulativeBalance.toLocaleString()
-              : "0"
-          }</span></p>
-        </div>
+    // Header with company name
+    doc.setFillColor(41, 128, 185);
+    doc.rect(0, 0, doc.internal.pageSize.width, 30, "F");
 
-        <div class="no-print" style="text-align: center; margin-top: 20px;">
-          <button onclick="window.print()" style="
-            padding: 8px 16px;
-            background: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-          ">Print Report</button>
-        </div>
-      </body>
-    </html>
-  `;
+    // Company name
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sky Fabric's", 15, 20);
 
-  // Write the content to the new window
-  printWindow.document.write(content);
-  printWindow.document.close();
+    // Document type
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `${type === "customer" ? "Customer" : "Supplier"} Statement`,
+      doc.internal.pageSize.width - 15,
+      20,
+      { align: "right" }
+    );
+
+    // Update starting position for rest of content
+    yPos = 40;
+
+    // Rest of the content
+    doc.setTextColor(0, 0, 0);
+
+    // Entity Info Section
+    const entityInfo = [
+      [
+        `${type === "customer" ? "Customer" : "Supplier"}: ${entity.name}`,
+        `ID: ${entity.id}`,
+      ],
+      [`Phone: ${entity.phone}`, `Store: ${entity.storeId || "Main Store"}`],
+      [`Report Date: ${formatDate(new Date())}`, ""],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [],
+      body: entityInfo,
+      theme: "plain",
+      styles: { fontSize: 10 },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { cellWidth: 90 },
+      },
+      didDrawPage: (data) => {
+        yPos = data.cursor.y + 10;
+      },
+    });
+
+    // Calculate totals
+    const totalAmount =
+      type === "customer"
+        ? transactions.reduce((sum, t) => sum + (Number(t.total) || 0), 0)
+        : transactions.reduce(
+            (sum, t) => sum + (Number(t.totalAmount) || 0),
+            0
+          );
+
+    const totalPaid =
+      type === "customer"
+        ? transactions.reduce((sum, t) => sum + (Number(t.deposit) || 0), 0)
+        : transactions.reduce((sum, t) => sum + (Number(t.paidAmount) || 0), 0);
+
+    const totalDue = transactions.reduce(
+      (sum, t) => sum + (Number(t.due) || 0),
+      0
+    );
+
+    // Financial Summary
+    const summaryData =
+      type === "customer"
+        ? [
+            ["Total Bill", "Total Deposit", "Total Due"],
+            [
+              formatCurrency(totalAmount),
+              formatCurrency(totalPaid),
+              formatCurrency(totalDue),
+            ],
+          ]
+        : [
+            ["Total Amount", "Total Paid", "Total Due"],
+            [
+              formatCurrency(totalAmount),
+              formatCurrency(totalPaid),
+              formatCurrency(totalDue),
+            ],
+          ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [summaryData[0]],
+      body: [summaryData[1]],
+      theme: "grid",
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: "bold",
+      },
+      styles: {
+        fontSize: 10,
+        halign: "right",
+      },
+      didDrawPage: (data) => {
+        yPos = data.cursor.y + 10;
+      },
+    });
+
+    // Transactions Table Headers
+    const headers =
+      type === "customer"
+        ? [["Date", "Memo", "Details", "Total", "Deposit", "Due", "Balance"]]
+        : [["Date", "Invoice", "Details", "Total", "Paid", "Due", "Balance"]];
+
+    // Map transaction data
+    const data = transactions.map((t) =>
+      type === "customer"
+        ? [
+            formatDate(t.date),
+            t.memoNumber || "",
+            t.details || "",
+            formatCurrency(Number(t.total) || 0),
+            formatCurrency(Number(t.deposit) || 0),
+            formatCurrency(Number(t.due) || 0),
+            formatCurrency(Number(t.cumulativeBalance) || 0),
+          ]
+        : [
+            formatDate(t.date),
+            t.invoiceNumber || "",
+            t.details || "",
+            formatCurrency(Number(t.totalAmount) || 0),
+            formatCurrency(Number(t.paidAmount) || 0),
+            formatCurrency(Number(t.due) || 0),
+            formatCurrency(Number(t.cumulativeBalance) || 0),
+          ]
+    );
+
+    // Transactions Table
+    let finalY = 0;
+    autoTable(doc, {
+      startY: yPos,
+      head: headers,
+      body: data,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: [255, 255, 255],
+        fontSize: 9,
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 25, halign: "right" },
+        4: { cellWidth: 25, halign: "right" },
+        5: { cellWidth: 25, halign: "right" },
+        6: { cellWidth: 25, halign: "right" },
+      },
+      margin: { left: 10 },
+      didDrawPage: (data) => {
+        finalY = data.cursor.y;
+        const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(128);
+        doc.text(
+          `Page ${pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: "center" }
+        );
+      },
+    });
+
+    // Check if there's enough space for the summary
+    const pageHeight = doc.internal.pageSize.height;
+    if (finalY > pageHeight - 50) {
+      doc.addPage();
+      finalY = 20;
+    }
+
+    // Calculate summary Y position
+    const summaryY = finalY + 20;
+
+    // Add final summary with proper positioning
+    doc.setDrawColor(41, 128, 185);
+    doc.setLineWidth(0.5);
+    doc.line(
+      doc.internal.pageSize.width - 80,
+      summaryY,
+      doc.internal.pageSize.width - 10,
+      summaryY
+    );
+
+    // Add total due summary
+    doc.setFontSize(12);
+    doc.setTextColor(41, 128, 185);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      "Total Outstanding:",
+      doc.internal.pageSize.width - 80,
+      summaryY + 10
+    );
+
+    doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      formatCurrency(totalDue),
+      doc.internal.pageSize.width - 10,
+      summaryY + 10,
+      { align: "right" }
+    );
+
+    // Add a note if there's due amount
+    if (totalDue > 0) {
+      doc.setFontSize(8);
+      doc.setTextColor(128);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        "* Please clear outstanding dues at your earliest convenience",
+        doc.internal.pageSize.width - 80,
+        doc.internal.pageSize.height - 25
+      );
+    }
+
+    // Save PDF
+    const fileName = `${entity.name.replace(
+      /\s+/g,
+      "-"
+    )}-${type}-statement-${formatDate(new Date())}.pdf`;
+    doc.save(fileName);
+    return fileName;
+  } catch (error) {
+    console.error("Error exporting PDF:", error);
+    alert("Failed to export PDF. Please try again.");
+    return null;
+  }
 };

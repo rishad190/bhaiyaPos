@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useReducer,
 } from "react";
 import {
   ref,
@@ -20,6 +21,7 @@ import {
   orderByChild,
   equalTo,
 } from "firebase/database";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Create context
@@ -36,20 +38,111 @@ const COLLECTION_REFS = {
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
 };
 
+// Add settings to the initial state
+const initialState = {
+  customers: [],
+  transactions: [],
+  dailyCashTransactions: [],
+  fabricBatches: [],
+  fabrics: [],
+  suppliers: [],
+  supplierTransactions: [],
+  loading: true,
+  error: null,
+  settings: {
+    store: {
+      storeName: "",
+      address: "",
+      phone: "",
+      email: "",
+      currency: "৳",
+    },
+    notifications: {
+      lowStockAlert: true,
+      duePaymentAlert: true,
+      newOrderAlert: true,
+      emailNotifications: false,
+    },
+    appearance: {
+      theme: "light",
+      compactMode: false,
+      showImages: true,
+    },
+    security: {
+      requirePassword: false,
+      sessionTimeout: 30,
+      backupEnabled: true,
+    },
+  },
+};
+
+// Add settings reducer cases
+function reducer(state, action) {
+  switch (action.type) {
+    case "SET_CUSTOMERS":
+      return {
+        ...state,
+        customers: action.payload,
+        loading: false,
+      };
+    case "SET_TRANSACTIONS":
+      return {
+        ...state,
+        transactions: action.payload,
+        loading: false,
+      };
+    case "SET_DAILY_CASH_TRANSACTIONS":
+      return {
+        ...state,
+        dailyCashTransactions: action.payload,
+        loading: false,
+      };
+    case "SET_FABRIC_BATCHES":
+      return {
+        ...state,
+        fabricBatches: action.payload,
+        loading: false,
+      };
+    case "SET_FABRICS":
+      return {
+        ...state,
+        fabrics: action.payload,
+        loading: false,
+      };
+    case "SET_SUPPLIERS":
+      return {
+        ...state,
+        suppliers: action.payload,
+        loading: false,
+      };
+    case "SET_SUPPLIER_TRANSACTIONS":
+      return {
+        ...state,
+        supplierTransactions: action.payload,
+        loading: false,
+      };
+    case "SET_ERROR":
+      return {
+        ...state,
+        error: action.payload,
+        loading: false,
+      };
+    case "UPDATE_SETTINGS":
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          ...action.payload,
+        },
+      };
+    default:
+      return state;
+  }
+}
+
 // Export the provider component
 export function DataProvider({ children }) {
-  // State Management
-  const [state, setState] = useState({
-    customers: [],
-    transactions: [],
-    dailyCashTransactions: [],
-    fabricBatches: [],
-    fabrics: [],
-    suppliers: [],
-    supplierTransactions: [],
-    loading: true,
-    error: null,
-  });
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   // Firebase Subscriptions
   useEffect(() => {
@@ -57,29 +150,29 @@ export function DataProvider({ children }) {
     const collections = [
       {
         path: COLLECTION_REFS.CUSTOMERS,
-        setter: (data) => setState((prev) => ({ ...prev, customers: data })),
+        setter: (data) => dispatch({ type: "SET_CUSTOMERS", payload: data }),
       },
       {
         path: COLLECTION_REFS.TRANSACTIONS,
-        setter: (data) => setState((prev) => ({ ...prev, transactions: data })),
+        setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }),
       },
       {
         path: COLLECTION_REFS.DAILY_CASH,
         setter: (data) =>
-          setState((prev) => ({ ...prev, dailyCashTransactions: data })),
+          dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: data }),
       },
       {
         path: COLLECTION_REFS.FABRIC_BATCHES,
         setter: (data) =>
-          setState((prev) => ({ ...prev, fabricBatches: data })),
+          dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
       },
       {
         path: COLLECTION_REFS.FABRICS,
-        setter: (data) => setState((prev) => ({ ...prev, fabrics: data })),
+        setter: (data) => dispatch({ type: "SET_FABRICS", payload: data }),
       },
       {
         path: COLLECTION_REFS.SUPPLIERS,
-        setter: (data) => setState((prev) => ({ ...prev, suppliers: data })),
+        setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
       },
     ];
 
@@ -101,7 +194,7 @@ export function DataProvider({ children }) {
       });
     } catch (err) {
       console.error("Error setting up Firebase listeners:", err);
-      setState((prev) => ({ ...prev, error: err.message, loading: false }));
+      dispatch({ type: "SET_ERROR", payload: err.message });
     }
 
     const supplierTransactionsRef = ref(
@@ -114,15 +207,15 @@ export function DataProvider({ children }) {
           id,
           ...value,
         }));
-        setState((prev) => ({ ...prev, supplierTransactions: data }));
+        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
       } else {
-        setState((prev) => ({ ...prev, supplierTransactions: [] }));
+        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
       }
     });
     unsubscribers.push(unsubscribe);
 
     return () => unsubscribers.forEach((unsub) => unsub());
-  }, []);
+  }, [dispatch]);
 
   // Add memoization for customer dues
   const customerDues = useMemo(() => {
@@ -455,6 +548,24 @@ export function DataProvider({ children }) {
     },
   };
 
+  const updateSettings = async (newSettings) => {
+    try {
+      // Update settings in Firebase
+      await updateDoc(doc(db, "settings", "app"), newSettings);
+
+      // Update local state
+      dispatch({
+        type: "UPDATE_SETTINGS",
+        payload: newSettings,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      throw error;
+    }
+  };
+
   const contextValue = {
     // State
     ...state,
@@ -463,7 +574,9 @@ export function DataProvider({ children }) {
     ...transactionOperations,
     ...fabricOperations,
     ...supplierOperations,
-    ...dailyCashOperations, // Make sure this is included
+    ...dailyCashOperations,
+    settings: state.settings,
+    updateSettings,
   };
 
   return (
