@@ -70,7 +70,7 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("customers");
 
   // Add debug logging
   useEffect(() => {
@@ -369,18 +369,18 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <TabsList className="grid w-full md:w-auto grid-cols-3 gap-2">
               <TabsTrigger
-                value="overview"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                <TrendingUp className="w-4 h-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger
                 value="customers"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Customers
+              </TabsTrigger>
+              <TabsTrigger
+                value="overview"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Overview
               </TabsTrigger>
               <TabsTrigger
                 value="inventory"
@@ -404,8 +404,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <TabsContent value="overview" className="space-y-4">
-            {/* Financial Summary */}
+          <TabsContent value="customers" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="bg-blue-50 border-none shadow-md hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
@@ -461,6 +460,58 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <CustomerSearch
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                selectedFilter={selectedFilter}
+                onFilterChange={setSelectedFilter}
+              />
+              <Button
+                onClick={() => setIsAddingCustomer(true)}
+                className="w-full md:w-auto"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Customer
+              </Button>
+            </div>
+
+            <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle>Customer List</CardTitle>
+                <CardDescription>
+                  Showing {filteredCustomers.length} customers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  {loadingState.customers ? (
+                    <TableSkeleton />
+                  ) : (
+                    <CustomerTable
+                      customers={filteredCustomers}
+                      getCustomerDue={getCustomerDue}
+                      onRowClick={handleRowClick}
+                      onEdit={setEditingCustomer}
+                      onDelete={handleDeleteCustomer}
+                      currentPage={currentPage}
+                      customersPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
+                    />
+                  )}
+                </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredCustomers.length}
+                  itemsPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
+                  onPageChange={setCurrentPage}
+                  className="mt-4"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="overview" className="space-y-4">
+            {/* Financial Summary */}
 
             {/* Recent Activity and Low Stock */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -570,57 +621,6 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="customers" className="space-y-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CustomerSearch
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                selectedFilter={selectedFilter}
-                onFilterChange={setSelectedFilter}
-              />
-              <Button
-                onClick={() => setIsAddingCustomer(true)}
-                className="w-full md:w-auto"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Customer
-              </Button>
-            </div>
-
-            <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle>Customer List</CardTitle>
-                <CardDescription>
-                  Showing {filteredCustomers.length} customers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  {loadingState.customers ? (
-                    <TableSkeleton />
-                  ) : (
-                    <CustomerTable
-                      customers={filteredCustomers}
-                      getCustomerDue={getCustomerDue}
-                      onRowClick={handleRowClick}
-                      onEdit={setEditingCustomer}
-                      onDelete={handleDeleteCustomer}
-                      currentPage={currentPage}
-                      customersPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
-                    />
-                  )}
-                </div>
-                <Pagination
-                  currentPage={currentPage}
-                  totalItems={filteredCustomers.length}
-                  itemsPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
-                  onPageChange={setCurrentPage}
-                  className="mt-4"
-                />
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="inventory" className="space-y-4">
