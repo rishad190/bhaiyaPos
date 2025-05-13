@@ -81,6 +81,7 @@ export default function SupplierDetail() {
         const supplierTransactions = Object.entries(transactionsData)
           .map(([id, data]) => ({ id, ...data }))
           .filter((t) => t.supplierId === params.id)
+          .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
           .sort((a, b) => {
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
@@ -96,7 +97,7 @@ export default function SupplierDetail() {
       unsubSupplier();
       unsubTransactions();
     };
-  }, [params.id, router]);
+  }, [params.id, router, storeFilter]);
 
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
@@ -189,29 +190,22 @@ export default function SupplierDetail() {
     return <div>Loading...</div>;
   }
 
-  // Replace the existing sortedTransactions with this:
-  const transactionsWithBalance = transactions
-    .sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateA - dateB; // Sort by date ascending (oldest to newest)
-    })
-    .reduce((acc, transaction) => {
-      const previousBalance =
-        acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-      const currentDue =
-        transaction.totalAmount - (transaction.paidAmount || 0);
-      const currentBalance = previousBalance + currentDue;
+  // Update the transactionsWithBalance calculation
+  const transactionsWithBalance = transactions.reduce((acc, transaction) => {
+    const previousBalance =
+      acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
+    const currentDue = transaction.totalAmount - (transaction.paidAmount || 0);
+    const currentBalance = previousBalance + currentDue;
 
-      return [
-        ...acc,
-        {
-          ...transaction,
-          due: currentDue,
-          cumulativeBalance: currentBalance,
-        },
-      ];
-    }, []);
+    return [
+      ...acc,
+      {
+        ...transaction,
+        due: currentDue,
+        cumulativeBalance: currentBalance,
+      },
+    ];
+  }, []);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -394,7 +388,7 @@ export default function SupplierDetail() {
         </Card>
       </div>
 
-      {/* Keep your existing table code */}
+      {/* Transactions Table */}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -487,10 +481,10 @@ export default function SupplierDetail() {
         </Table>
       </div>
 
-      {/* Footer Section */}
+      {/* Update the footer section */}
       <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-sm text-gray-500">
-          Showing {transactionsWithBalance.length} transactions
+          Total Transactions: {transactionsWithBalance.length}
         </div>
         <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
           <span className="font-semibold">Current Balance: </span>

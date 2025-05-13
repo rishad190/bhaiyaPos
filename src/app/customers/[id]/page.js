@@ -66,11 +66,9 @@ export default function CustomerDetail() {
   const [storeFilter, setStoreFilter] = useState(
     TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL
   );
-  const [page, setPage] = useState(1);
 
   const customer = customers?.find((c) => c.id === params.id);
 
-  // Memoize the filtered and sorted transactions
   const customerTransactionsWithBalance = useMemo(() => {
     if (!transactions) return [];
 
@@ -82,10 +80,9 @@ export default function CustomerDetail() {
           t.storeId === storeFilter
       )
       .sort((a, b) => {
-        // Convert dates to DD-MM-YYYY format for comparison
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        return dateA - dateB; // Sort by date descending
+        return dateA - dateB; // Sort by date ascending (oldest to newest)
       })
       .reduce((acc, transaction) => {
         const previousBalance =
@@ -100,15 +97,6 @@ export default function CustomerDetail() {
       }, []);
   }, [transactions, params.id, storeFilter]);
 
-  // Memoize paginated transactions
-  const paginatedTransactions = useMemo(() => {
-    const startIndex = (page - 1) * TRANSACTION_CONSTANTS.TRANSACTIONS_PER_PAGE;
-    return customerTransactionsWithBalance.slice(
-      startIndex,
-      startIndex + TRANSACTION_CONSTANTS.TRANSACTIONS_PER_PAGE
-    );
-  }, [customerTransactionsWithBalance, page]);
-
   useEffect(() => {
     if (customer && transactions) {
       setLoadingState((prev) => ({
@@ -118,11 +106,6 @@ export default function CustomerDetail() {
       }));
     }
   }, [customer, transactions]);
-
-  // Reset page when filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [storeFilter]);
 
   const handleAddTransaction = async (transactionData) => {
     try {
@@ -490,7 +473,7 @@ export default function CustomerDetail() {
               {loadingState.transactions ? (
                 <TableSkeleton />
               ) : (
-                paginatedTransactions.map((transaction) => (
+                customerTransactionsWithBalance.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="whitespace-nowrap">
                       {new Date(transaction.date)
@@ -572,8 +555,7 @@ export default function CustomerDetail() {
         {/* Footer Section */}
         <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="text-sm text-gray-500">
-            Showing {paginatedTransactions.length} of{" "}
-            {customerTransactionsWithBalance.length} transactions
+            Total Transactions: {customerTransactionsWithBalance.length}
           </div>
           <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
             <span className="font-semibold">Current Balance: </span>
