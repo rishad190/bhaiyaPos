@@ -53,6 +53,15 @@ export default function SupplierDetail() {
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);
 
+  // Format date to DD-MM-YYYY
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
   // Fetch supplier and transactions data
   useEffect(() => {
     const supplierRef = ref(db, `suppliers/${params.id}`);
@@ -72,7 +81,11 @@ export default function SupplierDetail() {
         const supplierTransactions = Object.entries(transactionsData)
           .map(([id, data]) => ({ id, ...data }))
           .filter((t) => t.supplierId === params.id)
-          .sort((a, b) => new Date(b.date) - new Date(a.date));
+          .sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            return dateA - dateB; // Sort by date ascending (oldest to newest)
+          });
         setTransactions(supplierTransactions);
       } else {
         setTransactions([]);
@@ -84,6 +97,7 @@ export default function SupplierDetail() {
       unsubTransactions();
     };
   }, [params.id, router]);
+
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
       Date: formatDate(t.date),
@@ -97,6 +111,7 @@ export default function SupplierDetail() {
     }));
     exportToCSV(data, `${supplier?.name}-transactions-${params.id}.csv`);
   };
+
   const handleAddTransaction = async (transaction) => {
     try {
       const transactionsRef = ref(db, "supplierTransactions");
@@ -176,7 +191,11 @@ export default function SupplierDetail() {
 
   // Replace the existing sortedTransactions with this:
   const transactionsWithBalance = transactions
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA - dateB; // Sort by date ascending (oldest to newest)
+    })
     .reduce((acc, transaction) => {
       const previousBalance =
         acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;

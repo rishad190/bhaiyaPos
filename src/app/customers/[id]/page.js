@@ -81,7 +81,12 @@ export default function CustomerDetail() {
           storeFilter === TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL ||
           t.storeId === storeFilter
       )
-      .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by date descending
+      .sort((a, b) => {
+        // Convert dates to DD-MM-YYYY format for comparison
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // Sort by date descending
+      })
       .reduce((acc, transaction) => {
         const previousBalance =
           acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
@@ -211,7 +216,13 @@ export default function CustomerDetail() {
 
   const handleExportCSV = () => {
     const data = customerTransactionsWithBalance.map((t) => ({
-      Date: formatDate(t.date),
+      Date: new Date(t.date)
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+        .replace(/\//g, "-"),
       Memo: t.memoNumber,
       Details: t.details,
       Total: `${t.total.toLocaleString()}`,
@@ -482,7 +493,13 @@ export default function CustomerDetail() {
                 paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="whitespace-nowrap">
-                      {formatDate(transaction.date)}
+                      {new Date(transaction.date)
+                        .toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })
+                        .replace(/\//g, "-")}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {transaction.memoNumber}
