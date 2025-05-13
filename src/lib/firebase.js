@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { get, getDatabase, ref, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
 
+// Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -13,47 +14,67 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+let app;
+let db;
+let auth;
 
-// Test database connection and monitor connectivity
-const connectedRef = ref(db, ".info/connected");
-onValue(connectedRef, (snap) => {
-  if (snap.val() === true) {
-    console.log("Connected to Firebase");
-  } else {
-    console.log("Not connected to Firebase");
-  }
-});
+try {
+  app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  auth = getAuth(app);
 
-// Test data access
-const dbRef = ref(db);
-get(dbRef)
-  .then(() => {
-    console.log("Firebase data access successful");
-  })
-  .catch((error) => {
-    console.error("Firebase data access error:", error);
-  });
-
-// Add this after the existing code to check for data
-const customersRef = ref(db, "customers");
-get(customersRef)
-  .then((snapshot) => {
-    if (snapshot.exists()) {
-      console.log(
-        "Customers data exists:",
-        Object.keys(snapshot.val()).length,
-        "records found"
-      );
+  // Monitor database connection
+  const connectedRef = ref(db, ".info/connected");
+  onValue(connectedRef, (snap) => {
+    if (snap.val() === true) {
+      console.log("Connected to Firebase");
     } else {
-      console.log("No customers data available");
+      console.warn("Not connected to Firebase");
     }
-  })
-  .catch((error) => {
-    console.error("Error fetching customers:", error);
   });
 
-// Export database instance
+  // Test database access
+  const dbRef = ref(db);
+  get(dbRef)
+    .then(() => {
+      console.log("Firebase data access successful");
+    })
+    .catch((error) => {
+      console.error("Firebase data access error:", error);
+    });
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  throw new Error("Failed to initialize Firebase");
+}
+
+// Export database instance and auth
 export { db, auth };
+
+// Helper function to safely get database reference
+export const getDbRef = (path) => {
+  if (!db) throw new Error("Database not initialized");
+  return ref(db, path);
+};
+
+// Helper function to safely get data
+export const getData = async (path) => {
+  try {
+    const snapshot = await get(getDbRef(path));
+    return snapshot.exists() ? snapshot.val() : null;
+  } catch (error) {
+    console.error(`Error getting data from ${path}:`, error);
+    throw error;
+  }
+};
+
+// Helper function to safely set data
+export const setData = async (path, data) => {
+  try {
+    const dbRef = getDbRef(path);
+    await set(dbRef, data);
+    return true;
+  } catch (error) {
+    console.error(`Error setting data at ${path}:`, error);
+    throw error;
+  }
+};

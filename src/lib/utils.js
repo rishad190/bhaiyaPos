@@ -7,22 +7,45 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// Format date to DD-MM-YYYY
 export const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      throw new Error("Invalid date");
+    }
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "Invalid Date";
+  }
 };
 
+// Format currency with proper error handling
 export const formatCurrency = (amount) => {
-  if (amount === undefined || amount === null) return "৳0";
-  return `${amount.toLocaleString("en-IN")}`;
+  try {
+    if (amount === undefined || amount === null) return "৳0";
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) {
+      throw new Error("Invalid amount");
+    }
+    return `৳${numAmount.toLocaleString("en-IN")}`;
+  } catch (error) {
+    console.error("Error formatting currency:", error);
+    return "৳0";
+  }
 };
 
+// Export to CSV with better error handling
 export const exportToCSV = (data, filename) => {
   try {
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("Invalid data format");
+    }
+
     // Convert data to CSV string
     const headers = Object.keys(data[0]);
     const csvContent = [
