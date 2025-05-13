@@ -85,7 +85,7 @@ export default function CustomerDetail() {
         // Convert dates to DD-MM-YYYY format for comparison
         const dateA = new Date(a.date);
         const dateB = new Date(b.date);
-        return dateB - dateA; // Sort by date descending
+        return dateA - dateB; // Sort by date descending
       })
       .reduce((acc, transaction) => {
         const previousBalance =
