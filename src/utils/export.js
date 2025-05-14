@@ -69,7 +69,7 @@ export const exportToCSV = (data, filename) => {
   }
 };
 
-export const exportToPDF = (entity, transactions, type = "customer") => {
+export const exportToPDF = (entity, transactions, type) => {
   try {
     // Create new document
     const doc = new jsPDF();

@@ -41,9 +41,10 @@ import {
   FileText,
   MoreVertical,
 } from "lucide-react";
-import { formatDate, exportToCSV, exportToPDF } from "@/lib/utils";
+import { formatDate, exportToCSV } from "@/lib/utils";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
+import { exportToPDF } from "@/utils/export";
 
 export default function CustomerDetail() {
   const params = useParams();
