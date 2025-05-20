@@ -521,7 +521,10 @@ export default function CustomerDetail() {
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-[160px]"
+                          >
                             <DropdownMenuItem asChild>
                               <EditTransactionDialog
                                 transaction={transaction}
@@ -535,7 +538,7 @@ export default function CustomerDetail() {
                               />
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="text-red-500"
+                              className="text-red-500 focus:text-red-500 focus:bg-red-50"
                               onClick={() =>
                                 handleDeleteTransaction(transaction.id)
                               }
