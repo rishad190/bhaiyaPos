@@ -43,13 +43,14 @@ import {
 } from "lucide-react";
 import { formatDate, exportToCSV } from "@/lib/utils";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
-import { useToast } from "@/hooks/use-toast";
+
 import { exportToPDF } from "@/utils/export";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CustomerDetail() {
   const params = useParams();
   const router = useRouter();
-  const toast = useToast();
+  const { toast } = useToast();
   const {
     customers,
     transactions,

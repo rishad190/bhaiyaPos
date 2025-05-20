@@ -44,14 +44,21 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState({
+    supplier: true,
+    transactions: true,
+    action: false,
+  });
 
   // Format date to DD-MM-YYYY
   const formatDate = (dateString) => {
@@ -71,8 +78,14 @@ export default function SupplierDetail() {
       if (snapshot.exists()) {
         setSupplier({ id: params.id, ...snapshot.val() });
       } else {
+        toast({
+          title: "Error",
+          description: "Supplier not found",
+          variant: "destructive",
+        });
         router.push("/suppliers");
       }
+      setLoading((prev) => ({ ...prev, supplier: false }));
     });
 
     const unsubTransactions = onValue(transactionsRef, (snapshot) => {
@@ -85,19 +98,20 @@ export default function SupplierDetail() {
           .sort((a, b) => {
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
-            return dateA - dateB; // Sort by date ascending (oldest to newest)
+            return dateA - dateB;
           });
         setTransactions(supplierTransactions);
       } else {
         setTransactions([]);
       }
+      setLoading((prev) => ({ ...prev, transactions: false }));
     });
 
     return () => {
       unsubSupplier();
       unsubTransactions();
     };
-  }, [params.id, router, storeFilter]);
+  }, [params.id, router, storeFilter, toast]);
 
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
@@ -115,6 +129,7 @@ export default function SupplierDetail() {
 
   const handleAddTransaction = async (transaction) => {
     try {
+      setLoading((prev) => ({ ...prev, action: true }));
       const transactionsRef = ref(db, "supplierTransactions");
       const newTransactionRef = push(transactionsRef);
       const newTransaction = {
@@ -123,11 +138,9 @@ export default function SupplierDetail() {
         supplierId: params.id,
         createdAt: new Date().toISOString(),
       };
-      console.log(newTransaction);
 
       await update(newTransactionRef, newTransaction);
 
-      // Update supplier's total due
       const newTotalDue =
         (supplier.totalDue || 0) +
         (transaction.totalAmount - (transaction.paidAmount || 0));
@@ -136,14 +149,27 @@ export default function SupplierDetail() {
         totalDue: newTotalDue,
         updatedAt: new Date().toISOString(),
       });
+
+      toast({
+        title: "Success",
+        description: "Transaction added successfully",
+      });
     } catch (error) {
       console.error("Error adding transaction:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add transaction",
+        variant: "destructive",
+      });
       throw error;
+    } finally {
+      setLoading((prev) => ({ ...prev, action: false }));
     }
   };
 
   const handleDeleteTransaction = async (transactionId, amount, paidAmount) => {
     try {
+      setLoading((prev) => ({ ...prev, action: true }));
       const dueAmount = amount - (paidAmount || 0);
       if (
         window.confirm(
@@ -156,38 +182,63 @@ export default function SupplierDetail() {
           amount,
           paidAmount
         );
+        toast({
+          title: "Success",
+          description: "Transaction deleted successfully",
+        });
       }
     } catch (error) {
       console.error("Error deleting transaction:", error);
-      alert("Failed to delete transaction. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading((prev) => ({ ...prev, action: false }));
     }
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
+      setLoading((prev) => ({ ...prev, action: true }));
       const oldTransaction = transactions.find((t) => t.id === transactionId);
       const oldDue =
         oldTransaction.totalAmount - (oldTransaction.paidAmount || 0);
       const newDue = updatedData.totalAmount - (updatedData.paidAmount || 0);
       const dueDifference = newDue - oldDue;
 
-      // Update transaction
       const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
       await update(transactionRef, updatedData);
 
-      // Update supplier's total due
       await updateSupplier(params.id, {
         totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
         updatedAt: new Date().toISOString(),
       });
+
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
     } catch (error) {
       console.error("Error updating transaction:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update transaction",
+        variant: "destructive",
+      });
       throw error;
+    } finally {
+      setLoading((prev) => ({ ...prev, action: false }));
     }
   };
 
-  if (!supplier) {
-    return <div>Loading...</div>;
+  if (loading.supplier) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   // Update the transactionsWithBalance calculation
@@ -414,69 +465,88 @@ export default function SupplierDetail() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactionsWithBalance.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell className="whitespace-nowrap">
-                  {formatDate(transaction.date)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {transaction.invoiceNumber}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {transaction.details}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
-                  ৳{(transaction.totalAmount || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
-                  ৳{(transaction.paidAmount || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right whitespace-nowrap text-red-500">
-                  ৳{(transaction.due || 0).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right font-medium whitespace-nowrap text-red-500">
-                  ৳{transaction.cumulativeBalance.toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <EditSupplierTransactionDialog
-                            transaction={transaction}
-                            onSave={handleEditTransaction}
-                          />
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (
-                              window.confirm(
-                                "Are you sure you want to delete this transaction?"
-                              )
-                            ) {
-                              handleDeleteTransaction(
-                                transaction.id,
-                                transaction.totalAmount,
-                                transaction.paidAmount
-                              );
-                            }
-                          }}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            {loading.transactions ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : transactionsWithBalance.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No transactions found
+                </TableCell>
+              </TableRow>
+            ) : (
+              transactionsWithBalance.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDate(transaction.date)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {transaction.invoiceNumber}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {transaction.details}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    ৳{(transaction.totalAmount || 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    ৳{(transaction.paidAmount || 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap text-red-500">
+                    ৳{(transaction.due || 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-medium whitespace-nowrap text-red-500">
+                    ৳{transaction.cumulativeBalance.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <EditSupplierTransactionDialog
+                              transaction={transaction}
+                              onSave={handleEditTransaction}
+                            />
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                window.confirm(
+                                  "Are you sure you want to delete this transaction?"
+                                )
+                              ) {
+                                handleDeleteTransaction(
+                                  transaction.id,
+                                  transaction.totalAmount,
+                                  transaction.paidAmount
+                                );
+                              }
+                            }}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

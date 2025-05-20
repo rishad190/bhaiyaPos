@@ -3,6 +3,7 @@ import "./globals.css";
 import { ClientLayout } from "@/components/ClientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Navbar } from "@/components/Navbar"; // Add this import
+import { Toaster } from "@/components/ui/toaster";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
             </div>
           </ProtectedRoute>
         </ClientLayout>
+        <Toaster />
       </body>
     </html>
   );
