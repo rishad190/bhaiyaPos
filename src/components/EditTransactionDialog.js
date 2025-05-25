@@ -71,20 +71,6 @@ export function EditTransactionDialog({
     }
 
     // Amount validations with better type checking
-    const totalAmount = parseFloat(formData.total);
-    const depositAmount = parseFloat(formData.deposit);
-
-    if (isNaN(totalAmount) || totalAmount < 0) {
-      newErrors.total = "Please enter a valid amount";
-    }
-
-    if (isNaN(depositAmount) || depositAmount < 0) {
-      newErrors.deposit = "Please enter a valid deposit amount";
-    }
-
-    if (depositAmount > totalAmount) {
-      newErrors.deposit = "Deposit cannot be greater than total amount";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
