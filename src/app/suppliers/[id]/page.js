@@ -44,7 +44,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierDetail() {
   const params = useParams();
