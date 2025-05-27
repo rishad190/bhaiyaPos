@@ -115,7 +115,6 @@ export default function CustomerDetail() {
       await addTransaction({
         ...transactionData,
         customerId: params.id,
-        date: new Date().toISOString(),
       });
       toast({
         title: "Success",

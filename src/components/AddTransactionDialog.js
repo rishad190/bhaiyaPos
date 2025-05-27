@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,13 @@ import { Input } from "@/components/ui/input";
 
 export function AddTransactionDialog({ customerId, onAddTransaction }) {
   const [open, setOpen] = useState(false);
+  const initialDate = useRef(new Date().toISOString().split("T")[0]);
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: initialDate.current,
     memoNumber: "",
     details: "",
-    total: "", // Changed from 0 to empty string for better form handling
-    deposit: "", // Changed from 0 to empty string
+    total: "",
+    deposit: "",
     storeId: "STORE1",
   });
   const [errors, setErrors] = useState({});
@@ -27,25 +28,29 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
 
     // Required field validations
     if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.memoNumber) newErrors.memoNumber = "Memo number is required";
 
-    // Total amount validation (optional but must be valid if provided)
-    if (formData.total && formData.total.trim() !== "") {
-      const totalAmount = parseFloat(formData.total);
-      if (isNaN(totalAmount)) {
-        newErrors.total = "Please enter a valid amount";
-      } else if (totalAmount < 0) {
-        newErrors.total = "Amount cannot be negative";
-      }
+    // Validate date is not in the future
+    const selectedDate = new Date(formData.date);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Set to end of day for comparison
+    if (selectedDate > today) {
+      newErrors.date = "Date cannot be in the future";
     }
 
-    // Deposit amount validation (only validate for valid number and non-negative)
+    if (!formData.memoNumber?.trim())
+      newErrors.memoNumber = "Memo number is required";
+
+    // Total amount validation
+
+    // Deposit amount validation
     if (formData.deposit && formData.deposit.trim() !== "") {
       const depositAmount = parseFloat(formData.deposit);
       if (isNaN(depositAmount)) {
         newErrors.deposit = "Please enter a valid amount";
       } else if (depositAmount < 0) {
         newErrors.deposit = "Deposit cannot be negative";
+      } else if (depositAmount > parseFloat(formData.total)) {
+        newErrors.deposit = "Deposit cannot be greater than total amount";
       }
     }
 
@@ -58,16 +63,17 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     if (!validate()) return;
 
     try {
-      // Handle empty values properly
-      const totalAmount = formData.total ? parseFloat(formData.total) : 0;
-      const depositAmount = formData.deposit ? parseFloat(formData.deposit) : 0;
+      const totalAmount = parseFloat(formData.total) || 0;
+      const depositAmount = parseFloat(formData.deposit) || 0;
 
       const newTransaction = {
         ...formData,
+        memoNumber: formData.memoNumber.trim(),
         customerId,
-        total: totalAmount || 0, // Ensure 0 if NaN
-        deposit: depositAmount || 0, // Ensure 0 if NaN
-        due: (totalAmount || 0) - (depositAmount || 0),
+        total: totalAmount,
+        deposit: depositAmount,
+        due: totalAmount - depositAmount,
+        createdAt: new Date().toISOString(),
       };
 
       await onAddTransaction(newTransaction);
@@ -88,6 +94,16 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     }
   };
 
+  const handleDateChange = (e) => {
+    const selectedDate = e.target.value;
+    if (selectedDate) {
+      setFormData((prev) => ({
+        ...prev,
+        date: selectedDate,
+      }));
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -103,9 +119,8 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             <Input
               type="date"
               value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
+              onChange={handleDateChange}
+              max={new Date().toISOString().split("T")[0]}
               className={errors.date ? "border-red-500" : ""}
             />
             {errors.date && (
