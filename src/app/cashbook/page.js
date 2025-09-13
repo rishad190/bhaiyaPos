@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF } from "@/lib/utils";
+import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CashBookPage() {
@@ -259,8 +259,10 @@ export default function CashBookPage() {
       date: new Date().toLocaleDateString(),
       transactions: dailyCashTransactions,
       summary: financials,
+      dailyCash: dailyCash, // Include daily cash calculations
+      selectedDate: dateFilter || null, // Include selected date filter
     };
-    exportToPDF(data, "cashbook-report.pdf");
+    exportCashbookToPDF(data);
   };
 
   // Loading skeleton components
@@ -415,7 +417,9 @@ export default function CashBookPage() {
             disabled={loadingState.actions}
           >
             <FileText className="mr-2 h-4 w-4" />
-            Export PDF
+            {dateFilter
+              ? `Export PDF (${formatDate(dateFilter)})`
+              : "Export PDF"}
           </Button>
           <Button
             onClick={handleExportCSV}

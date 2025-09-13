@@ -40,20 +40,6 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     if (!formData.memoNumber?.trim())
       newErrors.memoNumber = "Memo number is required";
 
-    // Total amount validation
-
-    // Deposit amount validation
-    if (formData.deposit && formData.deposit.trim() !== "") {
-      const depositAmount = parseFloat(formData.deposit);
-      if (isNaN(depositAmount)) {
-        newErrors.deposit = "Please enter a valid amount";
-      } else if (depositAmount < 0) {
-        newErrors.deposit = "Deposit cannot be negative";
-      } else if (depositAmount > parseFloat(formData.total)) {
-        newErrors.deposit = "Deposit cannot be greater than total amount";
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

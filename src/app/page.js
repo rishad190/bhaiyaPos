@@ -36,7 +36,10 @@ import {
   RefreshCw,
   TrendingUp,
   History,
+  Database,
+  Archive,
 } from "lucide-react";
+import { backupService } from "@/services/backupService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,6 +74,7 @@ export default function Dashboard() {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("customers");
+  const [backupLoading, setBackupLoading] = useState(false);
 
   // Add debug logging
   useEffect(() => {
@@ -201,6 +205,26 @@ export default function Dashboard() {
     }
   };
 
+  // Backup functions
+  const handleQuickBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const result = await backupService.exportToJSON();
+      toast({
+        title: "Backup Created",
+        description: `Data exported to ${result.filename}. ${result.recordCount} records backed up.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
     if (mounted && customers) {
@@ -324,6 +348,19 @@ export default function Dashboard() {
             >
               <FileText className="mr-2 h-4 w-4" />
               New Cash Memo
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full md:w-auto"
+              onClick={handleQuickBackup}
+              disabled={backupLoading || loadingState.actions}
+            >
+              {backupLoading ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="mr-2 h-4 w-4" />
+              )}
+              Backup Data
             </Button>
           </div>
         </div>
