@@ -89,7 +89,11 @@ export default function SuppliersPage() {
         acc.paidAmount += supplierTotal.paidAmount;
         acc.dueAmount = acc.totalAmount - acc.paidAmount;
 
-        supplier.totalDue =
+        // Avoid mutating original supplier object. Compute per-supplier due and
+        // attach it to a new object when rendering if needed.
+        // Store computed due in a temporary map for potential use elsewhere.
+        acc.supplierDues = acc.supplierDues || {};
+        acc.supplierDues[supplier.id] =
           supplierTotal.totalAmount - supplierTotal.paidAmount;
 
         return acc;
@@ -97,7 +101,13 @@ export default function SuppliersPage() {
       { totalAmount: 0, paidAmount: 0, dueAmount: 0 }
     );
 
-    return { filteredSuppliers: filtered, totals };
+    // Map filtered suppliers to include computed totalDue without mutating source
+    const filteredWithDue = filtered.map((s) => ({
+      ...s,
+      totalDue: totals.supplierDues?.[s.id] ?? s.totalDue ?? 0,
+    }));
+
+    return { filteredSuppliers: filteredWithDue, totals };
   }, [suppliers, supplierTransactions, searchTerm]);
 
   const handleAddSupplier = async (supplierData) => {

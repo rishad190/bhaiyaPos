@@ -54,6 +54,7 @@ export default function SupplierDetail() {
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
   const [loading, setLoading] = useState({
     supplier: true,
     transactions: true,
@@ -91,18 +92,26 @@ export default function SupplierDetail() {
     const unsubTransactions = onValue(transactionsRef, (snapshot) => {
       if (snapshot.exists()) {
         const transactionsData = snapshot.val();
-        const supplierTransactions = Object.entries(transactionsData)
+        const supplierTransactionsAll = Object.entries(transactionsData)
           .map(([id, data]) => ({ id, ...data }))
           .filter((t) => t.supplierId === params.id)
-          .filter((t) => storeFilter === "all" || t.storeId === storeFilter)
           .sort((a, b) => {
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
             return dateA - dateB;
           });
+
+        // Keep a complete list of supplier transactions (all stores)
+        setAllTransactions(supplierTransactionsAll);
+
+        // Apply store filter for the visible list
+        const supplierTransactions = supplierTransactionsAll.filter(
+          (t) => storeFilter === "all" || t.storeId === storeFilter
+        );
         setTransactions(supplierTransactions);
       } else {
         setTransactions([]);
+        setAllTransactions([]);
       }
       setLoading((prev) => ({ ...prev, transactions: false }));
     });
@@ -242,21 +251,66 @@ export default function SupplierDetail() {
   }
 
   // Update the transactionsWithBalance calculation
-  const transactionsWithBalance = transactions.reduce((acc, transaction) => {
-    const previousBalance =
-      acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
-    const currentDue = transaction.totalAmount - (transaction.paidAmount || 0);
-    const currentBalance = previousBalance + currentDue;
+  // Compute cumulative balances using the complete chronological set of supplier transactions
+  const cumulativeMap = allTransactions.reduce((map, txn) => {
+    const prevBalance = map.lastBalance || 0;
+    const due = (txn.totalAmount || 0) - (txn.paidAmount || 0);
+    const newBalance = prevBalance + due;
+    map.byId = map.byId || {};
+    map.byId[txn.id] = newBalance;
+    map.lastBalance = newBalance;
+    return map;
+  }, {});
 
-    return [
-      ...acc,
-      {
-        ...transaction,
-        due: currentDue,
-        cumulativeBalance: currentBalance,
-      },
-    ];
-  }, []);
+  // Attach computed cumulative balance to the visible (possibly filtered) transactions
+  const transactionsWithBalance = transactions.map((transaction) => ({
+    ...transaction,
+    due: (transaction.totalAmount || 0) - (transaction.paidAmount || 0),
+    cumulativeBalance: cumulativeMap.byId?.[transaction.id] ?? 0,
+  }));
+
+  // Diagnostic: compute derived total due from allTransactions and compare with supplier.totalDue
+  const derivedTotalDue = allTransactions.reduce((sum, t) => {
+    const total = Number(t.totalAmount) || 0;
+    const paid = Number(t.paidAmount) || 0;
+    return sum + (total - paid);
+  }, 0);
+
+  if (typeof supplier?.totalDue !== "undefined") {
+    if (Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001) {
+      console.warn(
+        "Supplier totalDue mismatch:",
+        { supplierId: params.id },
+        { supplierTotalDue: supplier.totalDue },
+        { computedTotalDue: derivedTotalDue },
+        { lastCumulative: cumulativeMap.lastBalance ?? 0 }
+      );
+    }
+  }
+
+  const handleFixTotalDue = async () => {
+    if (!window.confirm("Update stored Total Due to computed value?")) return;
+    try {
+      setLoading((prev) => ({ ...prev, action: true }));
+      await updateSupplier(params.id, {
+        totalDue: derivedTotalDue,
+        updatedAt: new Date().toISOString(),
+      });
+      toast({
+        title: "Success",
+        description: "Supplier totalDue updated to computed value",
+      });
+    } catch (error) {
+      console.error("Failed to update supplier totalDue:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update supplier totalDue",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading((prev) => ({ ...prev, action: false }));
+    }
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -440,6 +494,26 @@ export default function SupplierDetail() {
       </div>
 
       {/* Transactions Table */}
+      {typeof supplier?.totalDue !== "undefined" &&
+        Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 && (
+          <div className="mb-4 p-4 rounded-md bg-yellow-50 border border-yellow-200 text-sm flex items-start justify-between gap-4">
+            <div>
+              <strong>Warning:</strong> Computed total from transactions ( ৳
+              {derivedTotalDue.toLocaleString()}) does not match stored Total
+              Due ( ৳{(supplier.totalDue || 0).toLocaleString()}). Difference: ৳
+              {(derivedTotalDue - (supplier.totalDue || 0)).toLocaleString()}
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                className="inline-flex items-center px-3 py-1.5 bg-primary text-white rounded-md"
+                onClick={handleFixTotalDue}
+                disabled={loading.action}
+              >
+                Fix Total Due
+              </button>
+            </div>
+          </div>
+        )}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
