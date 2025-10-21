@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
 import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
 import {
@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/lib/utils";
+import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/utils/export";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CashBookPage() {

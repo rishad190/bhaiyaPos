@@ -1,0 +1,318 @@
+'use client';
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useData } from "@/app/data-context";
+import { useToast } from "@/hooks/use-toast";
+import { formatLargeNumber } from "@/lib/utils";
+import { PAGE_TITLES } from "@/lib/constants";
+import {
+  Users,
+  Package,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  FileText,
+  Download,
+  RefreshCw,
+  History,
+  Database,
+} from "lucide-react";
+import { backupService } from "@/services/backupService";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QuickStatCard } from "@/components/QuickStatCard";
+import { RecentTransactions } from "@/components/RecentTransactions";
+import { LowStockItems } from "@/components/LowStockItems";
+
+export default function Dashboard() {
+  const router = useRouter();
+  const { customers, transactions, fabrics, suppliers, error, getCustomerDue } =
+    useData();
+  const { toast } = useToast();
+
+  const [loadingState, setLoadingState] = useState({
+    initial: true,
+    transactions: true,
+  });
+  const [backupLoading, setBackupLoading] = useState(false);
+
+  const stats = useMemo(() => {
+    if (!customers || !transactions || !fabrics || !suppliers) {
+      return {
+        totalBill: 0,
+        totalDeposit: 0,
+        totalDue: 0,
+        totalCustomers: 0,
+        totalFabrics: 0,
+        totalSuppliers: 0,
+        recentTransactions: [],
+        lowStockItems: [],
+      };
+    }
+
+    const totals = customers.reduce(
+      (acc, customer) => {
+        const customerTransactions =
+          transactions?.filter((t) => t.customerId === customer.id) || [];
+        return {
+          totalBill:
+            acc.totalBill +
+            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
+          totalDeposit:
+            acc.totalDeposit +
+            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
+          totalDue: acc.totalDue + getCustomerDue(customer.id),
+        };
+      },
+      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
+    );
+
+    const recentTransactions = [...transactions]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 5);
+
+    const lowStockItems = fabrics
+      .filter((f) => f.totalQuantity < 10)
+      .slice(0, 5);
+
+    return {
+      ...totals,
+      totalCustomers: customers.length,
+      totalFabrics: fabrics.length,
+      totalSuppliers: suppliers.length,
+      recentTransactions,
+      lowStockItems,
+    };
+  }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
+
+  const handleQuickBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const result = await backupService.exportToJSON();
+      toast({
+        title: "Backup Created",
+        description: `Data exported to ${result.filename}. ${result.recordCount} records backed up.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Backup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (customers && transactions) {
+      setLoadingState((prev) => ({
+        ...prev,
+        initial: false,
+        transactions: false,
+      }));
+    }
+  }, [customers, transactions]);
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-500">Error: {error}</p>
+      </div>
+    );
+  }
+
+  if (loadingState.initial) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+
+        {/* Recent Activity */}
+        <Card className="border-none shadow-md">
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {PAGE_TITLES.DASHBOARD}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Welcome back! Here&apos;s an overview of your business
+            </p>
+          </div>
+          <div className="flex flex-col md:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="w-full md:w-auto"
+              onClick={() => router.push("/cashmemo")}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              New Cash Memo
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full md:w-auto"
+              onClick={handleQuickBackup}
+              disabled={backupLoading}
+            >
+              {backupLoading ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="mr-2 h-4 w-4" />
+              )}
+              Backup Data
+            </Button>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <QuickStatCard
+            title="Total Customers"
+            value={stats.totalCustomers}
+            icon={Users}
+            trend="up"
+            trendValue="12%"
+          />
+          <QuickStatCard
+            title="Total Fabrics"
+            value={stats.totalFabrics}
+            icon={Package}
+            trend="up"
+            trendValue="8%"
+          />
+          <QuickStatCard
+            title="Total Suppliers"
+            value={stats.totalSuppliers}
+            icon={Users}
+            trend="up"
+            trendValue="5%"
+          />
+          <QuickStatCard
+            title="Total Transactions"
+            value={transactions?.length || 0}
+            icon={History}
+            trend="up"
+            trendValue="15%"
+          />
+        </div>
+
+        {/* Financial Summary */}
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight mb-4">Financial Summary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-blue-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Total Bill Amount
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-blue-800" />
+                </div>
+                <div className="text-2xl font-bold text-blue-900">
+                  Taka {formatLargeNumber(stats.totalBill)}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-blue-800">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span>12% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-green-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-green-800">
+                    Total Deposit
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-green-800" />
+                </div>
+                <div className="text-2xl font-bold text-green-900">
+                  Taka {formatLargeNumber(stats.totalDeposit)}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-green-800">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span>8% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-red-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Total Due Amount
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-red-800" />
+                </div>
+                <div className="text-2xl font-bold text-red-900">
+                  Taka {formatLargeNumber(stats.totalDue)}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-red-800">
+                  <ArrowDownRight className="h-4 w-4 mr-1" />
+                  <span>3% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Recent Activity and Low Stock */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RecentTransactions transactions={stats.recentTransactions} customers={customers} />
+          <LowStockItems items={stats.lowStockItems} />
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+}

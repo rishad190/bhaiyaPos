@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF } from "@/lib/utils";
+import { exportToCSV, exportToPDF } from "@/utils/export";
 import {
   Search,
   Plus,
