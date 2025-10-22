@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+
 export const formatCurrencyWithSymbol = (amount) => {
   if (amount === undefined || amount === null) return "৳0";
   return amount.toLocaleString("en-IN", {
@@ -8,6 +9,34 @@ export const formatCurrencyWithSymbol = (amount) => {
     minimumFractionDigits: 0,
   });
 };
+
+export const formatCurrencyBD = (amount) => {
+  if (typeof amount !== "number") {
+    return "৳0";
+  }
+
+  const absAmount = Math.abs(amount);
+  let formattedAmount;
+
+  if (absAmount >= 10000000) {
+    formattedAmount = `${(amount / 10000000).toFixed(2)} cr`;
+  } else if (absAmount >= 100000) {
+    formattedAmount = `${(amount / 100000).toFixed(2)} lakh`;
+  } else {
+    formattedAmount = amount.toLocaleString("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  return `৳${formattedAmount}`;
+};
+
+export const formatCurrencyForPDF = (amount) => {
+  if (amount === undefined || amount === null) return "৳0";
+  return formatCurrencyBD(amount);
+};
+
 export const exportToCSV = (data, filename) => {
   const formatValue = (value, header) => {
     // Format memo to show only numeric part
@@ -101,12 +130,6 @@ export const exportToPDF = (entity, transactions, type) => {
     // Rest of the content
     doc.setTextColor(0, 0, 0);
 
-    // Format currency consistently
-    const formatCurrencyForPDF = (amount) => {
-      if (amount === undefined || amount === null) return "৳0";
-      return amount.toLocaleString("en-IN");
-    };
-
     // Entity Info Section
     const entityInfo = [
       [
@@ -141,7 +164,7 @@ export const exportToPDF = (entity, transactions, type) => {
             0
           );
 
-    const totalPaid =
+    const totalPaid = 
       type === "customer"
         ? transactions.reduce((sum, t) => sum + (Number(t.deposit) || 0), 0)
         : transactions.reduce((sum, t) => sum + (Number(t.paidAmount) || 0), 0);

@@ -447,7 +447,7 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                ৳{financials.totalCashIn.toLocaleString()}
+                {formatCurrency(financials.totalCashIn)}
               </p>
               <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
                 All time income
@@ -468,7 +468,7 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                ৳{financials.totalCashOut.toLocaleString()}
+                {formatCurrency(financials.totalCashOut)}
               </p>
               <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
                 All time expenses
@@ -513,7 +513,7 @@ export default function CashBookPage() {
                     : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                ৳{financials.availableCash.toLocaleString()}
+                {financials.availableCash} Taka
               </p>
               <p
                 className={`text-xs ${
@@ -553,10 +553,10 @@ export default function CashBookPage() {
                       })}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      ৳{cashIn.toLocaleString()}
+                      {formatCurrency(cashIn)}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      ৳{cashOut.toLocaleString()}
+                      {formatCurrency(cashOut)}
                     </TableCell>
                     <TableCell
                       className={`text-right font-medium ${

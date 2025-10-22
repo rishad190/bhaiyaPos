@@ -37,14 +37,14 @@ export const formatDate = (dateString) => {
 // Format currency with proper error handling
 export const formatCurrency = (amount) => {
   try {
-    if (amount === undefined || amount === null) return "0";
+    if (amount === undefined || amount === null) return "৳0";
     const numAmount = Number(amount);
     if (isNaN(numAmount)) {
       throw new Error("Invalid amount");
     }
-    return `${numAmount.toLocaleString("en-IN")}`;
+    return `৳${formatLargeNumber(numAmount)}`;
   } catch (error) {
     console.error("Error formatting currency:", error);
-    return "0";
+    return "৳0";
   }
 };
