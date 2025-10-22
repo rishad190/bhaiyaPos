@@ -73,12 +73,20 @@ export default function FabricViewPage() {
     }
   }, [fabrics, fabricBatches]);
 
-  const fabric = fabrics?.find((f) => f.id === id);
-  const batches = fabricBatches?.filter((b) => b.fabricId === id) || [];
-  const fabricTransactions =
-    transactions?.filter((t) => t.fabricId === id) || [];
+  const fabric = useMemo(
+    () => fabrics?.find((f) => f && f.id === id),
+    [fabrics, id]
+  );
+  const batches = useMemo(
+    () => fabricBatches?.filter((b) => b && b.fabricId === id) || [],
+    [fabricBatches, id]
+  );
+  const fabricTransactions = useMemo(
+    () => transactions?.filter((t) => t && t.fabricId === id) || [],
+    [transactions, id]
+  );
 
-  // Memoize calculations
+  // Memoize calculations for performance and data consistency
   const {
     totalQuantity,
     averageCost,
@@ -86,23 +94,45 @@ export default function FabricViewPage() {
     priceHistory,
     recentTransactions,
   } = useMemo(() => {
-    if (!fabric || !batches) return {};
+    if (!fabric || !batches || !fabricTransactions) {
+      return {
+        totalQuantity: 0,
+        averageCost: 0,
+        currentValue: 0,
+        priceHistory: [],
+        recentTransactions: [],
+      };
+    }
 
-    const totalQty = batches.reduce((sum, b) => sum + b.quantity, 0);
+    const totalQty = batches.reduce((sum, b) => sum + (b?.quantity || 0), 0);
     const avgCost = calculateWeightedAverage(batches);
     const currentVal = totalQty * avgCost;
 
     const history = batches
-      .map((b) => ({
-        date: new Date(b.createdAt).toLocaleDateString(),
-        price: b.unitCost,
-        quantity: b.quantity,
-        supplierName: b.supplierName,
-      }))
+      .map((b) => {
+        if (!b || !b.id) return null;
+        return {
+          id: b.id,
+          date: b.createdAt
+            ? new Date(b.createdAt).toLocaleDateString()
+            : "N/A",
+          price: b.unitCost || 0,
+          quantity: b.quantity || 0,
+          supplierName: b.supplierName || "N/A",
+        };
+      })
+      .filter((item) => item !== null)
+      .filter(
+        (item) => item.date !== "N/A" && !isNaN(new Date(item.date).getTime())
+      )
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const recent = fabricTransactions
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort(
+        (a, b) =>
+          (b?.date ? new Date(b.date).getTime() : 0) -
+          (a?.date ? new Date(a.date).getTime() : 0)
+      )
       .slice(0, 10);
 
     return {
@@ -118,9 +148,7 @@ export default function FabricViewPage() {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       if (!fabric) throw new Error("Fabric not found");
-
       const result = calculateFifoSale(batches, quantity);
-
       for (const batch of result.updatedBatches) {
         if (batch.quantity > 0) {
           await updateFabricBatch(batch.id, { quantity: batch.quantity });
@@ -128,7 +156,6 @@ export default function FabricViewPage() {
           await deleteFabricBatch(batch.id);
         }
       }
-
       const saleTransaction = {
         fabricId: id,
         quantity,
@@ -146,7 +173,8 @@ export default function FabricViewPage() {
       console.error("Error selling fabric:", error);
       toast({
         title: "Error",
-        description: "Failed to sell fabric. Please try again.",
+        description:
+          error.message || "Failed to sell fabric. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -155,9 +183,15 @@ export default function FabricViewPage() {
   };
 
   const handleEditBatch = async (batchId, updates) => {
+    if (!batchId || !updates) return;
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await updateFabricBatch(batchId, updates);
+      const validatedUpdates = {
+        ...updates,
+        quantity: parseFloat(updates.quantity) || 0,
+        unitCost: parseFloat(updates.unitCost) || 0,
+      };
+      await updateFabricBatch(batchId, validatedUpdates);
       toast({
         title: "Success",
         description: "Batch updated successfully",
@@ -175,7 +209,11 @@ export default function FabricViewPage() {
   };
 
   const handleDeleteBatch = async (batchId) => {
-    if (!window.confirm("Are you sure you want to delete this batch?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this batch? This action adjusts inventory levels."
+      )
+    ) {
       return;
     }
 
@@ -199,10 +237,19 @@ export default function FabricViewPage() {
   };
 
   const handlePurchaseStock = async (purchaseData) => {
+    if (!purchaseData || !purchaseData.fabricId) return;
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await addFabricBatch({
+      const validatedData = {
         ...purchaseData,
+        quantity: parseFloat(purchaseData.quantity) || 0,
+        unitCost: parseFloat(purchaseData.unitCost) || 0,
+        totalCost:
+          (parseFloat(purchaseData.quantity) || 0) *
+          (parseFloat(purchaseData.unitCost) || 0),
+      };
+      await addFabricBatch({
+        ...validatedData,
         fabricId: id,
         createdAt: new Date().toISOString(),
       });
@@ -222,10 +269,11 @@ export default function FabricViewPage() {
     }
   };
 
-  const handleEditFabric = async (updates) => {
+  const handleEditFabric = async (fabricIdToUpdate, updates) => {
+    if (!fabricIdToUpdate || !updates) return;
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await updateFabric(updates);
+      await updateFabric(fabricIdToUpdate, updates);
       toast({
         title: "Success",
         description: "Fabric updated successfully",
@@ -245,7 +293,7 @@ export default function FabricViewPage() {
   const handleDeleteFabric = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to delete this fabric? This action cannot be undone."
+        "Are you sure you want to delete this fabric and all its associated batches? This action cannot be undone."
       )
     ) {
       return;
@@ -266,12 +314,11 @@ export default function FabricViewPage() {
         description: "Failed to delete fabric. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
-  // Loading skeleton components
+  // --- SKELETON COMPONENTS ---
   const SummaryCardSkeleton = () => (
     <Card className="overflow-hidden border-none shadow-md">
       <CardContent className="p-0">
@@ -289,29 +336,33 @@ export default function FabricViewPage() {
     </Card>
   );
 
-  const TableSkeleton = () => (
+  const TableSkeleton = ({ columns = 5 }) => (
     <Card className="border-none shadow-md">
       <CardContent className="p-6">
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center gap-4 py-4">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-10" />
+            <div
+              key={i}
+              className={`flex items-center gap-4 py-4 border-b last:border-b-0`}
+            >
+              {[...Array(columns)].map((_, j) => (
+                <Skeleton
+                  key={j}
+                  className={`h-4 ${j < columns - 1 ? "w-24" : "w-10 ml-auto"}`}
+                />
+              ))}
             </div>
           ))}
         </div>
       </CardContent>
     </Card>
   );
+  // --- END SKELETON COMPONENTS ---
 
   if (loadingState.initial) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-        {/* Header Skeleton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <Skeleton className="h-8 w-32 mb-2" />
@@ -322,28 +373,25 @@ export default function FabricViewPage() {
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <SummaryCardSkeleton />
           <SummaryCardSkeleton />
           <SummaryCardSkeleton />
         </div>
-
-        {/* Tables */}
-        <TableSkeleton />
-        <TableSkeleton />
+        <TableSkeleton columns={5} />
+        <TableSkeleton columns={5} />
       </div>
     );
   }
 
-  if (!fabric) {
+  if (!loadingState.initial && !fabric) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-gray-900">Fabric Not Found</h2>
           <p className="mt-2 text-gray-600">
-            The fabric you're looking for doesn't exist or has been removed.
+            The fabric (ID: {id}) you&apos;re looking for doesn&apos;t exist or
+            has been removed.
           </p>
           <Button
             onClick={() => router.push("/inventory")}
@@ -372,13 +420,15 @@ export default function FabricViewPage() {
             Back to Inventory
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">{fabric.name}</h1>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Badge variant="outline">{fabric.code}</Badge>
             <Badge variant="secondary">{fabric.category}</Badge>
             <Badge variant="secondary">{fabric.unit}</Badge>
           </div>
           {fabric.description && (
-            <p className="text-muted-foreground mt-2">{fabric.description}</p>
+            <p className="text-muted-foreground mt-2 max-w-prose">
+              {fabric.description}
+            </p>
           )}
         </div>
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
@@ -386,29 +436,12 @@ export default function FabricViewPage() {
             fabric={fabric}
             onSave={handleEditFabric}
             onDelete={handleDeleteFabric}
-          >
-            <Button
-              variant="outline"
-              className="w-full md:w-auto"
-              disabled={loadingState.actions}
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Fabric
-            </Button>
-          </EditFabricDialog>
+          />
           <PurchaseStockDialog
-            fabrics={[fabric]}
-            suppliers={suppliers}
+            fabrics={fabrics ? [fabric] : []}
+            suppliers={suppliers || []}
             onPurchaseStock={handlePurchaseStock}
-          >
-            <Button
-              className="w-full md:w-auto"
-              disabled={loadingState.actions}
-            >
-              <Package className="mr-2 h-4 w-4" />
-              Purchase Stock
-            </Button>
-          </PurchaseStockDialog>
+          />
         </div>
       </div>
 
@@ -484,73 +517,79 @@ export default function FabricViewPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Price History</h2>
+              <h2 className="text-xl font-semibold">
+                Purchase History (Batches)
+              </h2>
             </div>
-            <Select value={viewMode} onValueChange={setViewMode}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="View Mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="chart">Chart View</SelectItem>
-                <SelectItem value="table">Table View</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          {viewMode === "chart" ? (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              Chart view coming soon...
-            </div>
-          ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Purchase Price</TableHead>
-                  <TableHead>Quantity</TableHead>
+                  <TableHead className="text-right">Purchase Price</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
                   <TableHead>Supplier</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {priceHistory.map((batch) => (
-                  <TableRow key={batch.id}>
-                    <TableCell>{batch.date}</TableCell>
-                    <TableCell>৳{batch.price.toFixed(2)}</TableCell>
-                    <TableCell>
-                      {batch.quantity} {fabric.unit}
-                    </TableCell>
-                    <TableCell>{batch.supplierName}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <EditBatchDialog
-                          batch={batch}
-                          fabric={fabric}
-                          onSave={handleEditBatch}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDeleteBatch(batch.id)}
-                          disabled={loadingState.actions}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!priceHistory.length && (
+                {Array.isArray(priceHistory) && priceHistory.length > 0 ? (
+                  priceHistory.map((batchItem) => {
+                    const fullBatch = batches.find(
+                      (b) => b && b.id === batchItem.id
+                    );
+                    if (!fullBatch) return null;
+
+                    return (
+                      <TableRow key={batchItem.id}>
+                        <TableCell>{batchItem.date}</TableCell>
+                        <TableCell className="text-right">
+                          ৳{(batchItem.price || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {batchItem.quantity || 0} {fabric?.unit || ""}
+                        </TableCell>
+                        <TableCell>{batchItem.supplierName}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <EditBatchDialog
+                              batch={fullBatch}
+                              fabric={fabric}
+                              onSave={handleEditBatch}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBatch(batchItem.id);
+                              }}
+                              disabled={loadingState.actions}
+                              aria-label="Delete batch"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-4">
-                      No price history available
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-4 text-muted-foreground"
+                    >
+                      No purchase history available for this fabric.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -562,49 +601,67 @@ export default function FabricViewPage() {
             <h2 className="text-xl font-semibold">Recent Stock Movements</h2>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Unit Price</TableHead>
-                <TableHead>Total Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>
-                    {new Date(transaction.date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        transaction.type === "FABRIC_SALE"
-                          ? "destructive"
-                          : "default"
-                      }
-                    >
-                      {transaction.type === "FABRIC_SALE" ? "Sale" : "Purchase"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {transaction.quantity} {fabric.unit}
-                  </TableCell>
-                  <TableCell>৳{transaction.unitPrice?.toFixed(2)}</TableCell>
-                  <TableCell>৳{transaction.totalValue?.toFixed(2)}</TableCell>
-                </TableRow>
-              ))}
-              {!recentTransactions.length && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4">
-                    No recent transactions
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Cost/Value</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {Array.isArray(recentTransactions) &&
+                recentTransactions.length > 0 ? (
+                  recentTransactions.map((transaction) => (
+                    <TableRow key={transaction?.id}>
+                      <TableCell>
+                        {transaction?.date
+                          ? formatDate(transaction.date)
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            transaction?.type === "FABRIC_SALE"
+                              ? "destructive"
+                              : "default"
+                          }
+                        >
+                          {transaction?.type === "FABRIC_SALE"
+                            ? "Sale"
+                            : "Purchase/Adjustment"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right ${
+                          transaction?.type === "FABRIC_SALE"
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {transaction?.type === "FABRIC_SALE" ? "-" : "+"}
+                        {transaction?.quantity || 0} {fabric?.unit || ""}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ৳{(transaction?.totalCost || 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="text-center py-4 text-muted-foreground"
+                    >
+                      No recent stock movements recorded.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -615,20 +672,17 @@ export default function FabricViewPage() {
             <div>
               <h2 className="text-xl font-semibold">Sell Stock</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Sell fabric from your current stock
+                Sell fabric from your current stock (uses FIFO method)
               </p>
             </div>
             <SellFabricDialog
-              fabric={{ ...fabric, batches, totalQuantity }}
+              fabric={{
+                ...fabric,
+                batches: batches,
+                totalQuantity: totalQuantity,
+              }}
               onSellFabric={handleSellFabric}
-            >
-              <Button
-                className="w-full md:w-auto"
-                disabled={loadingState.actions || totalQuantity <= 0}
-              >
-                Sell Stock
-              </Button>
-            </SellFabricDialog>
+            />
           </div>
         </CardContent>
       </Card>

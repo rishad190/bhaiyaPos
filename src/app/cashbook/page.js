@@ -50,7 +50,12 @@ export default function CashBookPage() {
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState(() => {
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    return firstDayOfMonth.toISOString().split("T")[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
@@ -161,7 +166,16 @@ export default function CashBookPage() {
           )
         : true;
 
-      const matchesDate = dateFilter ? day.date === dateFilter : true;
+      const dayDate = new Date(day.date);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Adjust for timezones by setting time to midnight
+      dayDate.setUTCHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
+      end.setUTCHours(0, 0, 0, 0);
+
+      const matchesDate = dayDate >= start && dayDate <= end;
 
       const matchesTab = (() => {
         switch (activeTab) {
@@ -176,7 +190,7 @@ export default function CashBookPage() {
 
       return matchesSearch && matchesDate && matchesTab;
     });
-  }, [dailyCash, searchTerm, dateFilter, activeTab]);
+  }, [dailyCash, searchTerm, startDate, endDate, activeTab]);
 
   const handleAddTransaction = async (transaction) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
@@ -260,7 +274,8 @@ export default function CashBookPage() {
       transactions: dailyCashTransactions,
       summary: financials,
       dailyCash: dailyCash, // Include daily cash calculations
-      selectedDate: dateFilter || null, // Include selected date filter
+      startDate: startDate,
+      endDate: endDate,
     };
     exportCashbookToPDF(data);
   };
@@ -417,8 +432,8 @@ export default function CashBookPage() {
             disabled={loadingState.actions}
           >
             <FileText className="mr-2 h-4 w-4" />
-            {dateFilter
-              ? `Export PDF (${formatDate(dateFilter)})`
+            {startDate && endDate
+              ? `Export PDF (${formatDate(startDate)} - ${formatDate(endDate)})`
               : "Export PDF"}
           </Button>
           <Button
@@ -592,22 +607,21 @@ export default function CashBookPage() {
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="pl-9 w-full md:w-[200px]"
                 />
               </div>
-              {dateFilter && (
-                <Button
-                  variant="outline"
-                  onClick={() => setDateFilter("")}
-                  className="w-full md:w-auto"
-                  size="icon"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Clear Date</span>
-                </Button>
-              )}
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="pl-9 w-full md:w-[200px]"
+                />
+              </div>
+
             </div>
           </div>
         </CardContent>

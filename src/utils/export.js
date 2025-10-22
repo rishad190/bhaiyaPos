@@ -12,6 +12,7 @@ export const formatCurrencyWithSymbol = (amount) => {
 
 export const formatCurrencyBD = (amount) => {
   if (typeof amount !== "number") {
+    // Use Taka symbol '৳' instead of 'เงณ'
     return "৳0";
   }
 
@@ -28,13 +29,16 @@ export const formatCurrencyBD = (amount) => {
       maximumFractionDigits: 2,
     });
   }
-
-  return `৳${formattedAmount}`;
+  // Use Taka symbol '৳' instead of 'เงณ'
+  return `${formattedAmount}`;
 };
 
 export const formatCurrencyForPDF = (amount) => {
-  if (amount === undefined || amount === null) return "৳0";
-  return formatCurrencyBD(amount);
+  if (amount === undefined || amount === null) {
+    // Use Taka symbol '৳' instead of 'เงณ'
+    return "৳0";
+  }
+  return amount; // Uses the updated formatCurrencyBD
 };
 
 export const exportToCSV = (data, filename) => {
@@ -164,7 +168,7 @@ export const exportToPDF = (entity, transactions, type) => {
             0
           );
 
-    const totalPaid = 
+    const totalPaid =
       type === "customer"
         ? transactions.reduce((sum, t) => sum + (Number(t.deposit) || 0), 0)
         : transactions.reduce((sum, t) => sum + (Number(t.paidAmount) || 0), 0);
@@ -366,7 +370,7 @@ export const addImageToPDF = (doc, imgData, x, y, width, height) => {
 // Specialized PDF export for Cashbook with daily calculations
 export const exportCashbookToPDF = (data) => {
   try {
-    const { title, date, transactions, summary, dailyCash, selectedDate } =
+    const { title, date, transactions, summary, dailyCash, startDate, endDate } =
       data;
 
     // Create new document
@@ -404,16 +408,25 @@ export const exportCashbookToPDF = (data) => {
     let filteredDailyCash = dailyCash;
     let reportPeriod = "All Time";
 
-    if (selectedDate) {
-      const selectedDateStr =
-        selectedDate instanceof Date
-          ? selectedDate.toISOString().split("T")[0]
-          : selectedDate;
-      filteredTransactions = transactions.filter(
-        (t) => t.date === selectedDateStr
-      );
-      filteredDailyCash = dailyCash.filter((d) => d.date === selectedDateStr);
-      reportPeriod = `Single Date: ${formatDate(selectedDateStr)}`;
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      start.setUTCHours(0, 0, 0, 0);
+      end.setUTCHours(0, 0, 0, 0);
+
+      filteredTransactions = transactions.filter((t) => {
+        const transactionDate = new Date(t.date);
+        transactionDate.setUTCHours(0, 0, 0, 0);
+        return transactionDate >= start && transactionDate <= end;
+      });
+
+      filteredDailyCash = dailyCash.filter((d) => {
+        const dayDate = new Date(d.date);
+        dayDate.setUTCHours(0, 0, 0, 0);
+        return dayDate >= start && dayDate <= end;
+      });
+
+      reportPeriod = `From: ${formatDate(startDate)} To: ${formatDate(endDate)}`;
     }
 
     // Report Info Section
@@ -444,7 +457,7 @@ export const exportCashbookToPDF = (data) => {
     });
 
     // Calculate filtered summary
-    const filteredSummary = selectedDate
+    const filteredSummary = (startDate && endDate)
       ? {
           totalCashIn: filteredTransactions.reduce(
             (sum, t) => sum + (t.cashIn || 0),
@@ -497,7 +510,7 @@ export const exportCashbookToPDF = (data) => {
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text(
-        selectedDate ? "Selected Date Summary" : "Daily Cash Summary",
+        (startDate && endDate) ? "Selected Date Summary" : "Daily Cash Summary",
         15,
         yPos
       );
@@ -508,7 +521,7 @@ export const exportCashbookToPDF = (data) => {
         ["Date", "Cash In", "Cash Out", "Daily Balance", "Running Balance"],
       ];
       const dailyData = filteredDailyCash.map((day, index) => {
-        const runningBalance = selectedDate
+        const runningBalance = (startDate && endDate)
           ? day.balance // For single date, running balance is just the daily balance
           : filteredDailyCash
               .slice(0, index + 1)
@@ -566,7 +579,7 @@ export const exportCashbookToPDF = (data) => {
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text(
-        selectedDate
+        (startDate && endDate)
           ? "Transactions for Selected Date"
           : "Individual Transactions",
         15,
@@ -668,8 +681,8 @@ export const exportCashbookToPDF = (data) => {
     }
 
     // Save the PDF
-    const filename = selectedDate
-      ? `cashbook-report-${formatDate(selectedDate, "YYYY-MM-DD")}.pdf`
+    const filename = (startDate && endDate)
+      ? `cashbook-report-${formatDate(startDate, "YYYY-MM-DD")}-to-${formatDate(endDate, "YYYY-MM-DD")}.pdf`
       : `cashbook-report-${formatDate(new Date(), "YYYY-MM-DD")}.pdf`;
     doc.save(filename);
     return true;
