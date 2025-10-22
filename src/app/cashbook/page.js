@@ -40,6 +40,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/utils/export";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export default function CashBookPage() {
   const {
@@ -59,6 +64,11 @@ export default function CashBookPage() {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
+
+  // State for PDF export date range
+  const [pdfStartDate, setPdfStartDate] = useState(startDate);
+  const [pdfEndDate, setPdfEndDate] = useState(endDate);
+
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [loadingState, setLoadingState] = useState({
     initial: true,
@@ -268,14 +278,39 @@ export default function CashBookPage() {
   };
 
   const handleExportPDF = () => {
+    const start = new Date(pdfStartDate);
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(pdfEndDate);
+    end.setUTCHours(0, 0, 0, 0);
+
+    const filteredDailyCash = dailyCash.filter((day) => {
+      const dayDate = new Date(day.date);
+      dayDate.setUTCHours(0, 0, 0, 0);
+      return dayDate >= start && dayDate <= end;
+    });
+
+    const transactionsForPDF = filteredDailyCash.flatMap((day) => day.dailyCash);
+
+    const financialsForPDF = {
+      totalCashIn: filteredDailyCash.reduce((sum, day) => sum + day.cashIn, 0),
+      totalCashOut: filteredDailyCash.reduce(
+        (sum, day) => sum + day.cashOut,
+        0
+      ),
+      availableCash: filteredDailyCash.reduce(
+        (sum, day) => sum + day.balance,
+        0
+      ),
+    };
+
     const data = {
       title: "Cash Book Report",
       date: new Date().toLocaleDateString(),
-      transactions: dailyCashTransactions,
-      summary: financials,
-      dailyCash: dailyCash, // Include daily cash calculations
-      startDate: startDate,
-      endDate: endDate,
+      transactions: transactionsForPDF,
+      summary: financialsForPDF,
+      dailyCash: filteredDailyCash,
+      startDate: pdfStartDate,
+      endDate: pdfEndDate,
     };
     exportCashbookToPDF(data);
   };
@@ -425,17 +460,55 @@ export default function CashBookPage() {
               Add Transaction
             </Button>
           </AddCashTransactionDialog>
-          <Button
-            onClick={handleExportPDF}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            {startDate && endDate
-              ? `Export PDF (${formatDate(startDate)} - ${formatDate(endDate)})`
-              : "Export PDF"}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                className="w-full md:w-auto"
+                variant="outline"
+                disabled={loadingState.actions}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {pdfStartDate && pdfEndDate
+                  ? `Export PDF (${formatDate(pdfStartDate)} - ${formatDate(
+                      pdfEndDate
+                    )})`
+                  : "Export PDF"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4">
+              <div className="space-y-4">
+                <h4 className="font-medium leading-none">Export PDF</h4>
+                <p className="text-sm text-muted-foreground">
+                  Select a date range for the PDF report.
+                </p>
+                <div className="grid gap-2">
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label htmlFor="pdf-start-date">Start Date</label>
+                    <Input
+                      id="pdf-start-date"
+                      type="date"
+                      value={pdfStartDate}
+                      onChange={(e) => setPdfStartDate(e.target.value)}
+                      className="col-span-2 h-8"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label htmlFor="pdf-end-date">End Date</label>
+                    <Input
+                      id="pdf-end-date"
+                      type="date"
+                      value={pdfEndDate}
+                      onChange={(e) => setPdfEndDate(e.target.value)}
+                      className="col-span-2 h-8"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleExportPDF} className="w-full">
+                  Export
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             onClick={handleExportCSV}
             className="w-full md:w-auto"
@@ -602,26 +675,31 @@ export default function CashBookPage() {
                 className="pl-9 w-full"
               />
             </div>
-            <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-9 w-full md:w-[200px]"
-                />
-              </div>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-9 w-full md:w-[200px]"
-                />
-              </div>
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Date Filter Section */}
+      <Card className="mb-8 border-none shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+            <div className="relative flex-1">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="pl-9 w-full"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="pl-9 w-full"
+              />
             </div>
           </div>
         </CardContent>
