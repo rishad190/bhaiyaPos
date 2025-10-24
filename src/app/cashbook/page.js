@@ -45,6 +45,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Pagination } from "@/components/Pagination";
 
 export default function CashBookPage() {
   const {
@@ -55,19 +56,14 @@ export default function CashBookPage() {
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState(() => {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    return firstDayOfMonth.toISOString().split("T")[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
+  const [date, setDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
 
   // State for PDF export date range
-  const [pdfStartDate, setPdfStartDate] = useState(startDate);
-  const [pdfEndDate, setPdfEndDate] = useState(endDate);
+  const [pdfStartDate, setPdfStartDate] = useState(date);
+  const [pdfEndDate, setPdfEndDate] = useState(date);
 
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [loadingState, setLoadingState] = useState({
@@ -76,6 +72,8 @@ export default function CashBookPage() {
     actions: false,
   });
   const [activeTab, setActiveTab] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Add useEffect to handle initial loading state
   useEffect(() => {
@@ -177,15 +175,13 @@ export default function CashBookPage() {
         : true;
 
       const dayDate = new Date(day.date);
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const filterDate = new Date(date);
 
       // Adjust for timezones by setting time to midnight
       dayDate.setUTCHours(0, 0, 0, 0);
-      start.setUTCHours(0, 0, 0, 0);
-      end.setUTCHours(0, 0, 0, 0);
+      filterDate.setUTCHours(0, 0, 0, 0);
 
-      const matchesDate = dayDate >= start && dayDate <= end;
+      const matchesDate = dayDate.getTime() === filterDate.getTime();
 
       const matchesTab = (() => {
         switch (activeTab) {
@@ -200,7 +196,13 @@ export default function CashBookPage() {
 
       return matchesSearch && matchesDate && matchesTab;
     });
-  }, [dailyCash, searchTerm, startDate, endDate, activeTab]);
+  }, [dailyCash, searchTerm, date, activeTab]);
+
+  const paginatedCash = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredCash.slice(startIndex, endIndex);
+  }, [filteredCash, currentPage, itemsPerPage]);
 
   const handleAddTransaction = async (transaction) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
@@ -687,17 +689,8 @@ export default function CashBookPage() {
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="pl-9 w-full"
-              />
-            </div>
-            <div className="relative flex-1">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 className="pl-9 w-full"
               />
             </div>
@@ -723,7 +716,7 @@ export default function CashBookPage() {
             <div className="space-y-4">
               {/* Mobile View */}
               <div className="block md:hidden">
-                {filteredCash.map((day) => (
+                {paginatedCash.map((day) => (
                   <div
                     key={day.date}
                     className="bg-white rounded-lg shadow mb-4"
@@ -881,7 +874,7 @@ export default function CashBookPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCash.map((day) => (
+                    {paginatedCash.map((day) => (
                       <TableRow key={day.date} className="border-b">
                         <TableCell className="whitespace-nowrap font-medium">
                           {formatDate(day.date)}
@@ -1011,6 +1004,12 @@ export default function CashBookPage() {
                   </TableBody>
                 </Table>
               </div>
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filteredCash.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </CardContent>

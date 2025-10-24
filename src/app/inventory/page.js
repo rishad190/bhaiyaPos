@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { exportToCSV, exportToPDF } from "@/utils/export";
+import { ProfitCard } from "@/components/ProfitCard";
 import {
   Search,
   Plus,
@@ -400,7 +401,8 @@ export default function InventoryPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <ProfitCard />
         <Card className="overflow-hidden border-none shadow-md">
           <CardContent className="p-0">
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 border-b border-blue-100 dark:border-blue-800">

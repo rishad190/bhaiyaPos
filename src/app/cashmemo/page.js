@@ -1,8 +1,8 @@
-"use client";
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
-import { CashMemoPrint } from "@/components/CashMemoPrint";
+'use client';
+import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useData } from '@/app/data-context';
+import { CashMemoPrint } from '@/components/CashMemoPrint';
 
 import {
   Table,
@@ -11,10 +11,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Printer,
   FileDown,
@@ -22,9 +22,9 @@ import {
   CheckCircle,
   Check,
   ChevronsUpDown,
-} from "lucide-react";
+} from 'lucide-react';
 
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from '@/components/ui/toaster';
 import {
   Command,
   CommandEmpty,
@@ -32,46 +32,51 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from '@/components/ui/command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/popover';
+import { calculateFifoSale } from '@/lib/inventory-utils';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { customers, addTransaction, addDailyCashTransaction } = useData();
-  const [customerId, setCustomerId] = useState("");
+  const { customers, addTransaction, addDailyCashTransaction, fabrics, fabricBatches } = useData();
+  const [customerId, setCustomerId] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [openPhonePopover, setOpenPhonePopover] = useState(false);
-  const [phoneSearchValue, setPhoneSearchValue] = useState("");
+  const [phoneSearchValue, setPhoneSearchValue] = useState('');
+  const [openProductPopover, setOpenProductPopover] = useState(false);
+  const [productSearchValue, setProductSearchValue] = useState('');
   const [memoData, setMemoData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    customerName: "",
-    customerPhone: "",
-    customerAddress: "",
+    date: new Date().toISOString().split('T')[0],
+    customerName: '',
+    customerPhone: '',
+    customerAddress: '',
     memoNumber: `MEMO-${Date.now()}`,
     deposit: 0, // Changed from empty string to 0
   });
 
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
-    name: "",
-    quality: "",
-    price: "",
+    name: '',
+    quality: '',
+    price: '',
     total: 0,
+    cost: 0,
+    profit: 0,
   });
 
   const originalContent = useRef(null);
 
   const handleAddProduct = () => {
     if (!newProduct.name.trim()) {
-      alert("Please enter product name");
+      alert('Please enter product name');
       return;
     }
 
@@ -80,7 +85,7 @@ export default function CashMemoPage() {
       isNaN(parseFloat(newProduct.quality)) ||
       parseFloat(newProduct.quality) <= 0
     ) {
-      alert("Please enter valid quality");
+      alert('Please enter valid quality');
       return;
     }
 
@@ -89,13 +94,23 @@ export default function CashMemoPage() {
       isNaN(parseFloat(newProduct.price)) ||
       parseFloat(newProduct.price) <= 0
     ) {
-      alert("Please enter valid price");
+      alert('Please enter valid price');
       return;
     }
 
     const quality = parseFloat(newProduct.quality);
     const price = parseFloat(newProduct.price);
     const total = quality * price;
+
+    const fabric = fabrics.find(f => f.name.toLowerCase() === newProduct.name.toLowerCase());
+    if (!fabric) {
+      alert('Fabric not found');
+      return;
+    }
+
+    const batches = fabricBatches.filter(b => b.fabricId === fabric.id);
+    const { totalCost } = calculateFifoSale(batches, quality);
+    const profit = total - totalCost;
 
     setProducts([
       ...products,
@@ -104,24 +119,30 @@ export default function CashMemoPage() {
         quality,
         price,
         total,
+        cost: totalCost,
+        profit,
       },
     ]);
 
     setNewProduct({
-      name: "",
-      quality: "",
-      price: "",
+      name: '',
+      quality: '',
+      price: '',
       total: 0,
+      cost: 0,
+      profit: 0,
     });
   };
 
   const grandTotal = products.reduce((sum, product) => sum + product.total, 0);
+  const totalCost = products.reduce((sum, product) => sum + product.cost, 0);
+  const totalProfit = products.reduce((sum, product) => sum + product.profit, 0);
 
   const handlePrint = () => {
-    const printContent = document.getElementById("print-section");
+    const printContent = document.getElementById('print-section');
     if (!printContent) return;
 
-    const printWindow = window.open("", "_blank");
+    const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     printWindow.document.write(`
@@ -236,27 +257,36 @@ export default function CashMemoPage() {
       ...memoData,
       customerPhone: customer.phone,
       customerName: customer.name,
-      customerAddress: customer.address || "",
+      customerAddress: customer.address || '',
     });
     setCustomerId(customer.id);
     setOpenPhonePopover(false);
   };
 
+  const handleSelectProduct = (fabric) => {
+    setNewProduct({ ...newProduct, name: fabric.name });
+    setOpenProductPopover(false);
+  };
+
+  const handlePhoneChange = (e) => {
+    setMemoData({ ...memoData, customerPhone: e.target.value });
+  };
+
   const handleSaveMemo = async () => {
     if (products.length === 0) {
       toast({
-        title: "Error",
-        description: "Please add at least one product",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Please add at least one product',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!customerId) {
       toast({
-        title: "Error",
-        description: "Please select a valid customer",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Please select a valid customer',
+        variant: 'destructive',
       });
       return;
     }
@@ -266,18 +296,19 @@ export default function CashMemoPage() {
       const deposit = Number(memoData.deposit) || 0;
 
       // Log transaction data for debugging
-      console.log("Saving transaction:", {
+      console.log('Saving transaction:', {
         customerId,
         date: memoData.date,
         memoNumber: memoData.memoNumber,
         total: grandTotal,
+        totalCost: totalCost, // Add totalCost
         deposit: deposit,
         due: grandTotal - deposit,
         details: products
           .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
-          .join(", "),
-        type: "SALE",
-        storeId: "STORE1",
+          .join(', '),
+        type: 'SALE',
+        storeId: 'STORE1',
       });
 
       // Create transaction for customer
@@ -286,19 +317,20 @@ export default function CashMemoPage() {
         date: memoData.date,
         memoNumber: memoData.memoNumber,
         total: grandTotal,
+        totalCost: totalCost, // Add totalCost
         deposit: deposit,
         due: grandTotal - deposit,
         details: products
           .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
-          .join(", "),
-        type: "SALE",
-        storeId: "STORE1",
+          .join(', '),
+        type: 'SALE',
+        storeId: 'STORE1',
         createdAt: new Date().toISOString(),
       };
 
       // Wait for transaction to be added
       const transactionResult = await addTransaction(transaction);
-      console.log("Transaction result:", transactionResult);
+      console.log('Transaction result:', transactionResult);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
       if (deposit > 0 && transactionResult) {
@@ -307,7 +339,7 @@ export default function CashMemoPage() {
           description: `Cash Memo: ${memoData.memoNumber} - ${memoData.customerName}`,
           cashIn: deposit,
           cashOut: 0,
-          category: "Sales",
+          category: 'Sales',
           createdAt: new Date().toISOString(),
         };
 
@@ -316,31 +348,31 @@ export default function CashMemoPage() {
 
       setSaveSuccess(true);
       toast({
-        title: "Success",
-        description: "Cash memo saved successfully",
+        title: 'Success',
+        description: 'Cash memo saved successfully',
       });
 
       // Reset form after delay
       setTimeout(() => {
         setMemoData({
-          date: new Date().toISOString().split("T")[0],
-          customerName: "",
-          customerPhone: "",
-          customerAddress: "",
+          date: new Date().toISOString().split('T')[0],
+          customerName: '',
+          customerPhone: '',
+          customerAddress: '',
           memoNumber: `MEMO-${Date.now()}`,
           deposit: 0,
         });
         setProducts([]);
-        setCustomerId("");
+        setCustomerId('');
         setSaveSuccess(false);
-        router.push("/cashbook");
+        router.push('/cashbook');
       }, 2000);
     } catch (error) {
-      console.error("Error saving memo:", error);
+      console.error('Error saving memo:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to save memo. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to save memo. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -428,10 +460,10 @@ export default function CashMemoPage() {
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    'mr-2 h-4 w-4',
                                     memoData.customerPhone === customer.phone
-                                      ? "opacity-100"
-                                      : "opacity-0"
+                                      ? 'opacity-100'
+                                      : 'opacity-0'
                                   )}
                                 />
                                 <div className="flex flex-col">
@@ -496,14 +528,71 @@ export default function CashMemoPage() {
       <Card className="p-4 md:p-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <Input
-              placeholder="Product name"
-              value={newProduct.name}
-              onChange={(e) =>
-                setNewProduct({ ...newProduct, name: e.target.value })
-              }
-              required
-            />
+            <Popover
+              open={openProductPopover}
+              onOpenChange={setOpenProductPopover}
+            >
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Input
+                    placeholder="Product name"
+                    value={newProduct.name}
+                    onChange={(e) => {
+                      setNewProduct({ ...newProduct, name: e.target.value });
+                      setProductSearchValue(e.target.value);
+                    }}
+                    required
+                    className="w-full"
+                  />
+                  <Button
+                    variant="ghost"
+                    role="combobox"
+                    aria-expanded={openProductPopover}
+                    className="absolute right-0 h-full px-3"
+                    onClick={() => setOpenProductPopover(!openProductPopover)}
+                  >
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Search products..."
+                    value={productSearchValue}
+                    onValueChange={setProductSearchValue}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No product found.</CommandEmpty>
+                    <CommandGroup>
+                      {fabrics
+                        ?.filter((fabric) =>
+                          fabric.name
+                            .toLowerCase()
+                            .includes(productSearchValue.toLowerCase())
+                        )
+                        .map((fabric) => (
+                          <CommandItem
+                            key={fabric.id}
+                            value={fabric.name}
+                            onSelect={() => handleSelectProduct(fabric)}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                newProduct.name.toLowerCase() === fabric.name.toLowerCase()
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}
+                            />
+                            <span>{fabric.name}</span>
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <Input
               type="number"
               min="0"
@@ -545,6 +634,9 @@ export default function CashMemoPage() {
                   <TableHead className="text-right whitespace-nowrap">
                     Total
                   </TableHead>
+                  <TableHead className="text-right whitespace-nowrap">
+                    Profit
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -562,10 +654,13 @@ export default function CashMemoPage() {
                     <TableCell className="text-right whitespace-nowrap">
                       ৳{product.total.toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      ৳{product.profit.toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow>
-                  <TableCell colSpan={3} className="text-right font-bold">
+                  <TableCell colSpan={4} className="text-right font-bold">
                     Grand Total:
                   </TableCell>
                   <TableCell className="text-right font-bold whitespace-nowrap">
@@ -574,7 +669,18 @@ export default function CashMemoPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
+                    className="text-right font-bold text-green-600"
+                  >
+                    Total Profit:
+                  </TableCell>
+                  <TableCell className="text-right font-bold whitespace-nowrap text-green-600">
+                    ৳{totalProfit.toLocaleString()}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
                     className="text-right font-medium text-green-600"
                   >
                     Deposit:
@@ -585,7 +691,7 @@ export default function CashMemoPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="text-right font-medium text-red-600"
                   >
                     Due Amount:
