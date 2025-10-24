@@ -167,35 +167,49 @@ export default function CashBookPage() {
 
   // Filter transactions based on search term, date, and active tab
   const filteredCash = useMemo(() => {
-    return dailyCash.filter((day) => {
-      const matchesSearch = searchTerm
-        ? day.dailyCash.some((t) =>
-            t.description.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        : true;
+    return dailyCash
+      .map(day => {
+        const filteredTransactions = day.dailyCash.filter(t =>
+          searchTerm
+            ? t.description.toLowerCase().includes(searchTerm.toLowerCase())
+            : true
+        );
 
-      const dayDate = new Date(day.date);
-      const filterDate = new Date(date);
-
-      // Adjust for timezones by setting time to midnight
-      dayDate.setUTCHours(0, 0, 0, 0);
-      filterDate.setUTCHours(0, 0, 0, 0);
-
-      const matchesDate = dayDate.getTime() === filterDate.getTime();
-
-      const matchesTab = (() => {
-        switch (activeTab) {
-          case "in":
-            return day.cashIn > 0;
-          case "out":
-            return day.cashOut > 0;
-          default:
-            return true;
+        if (filteredTransactions.length === 0 && searchTerm) {
+          return null;
         }
-      })();
 
-      return matchesSearch && matchesDate && matchesTab;
-    });
+        const newDay = { ...day, dailyCash: filteredTransactions };
+        // recalculate cashIn, cashOut, balance for the day
+        newDay.cashIn = filteredTransactions.reduce((sum, t) => sum + (t.cashIn || 0), 0);
+        newDay.cashOut = filteredTransactions.reduce((sum, t) => sum + (t.cashOut || 0), 0);
+        newDay.balance = newDay.cashIn - newDay.cashOut;
+
+        return newDay;
+      })
+      .filter(Boolean) // remove null days
+      .filter((day) => {
+        const matchesDate = date ? (() => {
+          const dayDate = new Date(day.date);
+          const filterDate = new Date(date);
+          dayDate.setUTCHours(0, 0, 0, 0);
+          filterDate.setUTCHours(0, 0, 0, 0);
+          return dayDate.getTime() === filterDate.getTime();
+        })() : true;
+
+        const matchesTab = (() => {
+          switch (activeTab) {
+            case "in":
+              return day.cashIn > 0;
+            case "out":
+              return day.cashOut > 0;
+            default:
+              return true;
+          }
+        })();
+
+        return matchesDate && matchesTab;
+      });
   }, [dailyCash, searchTerm, date, activeTab]);
 
   const paginatedCash = useMemo(() => {
@@ -266,6 +280,10 @@ export default function CashBookPage() {
     } finally {
       setLoadingState((prev) => ({ ...prev, actions: false }));
     }
+  };
+
+  const handleClearFilter = () => {
+    setDate(null);
   };
 
   const handleExportCSV = () => {
@@ -689,11 +707,14 @@ export default function CashBookPage() {
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
-                value={date}
+                value={date || ''}
                 onChange={(e) => setDate(e.target.value)}
                 className="pl-9 w-full"
               />
             </div>
+            <Button variant="ghost" onClick={handleClearFilter}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
