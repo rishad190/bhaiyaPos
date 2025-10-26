@@ -695,14 +695,6 @@ export default function CashBookPage() {
                 className="pl-9 w-full"
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Date Filter Section */}
-      <Card className="mb-8 border-none shadow-md">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-2 md:gap-4">
             <div className="relative flex-1">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -713,7 +705,8 @@ export default function CashBookPage() {
               />
             </div>
             <Button variant="ghost" onClick={handleClearFilter}>
-              <X className="h-4 w-4" />
+              <X className="mr-2 h-4 w-4" />
+              Clear Filter
             </Button>
           </div>
         </CardContent>

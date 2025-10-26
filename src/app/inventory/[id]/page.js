@@ -42,6 +42,7 @@ import {
   Trash2,
   Edit,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function FabricViewPage() {
   const router = useRouter();
@@ -119,6 +120,7 @@ export default function FabricViewPage() {
           price: b.unitCost || 0,
           quantity: b.quantity || 0,
           supplierName: b.supplierName || "N/A",
+          colors: b.colors || [],
         };
       })
       .filter((item) => item !== null)
@@ -240,16 +242,8 @@ export default function FabricViewPage() {
     if (!purchaseData || !purchaseData.fabricId) return;
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      const validatedData = {
-        ...purchaseData,
-        quantity: parseFloat(purchaseData.quantity) || 0,
-        unitCost: parseFloat(purchaseData.unitCost) || 0,
-        totalCost:
-          (parseFloat(purchaseData.quantity) || 0) *
-          (parseFloat(purchaseData.unitCost) || 0),
-      };
       await addFabricBatch({
-        ...validatedData,
+        ...purchaseData,
         fabricId: id,
         createdAt: new Date().toISOString(),
       });
@@ -528,9 +522,10 @@ export default function FabricViewPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
+                  <TableHead>Supplier/Container</TableHead>
+                  <TableHead>Color</TableHead>
                   <TableHead className="text-right">Purchase Price</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Supplier</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -545,13 +540,42 @@ export default function FabricViewPage() {
                     return (
                       <TableRow key={batchItem.id}>
                         <TableCell>{batchItem.date}</TableCell>
+                        <TableCell>{batchItem.supplierName}</TableCell>
+                        <TableCell>
+                          {Array.isArray(batchItem.colors) && batchItem.colors.length > 0 ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="link">{batchItem.colors.length} colors</Button>
+                              </PopoverTrigger>
+                              <PopoverContent>
+                                <div className="grid gap-4">
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Color Details</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                      Quantities per color in this batch.
+                                    </p>
+                                  </div>
+                                  <div className="grid gap-2">
+                                    {batchItem.colors.map((color, index) => (
+                                      <div key={index} className="grid grid-cols-2 items-center gap-4">
+                                        <span>{color.color}</span>
+                                        <span>{color.quantity}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            batchItem.color
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           ৳{(batchItem.price || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           {batchItem.quantity || 0} {fabric?.unit || ""}
                         </TableCell>
-                        <TableCell>{batchItem.supplierName}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
                             <EditBatchDialog
@@ -580,7 +604,7 @@ export default function FabricViewPage() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-center py-4 text-muted-foreground"
                     >
                       No purchase history available for this fabric.

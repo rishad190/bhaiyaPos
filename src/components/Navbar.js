@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Bell,
+  TrendingUp,
 } from "lucide-react";
 import { UserNav } from "./UserNav";
 
@@ -52,6 +53,11 @@ const navItems = [
     href: "/inventory",
     label: "Inventory",
     icon: Package,
+  },
+  {
+    href: "/inventory-profit",
+    label: "Inventory Profit",
+    icon: TrendingUp,
   },
   {
     href: "/cashmemo",

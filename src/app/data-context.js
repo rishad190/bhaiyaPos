@@ -23,6 +23,7 @@ import {
 } from "firebase/database";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { calculateFifoSale } from "@/lib/inventory-utils";
 
 // Create context
 const DataContext = createContext(null);
@@ -275,12 +276,28 @@ export function DataProvider({ children }) {
   // Transaction Operations
   const transactionOperations = {
     addTransaction: async (transactionData) => {
+      const { products, ...restTransactionData } = transactionData;
       const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
       const newTransactionRef = push(transactionsRef);
       await set(newTransactionRef, {
-        ...transactionData,
+        ...restTransactionData,
         createdAt: new Date().toISOString(),
       });
+
+      for (const product of products) {
+        const fabric = state.fabrics.find(f => f.name.toLowerCase() === product.name.toLowerCase());
+        if (fabric) {
+            const batches = state.fabricBatches.filter(b => b.fabricId === fabric.id);
+            const { updatedBatches } = calculateFifoSale(batches, product.quantity, product.color);
+            for (const batch of updatedBatches) {
+                if (batch.quantity > 0) {
+                    await fabricOperations.updateFabricBatch(batch.id, { quantity: batch.quantity, colors: batch.colors });
+                } else {
+                    await fabricOperations.deleteFabricBatch(batch.id);
+                }
+            }
+        }
+      }
 
       return newTransactionRef.key;
     },
@@ -323,6 +340,14 @@ export function DataProvider({ children }) {
         ...batchData,
         createdAt: serverTimestamp(),
       });
+    },
+
+    updateFabricBatch: async (batchId, updatedData) => {
+        const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
+        await update(batchRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
     },
 
     deleteFabricBatch: async (batchId) => {

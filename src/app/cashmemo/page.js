@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useData } from '@/app/data-context';
 import { CashMemoPrint } from '@/components/CashMemoPrint';
@@ -38,6 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { calculateFifoSale } from '@/lib/inventory-utils';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -70,7 +71,26 @@ export default function CashMemoPage() {
     total: 0,
     cost: 0,
     profit: 0,
+    color: ''
   });
+
+  const availableColors = useMemo(() => {
+    if (!newProduct.name) return [];
+    const fabric = fabrics.find(f => f.name.toLowerCase() === newProduct.name.toLowerCase());
+    if (!fabric) return [];
+    const batches = fabricBatches.filter(b => b.fabricId === fabric.id);
+    const colorQuantities = batches.reduce((acc, batch) => {
+        if (batch.colors && batch.colors.length > 0) {
+            batch.colors.forEach(color => {
+                acc[color.color] = (acc[color.color] || 0) + color.quantity;
+            });
+        } else if (batch.color) {
+            acc[batch.color] = (acc[batch.color] || 0) + batch.quantity;
+        }
+        return acc;
+    }, {});
+    return Object.entries(colorQuantities).map(([color, quantity]) => ({ color, quantity }));
+  }, [newProduct.name, fabrics, fabricBatches]);
 
   const originalContent = useRef(null);
 
@@ -109,7 +129,7 @@ export default function CashMemoPage() {
     }
 
     const batches = fabricBatches.filter(b => b.fabricId === fabric.id);
-    const { totalCost } = calculateFifoSale(batches, quality);
+    const { totalCost } = calculateFifoSale(batches, quality, newProduct.color);
     const profit = total - totalCost;
 
     setProducts([
@@ -121,6 +141,7 @@ export default function CashMemoPage() {
         total,
         cost: totalCost,
         profit,
+        color: newProduct.color,
       },
     ]);
 
@@ -131,6 +152,7 @@ export default function CashMemoPage() {
       total: 0,
       cost: 0,
       profit: 0,
+      color: ''
     });
   };
 
@@ -264,7 +286,7 @@ export default function CashMemoPage() {
   };
 
   const handleSelectProduct = (fabric) => {
-    setNewProduct({ ...newProduct, name: fabric.name });
+    setNewProduct({ ...newProduct, name: fabric.name, color: '' });
     setOpenProductPopover(false);
   };
 
@@ -295,22 +317,6 @@ export default function CashMemoPage() {
       setIsSaving(true);
       const deposit = Number(memoData.deposit) || 0;
 
-      // Log transaction data for debugging
-      console.log('Saving transaction:', {
-        customerId,
-        date: memoData.date,
-        memoNumber: memoData.memoNumber,
-        total: grandTotal,
-        totalCost: totalCost, // Add totalCost
-        deposit: deposit,
-        due: grandTotal - deposit,
-        details: products
-          .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
-          .join(', '),
-        type: 'SALE',
-        storeId: 'STORE1',
-      });
-
       // Create transaction for customer
       const transaction = {
         customerId,
@@ -321,16 +327,16 @@ export default function CashMemoPage() {
         deposit: deposit,
         due: grandTotal - deposit,
         details: products
-          .map((p) => `${p.name} (${p.quality} x ৳${p.price})`)
+          .map((p) => `${p.name} ${p.color ? `(${p.color})` : ''} (${p.quality} x ৳${p.price})`)
           .join(', '),
         type: 'SALE',
         storeId: 'STORE1',
         createdAt: new Date().toISOString(),
+        products: products,
       };
 
       // Wait for transaction to be added
       const transactionResult = await addTransaction(transaction);
-      console.log('Transaction result:', transactionResult);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
       if (deposit > 0 && transactionResult) {
@@ -527,7 +533,7 @@ export default function CashMemoPage() {
 
       <Card className="p-4 md:p-6">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
             <Popover
               open={openProductPopover}
               onOpenChange={setOpenProductPopover}
@@ -571,28 +577,53 @@ export default function CashMemoPage() {
                             .toLowerCase()
                             .includes(productSearchValue.toLowerCase())
                         )
-                        .map((fabric) => (
-                          <CommandItem
-                            key={fabric.id}
-                            value={fabric.name}
-                            onSelect={() => handleSelectProduct(fabric)}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                newProduct.name.toLowerCase() === fabric.name.toLowerCase()
-                                  ? 'opacity-100'
-                                  : 'opacity-0'
-                              )}
-                            />
-                            <span>{fabric.name}</span>
-                          </CommandItem>
-                        ))}
+                        .map((fabric) => {
+                          const batches = fabricBatches.filter(b => b.fabricId === fabric.id);
+                          const totalQuantity = batches.reduce((sum, b) => sum + (b?.quantity || 0), 0);
+
+                          return (
+                            <CommandItem
+                              key={fabric.id}
+                              value={fabric.name}
+                              onSelect={() => handleSelectProduct(fabric)}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  newProduct.name.toLowerCase() === fabric.name.toLowerCase()
+                                    ? 'opacity-100'
+                                    : 'opacity-0'
+                                )}
+                              />
+                              <div className="flex justify-between w-full">
+                                <span>{fabric.name}</span>
+                                <span className="text-muted-foreground text-sm">
+                                  {totalQuantity} {fabric.unit}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
                     </CommandGroup>
                   </CommandList>
                 </Command>
               </PopoverContent>
             </Popover>
+            <Select
+                value={newProduct.color}
+                onValueChange={(value) => setNewProduct({ ...newProduct, color: value })}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Select color" />
+                </SelectTrigger>
+                <SelectContent>
+                    {availableColors.map(({color, quantity}) => (
+                        <SelectItem key={color} value={color}>
+                            {color} ({quantity})
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
             <Input
               type="number"
               min="0"
@@ -625,6 +656,7 @@ export default function CashMemoPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="whitespace-nowrap">Product</TableHead>
+                  <TableHead className="whitespace-nowrap">Color</TableHead>
                   <TableHead className="text-right whitespace-nowrap">
                     Quality
                   </TableHead>
@@ -645,6 +677,9 @@ export default function CashMemoPage() {
                     <TableCell className="whitespace-nowrap">
                       {product.name}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {product.color}
+                    </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       {product.quality}
                     </TableCell>
@@ -660,7 +695,7 @@ export default function CashMemoPage() {
                   </TableRow>
                 ))}
                 <TableRow>
-                  <TableCell colSpan={4} className="text-right font-bold">
+                  <TableCell colSpan={5} className="text-right font-bold">
                     Grand Total:
                   </TableCell>
                   <TableCell className="text-right font-bold whitespace-nowrap">
@@ -669,7 +704,7 @@ export default function CashMemoPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-right font-bold text-green-600"
                   >
                     Total Profit:
@@ -680,7 +715,7 @@ export default function CashMemoPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-right font-medium text-green-600"
                   >
                     Deposit:
@@ -691,7 +726,7 @@ export default function CashMemoPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-right font-medium text-red-600"
                   >
                     Due Amount:
