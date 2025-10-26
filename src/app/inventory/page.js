@@ -94,7 +94,7 @@ export default function InventoryPage() {
       );
       const avgCost = calculateWeightedAverage(fabricBatchList);
       const totalQty = fabricBatchList.reduce(
-        (sum, batch) => sum + batch.quantity,
+        (sum, batch) => sum + Number(batch.quantity || 0),
         0
       );
 

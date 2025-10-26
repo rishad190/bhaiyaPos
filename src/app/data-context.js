@@ -237,7 +237,7 @@ export function DataProvider({ children }) {
   );
 
   // Customer Operations
-  const customerOperations = {
+  const customerOperations = useMemo(() => ({
     addCustomer: async (customerData) => {
       const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
       const newCustomerRef = push(customersRef);
@@ -271,36 +271,68 @@ export function DataProvider({ children }) {
     },
 
     getCustomerDue,
-  };
+  }), [state.transactions, getCustomerDue]);
 
   // Transaction Operations
-  const transactionOperations = {
-    addTransaction: async (transactionData) => {
-      const { products, ...restTransactionData } = transactionData;
-      const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
-      const newTransactionRef = push(transactionsRef);
-      await set(newTransactionRef, {
-        ...restTransactionData,
-        createdAt: new Date().toISOString(),
-      });
+  const transactionOperations = useMemo(() => ({
+      addTransaction: async (transactionData) => {
+        const { products, ...restTransactionData } = transactionData;
+        const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
+        const newTransactionRef = push(transactionsRef);
 
-      for (const product of products) {
-        const fabric = state.fabrics.find(f => f.name.toLowerCase() === product.name.toLowerCase());
-        if (fabric) {
-            const batches = state.fabricBatches.filter(b => b.fabricId === fabric.id);
-            const { updatedBatches } = calculateFifoSale(batches, product.quantity, product.color);
-            for (const batch of updatedBatches) {
-                if (batch.quantity > 0) {
-                    await fabricOperations.updateFabricBatch(batch.id, { quantity: batch.quantity, colors: batch.colors });
+        const newTransaction = {
+          ...restTransactionData,
+          createdAt: new Date().toISOString(), // Use ISO string
+        };
+
+        // Use updates for atomicity if possible (especially inventory)
+        const updates = {};
+        updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] = newTransaction;
+
+        // --- Inventory Update Logic ---
+        if (products && products.length > 0) {
+           for (const product of products) {
+                const fabric = state.fabrics.find(f => f?.name?.toLowerCase() === product?.name?.toLowerCase());
+                if (fabric?.id) {
+                    const batches = state.fabricBatches.filter(b => b?.fabricId === fabric.id);
+                    try {
+                        // CalculateFifoSale might throw if insufficient stock
+                        const { updatedBatches } = calculateFifoSale(batches, product.quantity, product.color || null);
+
+                        for (const batch of updatedBatches) {
+                            if (!batch?.id) continue; // Skip if batch id is missing
+                            const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
+                            if (batch.quantity > 0) {
+                                // **FIX: Include 'colors' in the update if it exists**
+                                const updatePayload = {
+                                    quantity: batch.quantity,
+                                    updatedAt: new Date().toISOString(), // Use ISO string
+                                };
+                                if (batch.colors) {
+                                    updatePayload.colors = batch.colors; // Include the updated colors array
+                                }
+                                updates[batchPath] = { ...(state.fabricBatches.find(b=>b.id===batch.id) || {}), ...updatePayload }; // Merge with existing data if needed or perform targeted update
+                            } else {
+                                updates[batchPath] = null; // Mark batch for deletion
+                            }
+                        }
+                    } catch (fifoError) {
+                        console.error(`FIFO calculation error for product ${product.name}:`, fifoError);
+                         // Re-throw the error to stop the transaction save if inventory fails
+                        throw new Error(`Inventory update failed for ${product.name}: ${fifoError.message}`);
+                    }
                 } else {
-                    await fabricOperations.deleteFabricBatch(batch.id);
+                    console.warn(`Fabric not found for product: ${product.name}`);
                 }
-            }
+           }
         }
-      }
+        // --- End Inventory Update Logic ---
 
-      return newTransactionRef.key;
-    },
+        // Perform atomic update for transaction and inventory changes
+        await update(ref(db), updates);
+
+        return newTransactionRef.key; // Return key after successful update
+      },
 
     updateTransaction: async (transactionId, updatedData) => {
       const transactionRef = ref(
@@ -316,10 +348,10 @@ export function DataProvider({ children }) {
     deleteTransaction: async (transactionId) => {
       await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
     },
-  };
+  }), [state.fabrics, state.fabricBatches]);
 
   // Fabric Operations
-  const fabricOperations = {
+  const fabricOperations = useMemo(() => ({
     addFabric: async (fabricData) => {
       await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
     },
@@ -343,11 +375,11 @@ export function DataProvider({ children }) {
     },
 
     updateFabricBatch: async (batchId, updatedData) => {
-        const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
-        await update(batchRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        });
+      const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
+      await update(batchRef, {
+        ...updatedData,
+        updatedAt: serverTimestamp(),
+      });
     },
 
     deleteFabricBatch: async (batchId) => {
@@ -370,10 +402,10 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-  };
+  }), []);
 
   // Supplier Operations
-  const supplierOperations = {
+  const supplierOperations = useMemo(() => ({
     addSupplier: async (supplierData) => {
       try {
         const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
@@ -500,9 +532,9 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-  };
+  }), [state.transactions]);
 
-  const dailyCashOperations = {
+  const dailyCashOperations = useMemo(() => ({
     addDailyCashTransaction: async (transaction) => {
       try {
         const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
@@ -571,9 +603,9 @@ export function DataProvider({ children }) {
         throw error;
       }
     },
-  };
+  }), []);
 
-  const updateSettings = async (newSettings) => {
+  const updateSettings = useCallback(async (newSettings) => {
     try {
       // Update settings in Firebase
       await updateDoc(doc(db, "settings", "app"), newSettings);
@@ -589,9 +621,9 @@ export function DataProvider({ children }) {
       console.error("Error updating settings:", error);
       throw error;
     }
-  };
+  }, []);
 
-  const contextValue = {
+  const contextValue = useMemo(() => ({
     // State
     ...state,
     // Operations
@@ -602,7 +634,7 @@ export function DataProvider({ children }) {
     ...dailyCashOperations,
     settings: state.settings,
     updateSettings,
-  };
+  }), [state, customerOperations, transactionOperations, fabricOperations, supplierOperations, dailyCashOperations, updateSettings]);
 
   return (
     <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
