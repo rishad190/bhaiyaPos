@@ -2,78 +2,88 @@ export function calculateWeightedAverage(batches) {
   if (!batches?.length) return 0;
 
   const totalValue = batches.reduce(
-    (sum, batch) => sum + batch.quantity * batch.unitCost,
+    (sum, batch) => (sum + (Number(batch.quantity) || 0) * (Number(batch.unitCost) || 0)),
     0
   );
 
-  const totalQuantity = batches.reduce((sum, batch) => sum + batch.quantity, 0);
+  const totalQuantity = batches.reduce((sum, batch) => sum + (Number(batch.quantity) || 0), 0);
 
   return totalQuantity > 0 ? totalValue / totalQuantity : 0;
 }
 
 export function calculateFifoSale(batches, soldQuantity, color = null) {
-  let remainingQty = soldQuantity;
+  let remainingQtyToSell = Number(soldQuantity) || 0;
   const costOfGoodsSold = [];
-  const updatedBatches = [];
+  const updatedBatchesMap = new Map();
 
-  let filteredBatches = [...batches];
-
-  if (color) {
-    filteredBatches = batches.map(batch => {
-      if (batch.colors && batch.colors.length > 0) {
-        const colorInfo = batch.colors.find(c => c.color === color);
-        return colorInfo ? { ...batch, quantity: colorInfo.quantity, isColorBatch: true, originalBatch: batch } : null;
-      } else if (batch.color === color) {
-        return { ...batch, isColorBatch: false };
-      }
-      return null;
-    }).filter(Boolean);
+  // Initialize the map with all batches, ensuring quantities are numbers
+  for (const batch of batches) {
+    const cleanBatch = JSON.parse(JSON.stringify(batch));
+    cleanBatch.quantity = Number(cleanBatch.quantity) || 0;
+    if (cleanBatch.colors) {
+      cleanBatch.colors.forEach(c => { c.quantity = Number(c.quantity) || 0; });
+    }
+    updatedBatchesMap.set(batch.id, cleanBatch);
   }
 
-  // Sort batches by purchase date
-  const sortedBatches = filteredBatches.sort(
-    (a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate)
+  const sortedBatches = [...batches].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
   );
 
   for (const batch of sortedBatches) {
-    if (remainingQty <= 0) {
-      updatedBatches.push(batch.isColorBatch ? batch.originalBatch : batch);
+    if (remainingQtyToSell <= 0) {
+      break;
+    }
+
+    const batchToUpdate = updatedBatchesMap.get(batch.id);
+    let availableQtyInBatch = 0;
+    let isColorSale = false;
+
+    if (color) {
+      if (batchToUpdate.colors && batchToUpdate.colors.length > 0) {
+        const colorInfo = batchToUpdate.colors.find(c => c.color === color);
+        if (colorInfo) {
+          availableQtyInBatch = colorInfo.quantity;
+          isColorSale = true;
+        }
+      } else if (batchToUpdate.color === color) {
+        availableQtyInBatch = batchToUpdate.quantity;
+      }
+    } else {
+      availableQtyInBatch = batchToUpdate.quantity;
+    }
+
+    if (availableQtyInBatch <= 0) {
       continue;
     }
 
-    const usedQty = Math.min(remainingQty, batch.quantity);
-    if (usedQty > 0) {
-      costOfGoodsSold.push({
-        batchId: batch.isColorBatch ? batch.originalBatch.id : batch.id,
-        quantity: usedQty,
-        unitCost: batch.unitCost,
-        color: color,
-      });
+    const qtyToUseFromBatch = Math.min(remainingQtyToSell, availableQtyInBatch);
 
-      const remainingBatchQty = batch.quantity - usedQty;
-      if (batch.isColorBatch) {
-        const originalBatch = batch.originalBatch;
-        const colorIndex = originalBatch.colors.findIndex(c => c.color === color);
-        originalBatch.colors[colorIndex].quantity = remainingBatchQty;
-        originalBatch.quantity = originalBatch.colors.reduce((sum, c) => sum + c.quantity, 0);
-        updatedBatches.push(originalBatch);
-      } else if (remainingBatchQty > 0) {
-        updatedBatches.push({
-          ...batch,
-          quantity: remainingBatchQty,
-        });
-      }
+    costOfGoodsSold.push({
+      batchId: batch.id,
+      quantity: qtyToUseFromBatch,
+      unitCost: Number(batch.unitCost) || 0,
+      color: color,
+    });
+
+    if (isColorSale) {
+      const colorIndex = batchToUpdate.colors.findIndex(c => c.color === color);
+      batchToUpdate.colors[colorIndex].quantity -= qtyToUseFromBatch;
+      batchToUpdate.quantity = batchToUpdate.colors.reduce((sum, c) => sum + c.quantity, 0);
+    } else {
+      batchToUpdate.quantity -= qtyToUseFromBatch;
     }
-    remainingQty -= usedQty;
+
+    remainingQtyToSell -= qtyToUseFromBatch;
   }
 
-  if (remainingQty > 0) {
+  if (remainingQtyToSell > 0) {
     throw new Error("Insufficient stock available");
   }
 
   return {
     costOfGoodsSold,
-    updatedBatches,
+    updatedBatches: Array.from(updatedBatchesMap.values()),
     totalCost: costOfGoodsSold.reduce(
       (sum, item) => sum + item.quantity * item.unitCost,
       0

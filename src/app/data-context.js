@@ -1,3 +1,4 @@
+
 "use client";
 import {
   createContext,
@@ -291,10 +292,12 @@ export function DataProvider({ children }) {
 
         // --- Inventory Update Logic ---
         if (products && products.length > 0) {
+          const tempFabricBatches = JSON.parse(JSON.stringify(state.fabricBatches));
+
            for (const product of products) {
                 const fabric = state.fabrics.find(f => f?.name?.toLowerCase() === product?.name?.toLowerCase());
                 if (fabric?.id) {
-                    const batches = state.fabricBatches.filter(b => b?.fabricId === fabric.id);
+                    const batches = tempFabricBatches.filter(b => b?.fabricId === fabric.id);
                     try {
                         // CalculateFifoSale might throw if insufficient stock
                         const { updatedBatches } = calculateFifoSale(batches, product.quantity, product.color || null);
@@ -303,17 +306,27 @@ export function DataProvider({ children }) {
                             if (!batch?.id) continue; // Skip if batch id is missing
                             const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
                             if (batch.quantity > 0) {
-                                // **FIX: Include 'colors' in the update if it exists**
                                 const updatePayload = {
                                     quantity: batch.quantity,
-                                    updatedAt: new Date().toISOString(), // Use ISO string
+                                    updatedAt: new Date().toISOString(),
                                 };
                                 if (batch.colors) {
-                                    updatePayload.colors = batch.colors; // Include the updated colors array
+                                    updatePayload.colors = batch.colors;
                                 }
-                                updates[batchPath] = { ...(state.fabricBatches.find(b=>b.id===batch.id) || {}), ...updatePayload }; // Merge with existing data if needed or perform targeted update
+                                updates[batchPath] = updatePayload;
+
+                                // Update tempFabricBatches for next iteration
+                                const batchIndex = tempFabricBatches.findIndex(b => b.id === batch.id);
+                                if (batchIndex !== -1) {
+                                  tempFabricBatches[batchIndex] = { ...tempFabricBatches[batchIndex], ...updatePayload };
+                                }
                             } else {
                                 updates[batchPath] = null; // Mark batch for deletion
+                                // Update tempFabricBatches for next iteration
+                                const batchIndex = tempFabricBatches.findIndex(b => b.id === batch.id);
+                                if (batchIndex !== -1) {
+                                  tempFabricBatches.splice(batchIndex, 1);
+                                }
                             }
                         }
                     } catch (fifoError) {

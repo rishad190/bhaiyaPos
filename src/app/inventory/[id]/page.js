@@ -44,6 +44,12 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  const date = new Date(dateString);
+  return date.toLocaleDateString();
+};
+
 export default function FabricViewPage() {
   const router = useRouter();
   const { id } = useParams();
@@ -93,7 +99,7 @@ export default function FabricViewPage() {
     averageCost,
     currentValue,
     priceHistory,
-    recentTransactions,
+    stockMovements,
   } = useMemo(() => {
     if (!fabric || !batches || !fabricTransactions) {
       return {
@@ -101,7 +107,7 @@ export default function FabricViewPage() {
         averageCost: 0,
         currentValue: 0,
         priceHistory: [],
-        recentTransactions: [],
+        stockMovements: [],
       };
     }
 
@@ -129,31 +135,42 @@ export default function FabricViewPage() {
       )
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const recent = fabricTransactions
-      .sort(
-        (a, b) =>
-          (b?.date ? new Date(b.date).getTime() : 0) -
-          (a?.date ? new Date(a.date).getTime() : 0)
-      )
-      .slice(0, 10);
+    const movements = [
+      ...batches.map((b) => ({
+        id: b.id,
+        date: b.createdAt,
+        type: "Purchase",
+        quantity: b.quantity,
+        totalCost: b.unitCost * b.quantity,
+        source: b.supplierName,
+      })),
+      ...fabricTransactions.map((t) => ({
+        id: t.id,
+        date: t.date,
+        type: "Sale",
+        quantity: t.quantity,
+        totalCost: t.totalCost,
+        source: t.customerName || "N/A", // Assuming customerName is available
+      })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     return {
       totalQuantity: totalQty,
       averageCost: avgCost,
       currentValue: currentVal,
       priceHistory: history,
-      recentTransactions: recent,
+      stockMovements: movements,
     };
   }, [fabric, batches, fabricTransactions]);
 
-  const handleSellFabric = async (quantity) => {
+  const handleSellFabric = async (quantity, color) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       if (!fabric) throw new Error("Fabric not found");
-      const result = calculateFifoSale(batches, quantity);
+      const result = calculateFifoSale(batches, quantity, color);
       for (const batch of result.updatedBatches) {
         if (batch.quantity > 0) {
-          await updateFabricBatch(batch.id, { quantity: batch.quantity });
+          await updateFabricBatch(batch.id, { quantity: batch.quantity, colors: batch.colors });
         } else {
           await deleteFabricBatch(batch.id);
         }
@@ -165,6 +182,7 @@ export default function FabricViewPage() {
         date: new Date().toISOString(),
         type: "FABRIC_SALE",
         batches: result.costOfGoodsSold,
+        color: color,
       };
       await addTransaction(saleTransaction);
       toast({
@@ -636,9 +654,9 @@ export default function FabricViewPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.isArray(recentTransactions) &&
-                recentTransactions.length > 0 ? (
-                  recentTransactions.map((transaction) => (
+                {Array.isArray(stockMovements) &&
+                stockMovements.length > 0 ? (
+                  stockMovements.map((transaction) => (
                     <TableRow key={transaction?.id}>
                       <TableCell>
                         {transaction?.date
@@ -648,24 +666,22 @@ export default function FabricViewPage() {
                       <TableCell>
                         <Badge
                           variant={
-                            transaction?.type === "FABRIC_SALE"
+                            transaction?.type === "Sale"
                               ? "destructive"
                               : "default"
                           }
                         >
-                          {transaction?.type === "FABRIC_SALE"
-                            ? "Sale"
-                            : "Purchase/Adjustment"}
+                          {transaction?.type}
                         </Badge>
                       </TableCell>
                       <TableCell
                         className={`text-right ${
-                          transaction?.type === "FABRIC_SALE"
+                          transaction?.type === "Sale"
                             ? "text-red-600"
                             : "text-green-600"
                         }`}
                       >
-                        {transaction?.type === "FABRIC_SALE" ? "-" : "+"}
+                        {transaction?.type === "Sale" ? "-" : "+"}
                         {transaction?.quantity || 0} {fabric?.unit || ""}
                       </TableCell>
                       <TableCell className="text-right">
