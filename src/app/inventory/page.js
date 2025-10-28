@@ -79,6 +79,10 @@ export default function InventoryPage() {
     }
   }, [fabrics]);
 
+  useEffect(() => {
+    setLoadingState((prev) => ({ ...prev, actions: false }));
+  }, [fabrics, fabricBatches]);
+
   // Memoize filtered fabrics and calculations
   const { filteredFabrics, totals } = useMemo(() => {
     const filtered =
