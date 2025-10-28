@@ -4,7 +4,6 @@ import { createContext, useContext, useReducer, useEffect, useMemo, useCallback 
 import { ref, onValue, push, set, remove, update, serverTimestamp, get, query, orderByChild, equalTo } from "firebase/database";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { calculateFifoSale } from "@/lib/inventory-utils";
 import { CustomerProvider } from "@/contexts/CustomerContext";
 import { InventoryProvider } from "@/contexts/InventoryContext";
 import { TransactionProvider } from "@/contexts/TransactionContext";
@@ -17,7 +16,6 @@ const COLLECTION_REFS = {
   CUSTOMERS: "customers",
   TRANSACTIONS: "transactions",
   DAILY_CASH: "dailyCash",
-  FABRIC_BATCHES: "fabricBatches",
   FABRICS: "fabrics",
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
@@ -27,7 +25,6 @@ const initialState = {
   customers: [],
   transactions: [],
   dailyCashTransactions: [],
-  fabricBatches: [],
   fabrics: [],
   suppliers: [],
   supplierTransactions: [],
@@ -46,7 +43,6 @@ function reducer(state, action) {
     case "SET_CUSTOMERS": return { ...state, customers: action.payload, loading: false };
     case "SET_TRANSACTIONS": return { ...state, transactions: action.payload, loading: false };
     case "SET_DAILY_CASH_TRANSACTIONS": return { ...state, dailyCashTransactions: action.payload, loading: false };
-    case "SET_FABRIC_BATCHES": return { ...state, fabricBatches: action.payload, loading: false };
     case "SET_FABRICS": return { ...state, fabrics: action.payload, loading: false };
     case "SET_SUPPLIERS": return { ...state, suppliers: action.payload, loading: false };
     case "SET_SUPPLIER_TRANSACTIONS": return { ...state, supplierTransactions: action.payload, loading: false };
@@ -65,7 +61,6 @@ export function DataProvider({ children }) {
       { path: COLLECTION_REFS.CUSTOMERS, setter: (data) => dispatch({ type: "SET_CUSTOMERS", payload: data }) },
       { path: COLLECTION_REFS.TRANSACTIONS, setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }) },
       { path: COLLECTION_REFS.DAILY_CASH, setter: (data) => dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: data }) },
-      { path: COLLECTION_REFS.FABRIC_BATCHES, setter: (data) => dispatch({ type: "SET_FABRIC_BATCHES", payload: data }) },
       { path: COLLECTION_REFS.FABRICS, setter: (data) => dispatch({ type: "SET_FABRICS", payload: data }) },
       { path: COLLECTION_REFS.SUPPLIERS, setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }) },
     ];
@@ -137,71 +132,35 @@ export function DataProvider({ children }) {
 
   const transactionOperations = useMemo(() => ({
     addTransaction: async (transactionData) => {
-        const { products, ...restTransactionData } = transactionData;
-        const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
-        const newTransactionRef = push(transactionsRef);
+      const { products, ...restTransactionData } = transactionData;
+      const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
+      const newTransactionRef = push(transactionsRef);
 
-        const newTransaction = {
-          ...restTransactionData,
-          createdAt: new Date().toISOString(),
-        };
+      const newTransaction = {
+        ...restTransactionData,
+        createdAt: new Date().toISOString(),
+      };
 
-        const updates = {};
-        updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] = newTransaction;
+      const updates = {};
+      updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] = newTransaction;
 
-        if (products && products.length > 0) {
-          const currentBatches = JSON.parse(JSON.stringify(state.fabricBatches));
-          for (const product of products) {
-            const fabric = state.fabrics.find(
-              (f) => f.name.toLowerCase() === product.name.toLowerCase()
-            );
-            if (!fabric) {
-              console.warn(`Fabric not found for product: ${product.name}`);
-              continue;
-            }
-            try {
-              const { updatedBatches } = calculateFifoSale(
-                currentBatches.filter((b) => b.fabricId === fabric.id),
-                product.quantity,
-                product.color || null
-              );
-              for (const batch of updatedBatches) {
-                const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
-                const batchIndex = currentBatches.findIndex(
-                  (b) => b.id === batch.id
-                );
-                if (batch.quantity > 0) {
-                  updates[batchPath] = {
-                    ...currentBatches[batchIndex],
-                    quantity: batch.quantity,
-                    colors: batch.colors,
-                    updatedAt: new Date().toISOString(),
-                  };
-                  if (batchIndex !== -1) {
-                    currentBatches[batchIndex].quantity = batch.quantity;
-                    currentBatches[batchIndex].colors = batch.colors;
-                  }
-                } else {
-                  updates[batchPath] = null;
-                  if (batchIndex !== -1) {
-                    currentBatches.splice(batchIndex, 1);
-                  }
-                }
-              }
-            } catch (error) {
-              console.error(
-                `FIFO calculation error for product ${product.name}:`,
-                error
-              );
-              throw new Error(
-                `Inventory update failed for ${product.name}: ${error.message}`
-              );
+      if (products && products.length > 0) {
+        for (const product of products) {
+          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${product.fabricId}`);
+          const snapshot = await get(fabricRef);
+          if (snapshot.exists()) {
+            const fabric = snapshot.val();
+            const colorIndex = fabric.colors.findIndex(c => c.color === product.color);
+            if (colorIndex > -1) {
+              const newQuantity = fabric.colors[colorIndex].quantity - product.quantity;
+              updates[`${COLLECTION_REFS.FABRICS}/${product.fabricId}/colors/${colorIndex}/quantity`] = newQuantity;
             }
           }
         }
-        await update(ref(db), updates);
-        return newTransactionRef.key;
-      },
+      }
+      await update(ref(db), updates);
+      return newTransactionRef.key;
+    },
     updateTransaction: async (transactionId, updatedData) => {
       const transactionRef = ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`);
       await update(transactionRef, { ...updatedData, updatedAt: serverTimestamp() });
@@ -209,7 +168,7 @@ export function DataProvider({ children }) {
     deleteTransaction: async (transactionId) => {
       await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
     },
-  }), [state.fabrics, state.fabricBatches]);
+  }), [state.fabrics]);
 
   const fabricOperations = useMemo(() => ({
     addFabric: async (fabricData) => {
@@ -220,24 +179,6 @@ export function DataProvider({ children }) {
     },
     deleteFabric: async (fabricId) => {
       await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
-    },
-    addFabricBatch: async (batchData) => {
-      await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), { ...batchData, createdAt: serverTimestamp() });
-    },
-    updateFabricBatch: async (batchId, updatedData) => {
-      const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
-      await update(batchRef, { ...updatedData, updatedAt: serverTimestamp() });
-    },
-    deleteFabricBatch: async (batchId) => {
-      try {
-        const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
-        const batchSnapshot = await get(batchRef);
-        if (!batchSnapshot.exists()) throw new Error("Batch not found");
-        await remove(batchRef);
-      } catch (error) {
-        console.error("Error deleting fabric batch:", error);
-        throw error;
-      }
     },
   }), []);
 
@@ -367,7 +308,7 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider value={{...state, settings: state.settings, updateSettings }}>
       <CustomerProvider customerOperations={customerOperations} customers={state.customers} customerDues={customerDues}>
-        <InventoryProvider fabricOperations={fabricOperations} fabrics={state.fabrics} fabricBatches={state.fabricBatches}>
+        <InventoryProvider fabricOperations={fabricOperations} fabrics={state.fabrics}>
           <TransactionProvider transactionOperations={transactionOperations} transactions={state.transactions}>
             <SupplierProvider supplierOperations={supplierOperations} suppliers={state.suppliers} supplierTransactions={state.supplierTransactions}>
               <DailyCashProvider dailyCashOperations={dailyCashOperations} dailyCashTransactions={state.dailyCashTransactions}>

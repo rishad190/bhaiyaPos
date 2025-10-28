@@ -12,11 +12,10 @@ export function useInventoryData() {
   return context;
 }
 
-export function InventoryProvider({ children, fabricOperations, fabrics, fabricBatches }) {
+export function InventoryProvider({ children, fabricOperations, fabrics }) {
   const value = {
     ...fabricOperations,
     fabrics,
-    fabricBatches,
   };
 
   return (
