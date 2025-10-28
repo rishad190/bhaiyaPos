@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useInventoryData } from "@/contexts/InventoryContext";
+import { useSupplierData } from "@/contexts/SupplierContext";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -63,8 +64,8 @@ export default function InventoryPage() {
     updateFabricBatch,
     deleteFabricBatch,
     addTransaction,
-    suppliers,
-  } = useData();
+  } = useInventoryData();
+  const { suppliers } = useSupplierData();
   const [viewMode, setViewMode] = useState("average");
   const [searchTerm, setSearchTerm] = useState("");
   const [loadingState, setLoadingState] = useState({

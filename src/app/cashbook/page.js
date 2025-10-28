@@ -1,9 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useData } from "@/app/data-context";
-import { Button } from "@/components/ui/button";
+import { useDailyCashData } from "@/contexts/DailyCashContext";
+import { useCustomerData } from "@/contexts/CustomerContext";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -53,7 +52,7 @@ export default function CashBookPage() {
     addDailyCashTransaction,
     updateDailyCashTransaction,
     deleteDailyCashTransaction,
-  } = useData();
+  } = useDailyCashData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [date, setDate] = useState(() => {

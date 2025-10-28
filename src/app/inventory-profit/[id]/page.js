@@ -1,7 +1,8 @@
 'use client';
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useData } from '@/app/data-context';
+import { useTransactionData } from '@/contexts/TransactionContext';
+import { useCustomerData } from '@/contexts/CustomerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -19,7 +20,8 @@ import {
 export default function InventoryProfitDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { transactions, customers } = useData();
+  const { transactions } = useTransactionData();
+  const { customers } = useCustomerData();
 
   const transaction = useMemo(() => {
     const trans = transactions.find((t) => t.id === id);

@@ -2,6 +2,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useCustomerData } from "@/contexts/CustomerContext";
+import { useTransactionData } from "@/contexts/TransactionContext";
+import { useInventoryData } from "@/contexts/InventoryContext";
+import { useSupplierData } from "@/contexts/SupplierContext";
 import {
   Card,
   CardContent,
@@ -34,8 +38,11 @@ import { LowStockItems } from "@/components/LowStockItems";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { customers, transactions, fabrics, suppliers, error, getCustomerDue } =
-    useData();
+  const { customers, getCustomerDue } = useCustomerData();
+  const { transactions } = useTransactionData();
+  const { fabrics } = useInventoryData();
+  const { suppliers } = useSupplierData();
+  const { error } = useData();
   const { toast } = useToast();
 
   const [loadingState, setLoadingState] = useState({

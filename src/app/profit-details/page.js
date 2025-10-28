@@ -1,5 +1,6 @@
 'use client';
-import { useData } from "@/app/data-context";
+import { useTransactionData } from "@/contexts/TransactionContext";
+import { useCustomerData } from "@/contexts/CustomerContext";
 import {
   Table,
   TableBody,
@@ -12,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export default function ProfitDetailsPage() {
-  const { transactions, customers } = useData();
+  const { transactions } = useTransactionData();
+  const { customers } = useCustomerData();
 
   const profitableTransactions = transactions
     .filter((t) => t.totalCost && t.total > t.totalCost)

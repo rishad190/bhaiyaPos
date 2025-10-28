@@ -2,7 +2,9 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useInventoryData } from "@/contexts/InventoryContext";
+import { useTransactionData } from "@/contexts/TransactionContext";
+import { useSupplierData } from "@/contexts/SupplierContext";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -57,15 +59,14 @@ export default function FabricViewPage() {
   const {
     fabrics,
     fabricBatches,
-    transactions,
     addFabricBatch,
     updateFabricBatch,
     deleteFabricBatch,
-    addTransaction,
-    suppliers,
     updateFabric,
     deleteFabric,
-  } = useData();
+  } = useInventoryData();
+  const { transactions, addTransaction } = useTransactionData();
+  const { suppliers } = useSupplierData();
 
   const [viewMode, setViewMode] = useState("table");
   const [loadingState, setLoadingState] = useState({

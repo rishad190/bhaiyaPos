@@ -1,7 +1,10 @@
 "use client";
 import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useCustomerData } from "@/contexts/CustomerContext";
+import { useTransactionData } from "@/contexts/TransactionContext";
+import { useDailyCashData } from "@/contexts/DailyCashContext";
+import { useInventoryData } from "@/contexts/InventoryContext";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 
 import {
@@ -52,13 +55,10 @@ import { useToast } from "@/hooks/use-toast";
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast(); // Get toast function
-  const {
-    customers,
-    addTransaction,
-    addDailyCashTransaction,
-    fabrics,
-    fabricBatches,
-  } = useData();
+  const { customers } = useCustomerData();
+  const { addTransaction } = useTransactionData();
+  const { addDailyCashTransaction } = useDailyCashData();
+  const { fabrics, fabricBatches } = useInventoryData();
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

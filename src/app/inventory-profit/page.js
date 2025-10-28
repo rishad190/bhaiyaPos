@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
-import { useData } from "@/app/data-context";
+import { useTransactionData } from "@/contexts/TransactionContext";
+import { useCustomerData } from "@/contexts/CustomerContext";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -24,7 +25,8 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 export default function InventoryProfitPage() {
-  const { transactions, customers, deleteTransaction } = useData();
+  const { transactions, deleteTransaction } = useTransactionData();
+  const { customers } = useCustomerData();
   const router = useRouter();
   const { toast } = useToast();
   const [loadingActions, setLoadingActions] = useState(false);

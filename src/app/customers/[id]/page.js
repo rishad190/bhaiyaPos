@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useCustomerData } from "@/contexts/CustomerContext";
+import { useTransactionData } from "@/contexts/TransactionContext";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -59,13 +60,13 @@ export default function CustomerDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { customers } = useCustomerData();
   const {
-    customers,
     transactions,
     addTransaction,
     deleteTransaction,
     updateTransaction,
-  } = useData();
+  } = useTransactionData();
 
   const [loadingState, setLoadingState] = useState({
     initial: true,

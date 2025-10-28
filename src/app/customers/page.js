@@ -16,7 +16,7 @@ import { CustomerSearch } from "@/components/CustomerSearch";
 import { Pagination } from "@/components/Pagination";
 import { TableSkeleton } from "@/components/LoadingState";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useData } from "@/app/data-context";
+import { useCustomerData } from "@/contexts/CustomerContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   CUSTOMER_CONSTANTS,
@@ -35,7 +35,7 @@ export default function CustomerPage() {
     updateCustomer,
     deleteCustomer,
     getCustomerDue,
-  } = useData();
+  } = useCustomerData();
   const { toast } = useToast();
 
   const [loadingState, setLoadingState] = useState({
