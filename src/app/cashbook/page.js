@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useDailyCashData } from "@/contexts/DailyCashContext";
 import { useCustomerData } from "@/contexts/CustomerContext";
 import {
+  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -45,6 +46,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Pagination } from "@/components/Pagination";
+import { Button } from "@/components/ui/button";
 
 export default function CashBookPage() {
   const {
@@ -167,8 +169,8 @@ export default function CashBookPage() {
   // Filter transactions based on search term, date, and active tab
   const filteredCash = useMemo(() => {
     return dailyCash
-      .map(day => {
-        const filteredTransactions = day.dailyCash.filter(t =>
+      .map((day) => {
+        const filteredTransactions = day.dailyCash.filter((t) =>
           searchTerm
             ? t.description.toLowerCase().includes(searchTerm.toLowerCase())
             : true
@@ -180,21 +182,29 @@ export default function CashBookPage() {
 
         const newDay = { ...day, dailyCash: filteredTransactions };
         // recalculate cashIn, cashOut, balance for the day
-        newDay.cashIn = filteredTransactions.reduce((sum, t) => sum + (t.cashIn || 0), 0);
-        newDay.cashOut = filteredTransactions.reduce((sum, t) => sum + (t.cashOut || 0), 0);
+        newDay.cashIn = filteredTransactions.reduce(
+          (sum, t) => sum + (t.cashIn || 0),
+          0
+        );
+        newDay.cashOut = filteredTransactions.reduce(
+          (sum, t) => sum + (t.cashOut || 0),
+          0
+        );
         newDay.balance = newDay.cashIn - newDay.cashOut;
 
         return newDay;
       })
       .filter(Boolean) // remove null days
       .filter((day) => {
-        const matchesDate = date ? (() => {
-          const dayDate = new Date(day.date);
-          const filterDate = new Date(date);
-          dayDate.setUTCHours(0, 0, 0, 0);
-          filterDate.setUTCHours(0, 0, 0, 0);
-          return dayDate.getTime() === filterDate.getTime();
-        })() : true;
+        const matchesDate = date
+          ? (() => {
+              const dayDate = new Date(day.date);
+              const filterDate = new Date(date);
+              dayDate.setUTCHours(0, 0, 0, 0);
+              filterDate.setUTCHours(0, 0, 0, 0);
+              return dayDate.getTime() === filterDate.getTime();
+            })()
+          : true;
 
         const matchesTab = (() => {
           switch (activeTab) {
@@ -308,7 +318,9 @@ export default function CashBookPage() {
       return dayDate >= start && dayDate <= end;
     });
 
-    const transactionsForPDF = filteredDailyCash.flatMap((day) => day.dailyCash);
+    const transactionsForPDF = filteredDailyCash.flatMap(
+      (day) => day.dailyCash
+    );
 
     const financialsForPDF = {
       totalCashIn: filteredDailyCash.reduce((sum, day) => sum + day.cashIn, 0),
@@ -698,7 +710,7 @@ export default function CashBookPage() {
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
-                value={date || ''}
+                value={date || ""}
                 onChange={(e) => setDate(e.target.value)}
                 className="pl-9 w-full"
               />
