@@ -1,4 +1,3 @@
-
 "use client";
 import {
   createContext,
@@ -238,44 +237,51 @@ export function DataProvider({ children }) {
   );
 
   // Customer Operations
-  const customerOperations = useMemo(() => ({
-    addCustomer: async (customerData) => {
-      const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
-      const newCustomerRef = push(customersRef);
-      await set(newCustomerRef, {
-        ...customerData,
-        createdAt: new Date().toISOString(),
-      });
-      return newCustomerRef.key;
-    },
+  const customerOperations = useMemo(
+    () => ({
+      addCustomer: async (customerData) => {
+        const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
+        const newCustomerRef = push(customersRef);
+        await set(newCustomerRef, {
+          ...customerData,
+          createdAt: new Date().toISOString(),
+        });
+        return newCustomerRef.key;
+      },
 
-    updateCustomer: async (customerId, updatedData) => {
-      const customerRef = ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`);
-      await update(customerRef, {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-
-    deleteCustomer: async (customerId) => {
-      // First delete associated transactions
-      const customerTransactions = state.transactions.filter(
-        (t) => t.customerId === customerId
-      );
-      for (const transaction of customerTransactions) {
-        await remove(
-          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+      updateCustomer: async (customerId, updatedData) => {
+        const customerRef = ref(
+          db,
+          `${COLLECTION_REFS.CUSTOMERS}/${customerId}`
         );
-      }
-      // Then delete the customer
-      await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
-    },
+        await update(customerRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
+      },
 
-    getCustomerDue,
-  }), [state.transactions, getCustomerDue]);
+      deleteCustomer: async (customerId) => {
+        // First delete associated transactions
+        const customerTransactions = state.transactions.filter(
+          (t) => t.customerId === customerId
+        );
+        for (const transaction of customerTransactions) {
+          await remove(
+            ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+          );
+        }
+        // Then delete the customer
+        await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
+      },
+
+      getCustomerDue,
+    }),
+    [state.transactions, getCustomerDue]
+  );
 
   // Transaction Operations
-  const transactionOperations = useMemo(() => ({
+  const transactionOperations = useMemo(
+    () => ({
       addTransaction: async (transactionData) => {
         const { products, ...restTransactionData } = transactionData;
         const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
@@ -287,7 +293,8 @@ export function DataProvider({ children }) {
         };
 
         const updates = {};
-        updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] = newTransaction;
+        updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] =
+          newTransaction;
 
         if (products && products.length > 0) {
           for (const product of products) {
@@ -316,294 +323,328 @@ export function DataProvider({ children }) {
           }
         }
 
+        if (process.env.NODE_ENV !== "production") {
+          try {
+            console.debug("[data-context] addTransaction products:", products);
+            console.debug(
+              "[data-context] constructed updates keys:",
+              Object.keys(updates)
+            );
+          } catch (e) {
+            /* ignore logging errors */
+          }
+        }
+
         await update(ref(db), updates);
 
         return newTransactionRef.key;
       },
 
-    updateTransaction: async (transactionId, updatedData) => {
-      const transactionRef = ref(
-        db,
-        `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
-      );
-      await update(transactionRef, {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-
-    deleteTransaction: async (transactionId) => {
-      await remove(ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`));
-    },
-  }), [state.fabrics, state.fabricBatches]);
-
-  // Fabric Operations
-  const fabricOperations = useMemo(() => ({
-    addFabric: async (fabricData) => {
-      await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
-    },
-
-    updateFabric: async (fabricId, updatedData) => {
-      await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-
-    deleteFabric: async (fabricId) => {
-      await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
-    },
-
-    addFabricBatch: async (batchData) => {
-      if (batchData.colors && batchData.colors.length > 0) {
-        const { colors, ...rest } = batchData;
-        for (const color of colors) {
-          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-            ...rest,
-            color: color.color,
-            quantity: parseFloat(color.quantity),
-            totalCost: parseFloat(color.quantity) * rest.unitCost,
-            createdAt: serverTimestamp(),
-          });
-        }
-      } else {
-        await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-          ...batchData,
-          createdAt: serverTimestamp(),
-        });
-      }
-    },
-
-    updateFabricBatch: async (batchId, updatedData) => {
-      const batchRef = ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`);
-      await update(batchRef, {
-        ...updatedData,
-        updatedAt: serverTimestamp(),
-      });
-    },
-
-    deleteFabricBatch: async (batchId) => {
-      try {
-        // Get the batch data first to update fabric totals
-        const batchRef = ref(
-          db,
-          `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
-        );
-        const batchSnapshot = await get(batchRef);
-
-        if (!batchSnapshot.exists()) {
-          throw new Error("Batch not found");
-        }
-
-        // Delete the batch
-        await remove(batchRef);
-      } catch (error) {
-        console.error("Error deleting fabric batch:", error);
-        throw error;
-      }
-    },
-  }), []);
-
-  // Supplier Operations
-  const supplierOperations = useMemo(() => ({
-    addSupplier: async (supplierData) => {
-      try {
-        const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
-        const newSupplierRef = push(suppliersRef);
-        await set(newSupplierRef, {
-          ...supplierData,
-          totalDue: 0,
-          createdAt: serverTimestamp(),
-        });
-        return newSupplierRef.key;
-      } catch (error) {
-        console.error("Error adding supplier:", error);
-        throw error;
-      }
-    },
-
-    updateSupplier: async (supplierId, updatedData) => {
-      try {
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
-        );
-        await update(supplierRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (error) {
-        console.error("Error updating supplier:", error);
-        throw error;
-      }
-    },
-
-    deleteSupplier: async (supplierId) => {
-      try {
-        // First delete associated transactions
-        const supplierTransactions = state.transactions.filter(
-          (t) => t.supplierId === supplierId
-        );
-
-        for (const transaction of supplierTransactions) {
-          await remove(
-            ref(
-              db,
-              `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
-            )
-          );
-        }
-
-        // Then delete the supplier
-        await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
-      } catch (error) {
-        console.error("Error deleting supplier:", error);
-        throw error;
-      }
-    },
-
-    addSupplierTransaction: async (transaction) => {
-      try {
-        const transactionsRef = ref(db, COLLECTION_REFS.SUPPLIER_TRANSACTIONS);
-        const newTransactionRef = push(transactionsRef);
-
-        const newTransaction = {
-          ...transaction,
-          id: newTransactionRef.key,
-          due: transaction.totalAmount - (transaction.paidAmount || 0),
-          createdAt: serverTimestamp(),
-        };
-
-        await set(newTransactionRef, newTransaction);
-
-        // Update supplier's total due
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
-        );
-        const supplierSnapshot = await get(supplierRef);
-
-        if (supplierSnapshot.exists()) {
-          const currentDue = supplierSnapshot.val().totalDue || 0;
-          await update(supplierRef, {
-            totalDue: currentDue + newTransaction.due,
-            updatedAt: serverTimestamp(),
-          });
-        }
-
-        return newTransactionRef.key;
-      } catch (error) {
-        console.error("Error adding supplier transaction:", error);
-        throw error;
-      }
-    },
-
-    deleteSupplierTransaction: async (
-      transactionId,
-      supplierId,
-      amount,
-      paidAmount
-    ) => {
-      try {
-        // Delete transaction
-        await remove(
-          ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
-        );
-
-        // Update supplier's total due
-        const supplierRef = ref(
-          db,
-          `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
-        );
-        const supplierSnapshot = await get(supplierRef);
-
-        if (supplierSnapshot.exists()) {
-          const supplier = supplierSnapshot.val();
-          const dueAmount = amount - (paidAmount || 0);
-          const newTotalDue = Math.max(0, (supplier.totalDue || 0) - dueAmount);
-
-          await update(supplierRef, {
-            totalDue: newTotalDue,
-            updatedAt: serverTimestamp(),
-          });
-        }
-      } catch (error) {
-        console.error("Error deleting supplier transaction:", error);
-        throw error;
-      }
-    },
-  }), [state.transactions]);
-
-  const dailyCashOperations = useMemo(() => ({
-    addDailyCashTransaction: async (transaction) => {
-      try {
-        const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
-        const newTransactionRef = push(dailyCashRef);
-        await set(newTransactionRef, {
-          ...transaction,
-          id: newTransactionRef.key,
-          createdAt: serverTimestamp(),
-        });
-
-        // Update related customer transaction if it's a sale
-        if (transaction.type === "sale" && transaction.reference) {
-          const customerTransactionRef = query(
-            ref(db, "transactions"),
-            orderByChild("memoNumber"),
-            equalTo(transaction.reference)
-          );
-
-          const snapshot = await get(customerTransactionRef);
-          if (snapshot.exists()) {
-            const [transactionId, transactionData] = Object.entries(
-              snapshot.val()
-            )[0];
-            await update(ref(db, `transactions/${transactionId}`), {
-              deposit:
-                (transactionData.deposit || 0) + (transaction.cashIn || 0),
-              due:
-                transactionData.total -
-                ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
-            });
-          }
-        }
-
-        return newTransactionRef.key;
-      } catch (error) {
-        console.error("Error adding daily cash transaction:", error);
-        throw error;
-      }
-    },
-
-    deleteDailyCashTransaction: async (transactionId) => {
-      try {
+      updateTransaction: async (transactionId, updatedData) => {
         const transactionRef = ref(
           db,
-          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
-        );
-        await remove(transactionRef);
-      } catch (error) {
-        console.error("Error deleting daily cash transaction:", error);
-        throw error;
-      }
-    },
-
-    updateDailyCashTransaction: async (transactionId, updatedData) => {
-      try {
-        const transactionRef = ref(
-          db,
-          `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+          `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
         );
         await update(transactionRef, {
           ...updatedData,
           updatedAt: serverTimestamp(),
         });
-      } catch (error) {
-        console.error("Error updating daily cash transaction:", error);
-        throw error;
-      }
-    },
-  }), []);
+      },
+
+      deleteTransaction: async (transactionId) => {
+        await remove(
+          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`)
+        );
+      },
+    }),
+    [state.fabrics, state.fabricBatches]
+  );
+
+  // Fabric Operations
+  const fabricOperations = useMemo(
+    () => ({
+      addFabric: async (fabricData) => {
+        await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
+      },
+
+      updateFabric: async (fabricId, updatedData) => {
+        await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
+      },
+
+      deleteFabric: async (fabricId) => {
+        await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+      },
+
+      addFabricBatch: async (batchData) => {
+        if (batchData.colors && batchData.colors.length > 0) {
+          const { colors, ...rest } = batchData;
+          for (const color of colors) {
+            await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
+              ...rest,
+              color: color.color,
+              quantity: parseFloat(color.quantity),
+              totalCost: parseFloat(color.quantity) * rest.unitCost,
+              createdAt: serverTimestamp(),
+            });
+          }
+        } else {
+          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
+            ...batchData,
+            createdAt: serverTimestamp(),
+          });
+        }
+      },
+
+      updateFabricBatch: async (batchId, updatedData) => {
+        const batchRef = ref(
+          db,
+          `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
+        );
+        await update(batchRef, {
+          ...updatedData,
+          updatedAt: serverTimestamp(),
+        });
+      },
+
+      deleteFabricBatch: async (batchId) => {
+        try {
+          // Get the batch data first to update fabric totals
+          const batchRef = ref(
+            db,
+            `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
+          );
+          const batchSnapshot = await get(batchRef);
+
+          if (!batchSnapshot.exists()) {
+            throw new Error("Batch not found");
+          }
+
+          // Delete the batch
+          await remove(batchRef);
+        } catch (error) {
+          console.error("Error deleting fabric batch:", error);
+          throw error;
+        }
+      },
+    }),
+    []
+  );
+
+  // Supplier Operations
+  const supplierOperations = useMemo(
+    () => ({
+      addSupplier: async (supplierData) => {
+        try {
+          const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
+          const newSupplierRef = push(suppliersRef);
+          await set(newSupplierRef, {
+            ...supplierData,
+            totalDue: 0,
+            createdAt: serverTimestamp(),
+          });
+          return newSupplierRef.key;
+        } catch (error) {
+          console.error("Error adding supplier:", error);
+          throw error;
+        }
+      },
+
+      updateSupplier: async (supplierId, updatedData) => {
+        try {
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+          );
+          await update(supplierRef, {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error("Error updating supplier:", error);
+          throw error;
+        }
+      },
+
+      deleteSupplier: async (supplierId) => {
+        try {
+          // First delete associated transactions
+          const supplierTransactions = state.transactions.filter(
+            (t) => t.supplierId === supplierId
+          );
+
+          for (const transaction of supplierTransactions) {
+            await remove(
+              ref(
+                db,
+                `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transaction.id}`
+              )
+            );
+          }
+
+          // Then delete the supplier
+          await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
+        } catch (error) {
+          console.error("Error deleting supplier:", error);
+          throw error;
+        }
+      },
+
+      addSupplierTransaction: async (transaction) => {
+        try {
+          const transactionsRef = ref(
+            db,
+            COLLECTION_REFS.SUPPLIER_TRANSACTIONS
+          );
+          const newTransactionRef = push(transactionsRef);
+
+          const newTransaction = {
+            ...transaction,
+            id: newTransactionRef.key,
+            due: transaction.totalAmount - (transaction.paidAmount || 0),
+            createdAt: serverTimestamp(),
+          };
+
+          await set(newTransactionRef, newTransaction);
+
+          // Update supplier's total due
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${transaction.supplierId}`
+          );
+          const supplierSnapshot = await get(supplierRef);
+
+          if (supplierSnapshot.exists()) {
+            const currentDue = supplierSnapshot.val().totalDue || 0;
+            await update(supplierRef, {
+              totalDue: currentDue + newTransaction.due,
+              updatedAt: serverTimestamp(),
+            });
+          }
+
+          return newTransactionRef.key;
+        } catch (error) {
+          console.error("Error adding supplier transaction:", error);
+          throw error;
+        }
+      },
+
+      deleteSupplierTransaction: async (
+        transactionId,
+        supplierId,
+        amount,
+        paidAmount
+      ) => {
+        try {
+          // Delete transaction
+          await remove(
+            ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
+          );
+
+          // Update supplier's total due
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+          );
+          const supplierSnapshot = await get(supplierRef);
+
+          if (supplierSnapshot.exists()) {
+            const supplier = supplierSnapshot.val();
+            const dueAmount = amount - (paidAmount || 0);
+            const newTotalDue = Math.max(
+              0,
+              (supplier.totalDue || 0) - dueAmount
+            );
+
+            await update(supplierRef, {
+              totalDue: newTotalDue,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        } catch (error) {
+          console.error("Error deleting supplier transaction:", error);
+          throw error;
+        }
+      },
+    }),
+    [state.transactions]
+  );
+
+  const dailyCashOperations = useMemo(
+    () => ({
+      addDailyCashTransaction: async (transaction) => {
+        try {
+          const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
+          const newTransactionRef = push(dailyCashRef);
+          await set(newTransactionRef, {
+            ...transaction,
+            id: newTransactionRef.key,
+            createdAt: serverTimestamp(),
+          });
+
+          // Update related customer transaction if it's a sale
+          if (transaction.type === "sale" && transaction.reference) {
+            const customerTransactionRef = query(
+              ref(db, "transactions"),
+              orderByChild("memoNumber"),
+              equalTo(transaction.reference)
+            );
+
+            const snapshot = await get(customerTransactionRef);
+            if (snapshot.exists()) {
+              const [transactionId, transactionData] = Object.entries(
+                snapshot.val()
+              )[0];
+              await update(ref(db, `transactions/${transactionId}`), {
+                deposit:
+                  (transactionData.deposit || 0) + (transaction.cashIn || 0),
+                due:
+                  transactionData.total -
+                  ((transactionData.deposit || 0) + (transaction.cashIn || 0)),
+              });
+            }
+          }
+
+          return newTransactionRef.key;
+        } catch (error) {
+          console.error("Error adding daily cash transaction:", error);
+          throw error;
+        }
+      },
+
+      deleteDailyCashTransaction: async (transactionId) => {
+        try {
+          const transactionRef = ref(
+            db,
+            `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+          );
+          await remove(transactionRef);
+        } catch (error) {
+          console.error("Error deleting daily cash transaction:", error);
+          throw error;
+        }
+      },
+
+      updateDailyCashTransaction: async (transactionId, updatedData) => {
+        try {
+          const transactionRef = ref(
+            db,
+            `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+          );
+          await update(transactionRef, {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error("Error updating daily cash transaction:", error);
+          throw error;
+        }
+      },
+    }),
+    []
+  );
 
   const updateSettings = useCallback(async (newSettings) => {
     try {
@@ -623,18 +664,29 @@ export function DataProvider({ children }) {
     }
   }, []);
 
-  const contextValue = useMemo(() => ({
-    // State
-    ...state,
-    // Operations
-    ...customerOperations,
-    ...transactionOperations,
-    ...fabricOperations,
-    ...supplierOperations,
-    ...dailyCashOperations,
-    settings: state.settings,
-    updateSettings,
-  }), [state, customerOperations, transactionOperations, fabricOperations, supplierOperations, dailyCashOperations, updateSettings]);
+  const contextValue = useMemo(
+    () => ({
+      // State
+      ...state,
+      // Operations
+      ...customerOperations,
+      ...transactionOperations,
+      ...fabricOperations,
+      ...supplierOperations,
+      ...dailyCashOperations,
+      settings: state.settings,
+      updateSettings,
+    }),
+    [
+      state,
+      customerOperations,
+      transactionOperations,
+      fabricOperations,
+      supplierOperations,
+      dailyCashOperations,
+      updateSettings,
+    ]
+  );
 
   return (
     <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>

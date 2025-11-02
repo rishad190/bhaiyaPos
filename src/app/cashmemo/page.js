@@ -46,6 +46,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { calculateFifoSale } from "@/lib/inventory-utils";
+import {
+  getAvailableColors,
+  formatColorDisplay,
+  formatProductWithColor,
+} from "@/lib/color-utils";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -86,24 +91,11 @@ export default function CashMemoPage() {
     color: "",
   });
 
-  const availableColors = useMemo(() => {
-    if (!newProduct.name || !fabrics || !fabricBatches) return [];
-    const fabric = fabrics.find(
-      (f) => f.name.toLowerCase() === newProduct.name.toLowerCase()
-    );
-    if (!fabric) return [];
-    const batches = fabricBatches.filter((b) => b.fabricId === fabric.id);
-    const colorQuantities = batches.reduce((acc, batch) => {
-      if (batch.color) {
-        acc[batch.color] = (acc[batch.color] || 0) + batch.quantity;
-      }
-      return acc;
-    }, {});
-
-    return Object.entries(colorQuantities)
-      .map(([color, quantity]) => ({ color, quantity }))
-      .filter((item) => item.quantity > 0);
-  }, [newProduct.name, fabrics, fabricBatches]);
+  const availableColors = useMemo(
+    () =>
+      getAvailableColors(newProduct.name, fabrics || [], fabricBatches || []),
+    [newProduct.name, fabrics, fabricBatches]
+  );
 
   const originalContent = useRef(null);
 
@@ -378,10 +370,7 @@ export default function CashMemoPage() {
         due: grandTotal - deposit,
         details: products
           .map(
-            (p) =>
-              `${p.name} ${p.color ? `(${p.color})` : ""} (${p.quality} x ৳${
-                p.price
-              })`
+            (p) => `${formatProductWithColor(p)} (${p.quality} x ৳${p.price})`
           )
           .join(", "),
         type: "SALE",
@@ -389,6 +378,15 @@ export default function CashMemoPage() {
         createdAt: new Date().toISOString(),
         products: products, // Include product details for inventory update logic
       };
+
+      // Debug: in dev show transaction payload to help validate product shapes
+      if (process.env.NODE_ENV !== "production") {
+        try {
+          console.debug("[CashMemo] transaction payload:", transaction);
+        } catch (e) {
+          /* ignore logging errors */
+        }
+      }
 
       // Wait for transaction to be added (and inventory updated within addTransaction)
       const transactionResult = await addTransaction(transaction);
@@ -778,7 +776,7 @@ export default function CashMemoPage() {
                   <TableHead className="whitespace-nowrap">Product</TableHead>
                   <TableHead className="whitespace-nowrap">Color</TableHead>
                   <TableHead className="text-right whitespace-nowrap">
-                    Quality
+                    Quantity
                   </TableHead>
                   <TableHead className="text-right whitespace-nowrap">
                     Price
@@ -798,7 +796,7 @@ export default function CashMemoPage() {
                       {product.name}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {product.color || "-"} {/* Display dash if no color */}
+                      {formatColorDisplay(product.color)}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       {product.quality}
