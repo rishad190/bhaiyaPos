@@ -283,68 +283,42 @@ export function DataProvider({ children }) {
 
         const newTransaction = {
           ...restTransactionData,
-          createdAt: new Date().toISOString(), // Use ISO string
+          createdAt: new Date().toISOString(),
         };
 
-        // Use updates for atomicity if possible (especially inventory)
         const updates = {};
         updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] = newTransaction;
 
-        // --- Inventory Update Logic ---
         if (products && products.length > 0) {
-          const tempFabricBatches = JSON.parse(JSON.stringify(state.fabricBatches));
+          for (const product of products) {
+            const fabric = state.fabrics.find(
+              (f) => f.name.toLowerCase() === product.name.toLowerCase()
+            );
+            if (fabric) {
+              const batches = state.fabricBatches.filter(
+                (b) => b.fabricId === fabric.id
+              );
+              const { updatedBatches } = calculateFifoSale(
+                batches,
+                product.quantity,
+                product.color
+              );
 
-           for (const product of products) {
-                const fabric = state.fabrics.find(f => f?.name?.toLowerCase() === product?.name?.toLowerCase());
-                if (fabric?.id) {
-                    const batches = tempFabricBatches.filter(b => b?.fabricId === fabric.id);
-                    try {
-                        // CalculateFifoSale might throw if insufficient stock
-                        const { updatedBatches } = calculateFifoSale(batches, product.quantity, product.color || null);
-
-                        for (const batch of updatedBatches) {
-                            if (!batch?.id) continue; // Skip if batch id is missing
-                            const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
-                            if (batch.quantity > 0) {
-                                const updatePayload = {
-                                    quantity: batch.quantity,
-                                    updatedAt: new Date().toISOString(),
-                                };
-                                if (batch.colors) {
-                                    updatePayload.colors = batch.colors;
-                                }
-                                updates[batchPath] = updatePayload;
-
-                                // Update tempFabricBatches for next iteration
-                                const batchIndex = tempFabricBatches.findIndex(b => b.id === batch.id);
-                                if (batchIndex !== -1) {
-                                  tempFabricBatches[batchIndex] = { ...tempFabricBatches[batchIndex], ...updatePayload };
-                                }
-                            } else {
-                                updates[batchPath] = null; // Mark batch for deletion
-                                // Update tempFabricBatches for next iteration
-                                const batchIndex = tempFabricBatches.findIndex(b => b.id === batch.id);
-                                if (batchIndex !== -1) {
-                                  tempFabricBatches.splice(batchIndex, 1);
-                                }
-                            }
-                        }
-                    } catch (fifoError) {
-                        console.error(`FIFO calculation error for product ${product.name}:`, fifoError);
-                         // Re-throw the error to stop the transaction save if inventory fails
-                        throw new Error(`Inventory update failed for ${product.name}: ${fifoError.message}`);
-                    }
+              updatedBatches.forEach((batch) => {
+                const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
+                if (batch.quantity > 0) {
+                  updates[batchPath] = batch;
                 } else {
-                    console.warn(`Fabric not found for product: ${product.name}`);
+                  updates[batchPath] = null; // Deletes the batch
                 }
-           }
+              });
+            }
+          }
         }
-        // --- End Inventory Update Logic ---
 
-        // Perform atomic update for transaction and inventory changes
         await update(ref(db), updates);
 
-        return newTransactionRef.key; // Return key after successful update
+        return newTransactionRef.key;
       },
 
     updateTransaction: async (transactionId, updatedData) => {
@@ -381,10 +355,23 @@ export function DataProvider({ children }) {
     },
 
     addFabricBatch: async (batchData) => {
-      await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-        ...batchData,
-        createdAt: serverTimestamp(),
-      });
+      if (batchData.colors && batchData.colors.length > 0) {
+        const { colors, ...rest } = batchData;
+        for (const color of colors) {
+          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
+            ...rest,
+            color: color.color,
+            quantity: parseFloat(color.quantity),
+            totalCost: parseFloat(color.quantity) * rest.unitCost,
+            createdAt: serverTimestamp(),
+          });
+        }
+      } else {
+        await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
+          ...batchData,
+          createdAt: serverTimestamp(),
+        });
+      }
     },
 
     updateFabricBatch: async (batchId, updatedData) => {

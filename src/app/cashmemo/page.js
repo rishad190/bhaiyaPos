@@ -87,38 +87,23 @@ export default function CashMemoPage() {
   });
 
   const availableColors = useMemo(() => {
-    if (!newProduct.name || !fabrics || !fabricBatches) return []; // Added checks for fabrics/fabricBatches
+    if (!newProduct.name || !fabrics || !fabricBatches) return [];
     const fabric = fabrics.find(
       (f) => f.name.toLowerCase() === newProduct.name.toLowerCase()
     );
     if (!fabric) return [];
     const batches = fabricBatches.filter((b) => b.fabricId === fabric.id);
     const colorQuantities = batches.reduce((acc, batch) => {
-      // Ensure batch and quantities are valid numbers
-      const batchQty = Number(batch?.quantity || 0);
-
-      if (batch.colors && batch.colors.length > 0) {
-        batch.colors.forEach((colorInfo) => {
-          const colorQty = Number(colorInfo?.quantity || 0);
-          if (colorInfo.color && colorQty > 0) {
-            acc[colorInfo.color] = (acc[colorInfo.color] || 0) + colorQty;
-          }
-        });
-      } else if (batch.color && batchQty > 0) {
-        // Also consider batches with single color field
-        acc[batch.color] = (acc[batch.color] || 0) + batchQty;
-      }
-      // Consider batches without specific color info if no color is selected yet for the product
-      else if (!newProduct.color && batchQty > 0) {
-        acc["Default"] = (acc["Default"] || 0) + batchQty;
+      if (batch.color) {
+        acc[batch.color] = (acc[batch.color] || 0) + batch.quantity;
       }
       return acc;
     }, {});
 
     return Object.entries(colorQuantities)
-      .map(([color, quantity]) => ({ color, quantity: Number(quantity || 0) })) // Ensure quantity is a number
-      .filter((item) => item.quantity > 0); // Only show colors with stock > 0
-  }, [newProduct.name, fabrics, fabricBatches, newProduct.color]); // Added fabrics, fabricBatches to dependency array
+      .map(([color, quantity]) => ({ color, quantity }))
+      .filter((item) => item.quantity > 0);
+  }, [newProduct.name, fabrics, fabricBatches]);
 
   const originalContent = useRef(null);
 
@@ -184,6 +169,7 @@ export default function CashMemoPage() {
         {
           name: newProduct.name.trim(),
           quality: qualityNum, // Use parsed number
+          quantity: qualityNum, // Also provide `quantity` (expected by addTransaction / FIFO)
           price: priceNum, // Use parsed number
           total,
           cost: totalCost,

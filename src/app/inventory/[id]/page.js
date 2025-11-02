@@ -42,7 +42,11 @@ import {
   Trash2,
   Edit,
 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
@@ -170,7 +174,10 @@ export default function FabricViewPage() {
       const result = calculateFifoSale(batches, quantity, color);
       for (const batch of result.updatedBatches) {
         if (batch.quantity > 0) {
-          await updateFabricBatch(batch.id, { quantity: batch.quantity, colors: batch.colors });
+          await updateFabricBatch(batch.id, {
+            quantity: batch.quantity,
+            colors: batch.colors,
+          });
         } else {
           await deleteFabricBatch(batch.id);
         }
@@ -560,33 +567,84 @@ export default function FabricViewPage() {
                         <TableCell>{batchItem.date}</TableCell>
                         <TableCell>{batchItem.supplierName}</TableCell>
                         <TableCell>
-                          {Array.isArray(batchItem.colors) && batchItem.colors.length > 0 ? (
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="link">{batchItem.colors.length} colors</Button>
-                              </PopoverTrigger>
-                              <PopoverContent>
-                                <div className="grid gap-4">
-                                  <div className="space-y-2">
-                                    <h4 className="font-medium leading-none">Color Details</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                      Quantities per color in this batch.
-                                    </p>
+                          {(() => {
+                            // Normalize color shape handling to be robust across different batch shapes
+                            const colorsArr = Array.isArray(batchItem.colors)
+                              ? batchItem.colors
+                              : [];
+
+                            const getColorName = (c) =>
+                              c?.color ||
+                              c?.name ||
+                              c?.colorName ||
+                              c?.colour ||
+                              c?.label ||
+                              "";
+
+                            const getColorQty = (c) =>
+                              typeof c?.quantity !== "undefined"
+                                ? c.quantity
+                                : c?.qty || c?.amount || "";
+
+                            if (colorsArr.length > 0) {
+                              if (colorsArr.length === 1) {
+                                const single = colorsArr[0];
+                                const name =
+                                  getColorName(single) || batchItem.color;
+                                const qty = getColorQty(single);
+                                return (
+                                  <div>
+                                    {name || "N/A"}
+                                    {qty !== "" && (
+                                      <span className="ml-2 text-sm text-muted-foreground">
+                                        ({qty})
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="grid gap-2">
-                                    {batchItem.colors.map((color, index) => (
-                                      <div key={index} className="grid grid-cols-2 items-center gap-4">
-                                        <span>{color.color}</span>
-                                        <span>{color.quantity}</span>
+                                );
+                              }
+
+                              return (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="link">
+                                      {colorsArr.length} colors
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent>
+                                    <div className="grid gap-4">
+                                      <div className="space-y-2">
+                                        <h4 className="font-medium leading-none">
+                                          Color Details
+                                        </h4>
+                                        <p className="text-sm text-muted-foreground">
+                                          Quantities per color in this batch.
+                                        </p>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          ) : (
-                            batchItem.color
-                          )}
+                                      <div className="grid gap-2">
+                                        {colorsArr.map((color, index) => (
+                                          <div
+                                            key={index}
+                                            className="grid grid-cols-2 items-center gap-4"
+                                          >
+                                            <span>
+                                              {getColorName(color) || "N/A"}
+                                            </span>
+                                            <span>
+                                              {getColorQty(color) || 0}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              );
+                            }
+
+                            // Fallback to legacy single-color field
+                            return batchItem.color || "N/A";
+                          })()}
                         </TableCell>
                         <TableCell className="text-right">
                           ৳{(batchItem.price || 0).toFixed(2)}
@@ -654,8 +712,7 @@ export default function FabricViewPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Array.isArray(stockMovements) &&
-                stockMovements.length > 0 ? (
+                {Array.isArray(stockMovements) && stockMovements.length > 0 ? (
                   stockMovements.map((transaction) => (
                     <TableRow key={transaction?.id}>
                       <TableCell>
