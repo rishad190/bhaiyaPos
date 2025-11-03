@@ -32,7 +32,6 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const {
     fabrics,
-    fabricBatches,
     addFabric,
     updateFabric,
     deleteFabric,

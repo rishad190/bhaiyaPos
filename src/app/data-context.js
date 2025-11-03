@@ -145,7 +145,7 @@ function reducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Memoized fabrics with batches
+  // Memoized fabrics with batches in unified structure
   const fabricsWithBatches = useMemo(() => {
     const fabrics = state.fabrics;
     const fabricBatches = state.fabricBatches;
@@ -153,15 +153,40 @@ export function DataProvider({ children }) {
     if (!fabrics || !fabricBatches) return [];
 
     return Object.entries(fabrics).map(([id, fabric]) => {
-      // Find all batches for this fabric
-      const batches = Object.values(fabricBatches).filter(
-        (batch) => batch.fabricId === id
-      );
+      // Find all batches for this fabric and transform to unified structure
+      const batches = Object.values(fabricBatches)
+        .filter((batch) => batch && batch.fabricId === id)
+        .map((batch) => ({
+          id: batch.id || batch.batchNumber,
+          batchNumber: batch.batchNumber,
+          containerNo: batch.containerNo,
+          purchaseDate: batch.purchaseDate,
+          costPerPiece:
+            Number(batch.unitCost) || Number(batch.costPerPiece) || 0,
+          unitCost: Number(batch.unitCost) || Number(batch.costPerPiece) || 0,
+          totalCost: Number(batch.totalCost) || 0,
+          supplierName: batch.supplierName || "",
+          unit: batch.unit || fabric.unit || "piece",
+          items: (batch.items || []).map((item) => ({
+            colorName: item.colorName || "",
+            quantity: Number(item.quantity) || 0,
+          })),
+          createdAt: batch.createdAt,
+          updatedAt: batch.updatedAt,
+        }));
 
+      // Return unified fabric object structure
       return {
-        ...fabric,
         id,
-        batches,
+        name: fabric.name || "",
+        code: fabric.code || "",
+        category: fabric.category || "",
+        unit: fabric.unit || "piece",
+        description: fabric.description || "",
+        lowStockThreshold: Number(fabric.lowStockThreshold) || 20,
+        batches: batches,
+        createdAt: fabric.createdAt,
+        updatedAt: fabric.updatedAt,
       };
     });
   }, [state.fabrics, state.fabricBatches]);
@@ -488,7 +513,6 @@ export function DataProvider({ children }) {
             category: fabricData.category?.trim() || "",
             unit: fabricData.unit || "piece",
             lowStockThreshold: Number(fabricData.lowStockThreshold) || 20,
-            batches: [],
             createdAt: timestamp,
             updatedAt: timestamp,
           };
@@ -573,10 +597,13 @@ export function DataProvider({ children }) {
         try {
           const timestamp = serverTimestamp();
           const batch = {
-            id: batchData.batchNumber,
             fabricId: batchData.fabricId,
             batchNumber: batchData.batchNumber,
-            unitCost: Number(batchData.unitCost) || 0,
+            containerNo: batchData.containerNo || "", // Provide default value
+            unitCost:
+              Number(batchData.unitCost) || Number(batchData.costPerPiece) || 0,
+            costPerPiece:
+              Number(batchData.costPerPiece) || Number(batchData.unitCost) || 0,
             totalCost: Number(batchData.totalCost) || 0,
             supplierName: batchData.supplierName || "",
             purchaseDate: batchData.purchaseDate,

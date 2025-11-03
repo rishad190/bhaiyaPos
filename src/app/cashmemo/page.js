@@ -53,13 +53,8 @@ import { useToast } from "@/hooks/use-toast";
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast(); // Get toast function
-  const {
-    customers,
-    addTransaction,
-    addDailyCashTransaction,
-    fabrics,
-    fabricBatches,
-  } = useData();
+  const { customers, addTransaction, addDailyCashTransaction, fabrics } =
+    useData();
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
