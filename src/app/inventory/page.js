@@ -18,7 +18,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  calculateTotalQuantity,
+  getQuantityByColor,
+  isLowStock,
+  calculateAverageCost,
+} from "@/lib/inventory-utils";
 import { Plus, Package, Search } from "lucide-react";
+import { ColorChipGroup } from "@/components/ui/color-chip";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -45,13 +52,16 @@ export default function InventoryPage() {
   }, [fabrics]);
 
   const filteredFabrics = useMemo(() => {
-    return (
-      fabrics?.filter(
-        (fabric) =>
-          fabric.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          fabric.code.toLowerCase().includes(searchTerm.toLowerCase())
-      ) || []
-    );
+    if (!fabrics) return [];
+
+    return fabrics.filter((fabric) => {
+      const searchString = searchTerm.toLowerCase();
+      return (
+        fabric.name.toLowerCase().includes(searchString) ||
+        fabric.code.toLowerCase().includes(searchString) ||
+        fabric.category.toLowerCase().includes(searchString)
+      );
+    });
   }, [fabrics, searchTerm]);
 
   const handleAddFabric = async (fabricData) => {
@@ -147,18 +157,7 @@ export default function InventoryPage() {
     }
   };
 
-  const getStockByColor = (fabricId) => {
-    const batches = fabricBatches.filter((b) => b.fabricId === fabricId);
-    const colorStock = batches.reduce((acc, batch) => {
-      if (batch.color) {
-        acc[batch.color] = (acc[batch.color] || 0) + batch.quantity;
-      } else {
-        acc["N/A"] = (acc["N/A"] || 0) + batch.quantity;
-      }
-      return acc;
-    }, {});
-    return colorStock;
-  };
+  // We'll use the imported getQuantityByColor function instead
 
   if (loadingState.initial) {
     return <div>Loading...</div>;
@@ -223,15 +222,20 @@ export default function InventoryPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Fabric Name</TableHead>
-                <TableHead className="text-right">Total Quantity</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Total Stock</TableHead>
+                <TableHead>Colors Available</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredFabrics.map((fabric) => {
-                const totalQty = (fabricBatches || [])
-                  .filter((b) => b.fabricId === fabric.id)
-                  .reduce((sum, b) => sum + (b.quantity || 0), 0);
+                const totalQty = calculateTotalQuantity(fabric);
+                const colorQuantities = getQuantityByColor(fabric);
+                const avgCost = calculateAverageCost(fabric);
+                const lowStock = isLowStock(fabric);
+
                 return (
                   <TableRow
                     key={fabric.id}
@@ -240,10 +244,33 @@ export default function InventoryPage() {
                   >
                     <TableCell>
                       <div className="font-medium">{fabric.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {fabric.code}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{fabric.category}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Badge variant={totalQty > 0 ? "default" : "destructive"}>
                         {totalQty.toFixed(2)} {fabric.unit}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <ColorChipGroup
+                        colors={Object.entries(colorQuantities).map(
+                          ([color, qty]) => ({
+                            colorName: color,
+                            quantity: qty,
+                          })
+                        )}
+                        layout="inline"
+                        unit={fabric.unit}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={lowStock ? "destructive" : "success"}>
+                        {lowStock ? "Low Stock" : "In Stock"}
                       </Badge>
                     </TableCell>
                     <TableCell>

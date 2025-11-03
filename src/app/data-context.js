@@ -364,37 +364,112 @@ export function DataProvider({ children }) {
   const fabricOperations = useMemo(
     () => ({
       addFabric: async (fabricData) => {
-        await push(ref(db, COLLECTION_REFS.FABRICS), fabricData);
+        try {
+          const timestamp = serverTimestamp();
+          const fabric = {
+            code: (fabricData.code || "").toUpperCase(),
+            name: fabricData.name?.trim() || "",
+            description: fabricData.description?.trim() || "",
+            category: fabricData.category?.trim() || "",
+            unit: fabricData.unit || "piece",
+            lowStockThreshold: Number(fabricData.lowStockThreshold) || 20,
+            batches: [],
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+
+          // Validate required fields
+          if (!fabric.code) throw new Error("Fabric code is required");
+          if (!fabric.name) throw new Error("Fabric name is required");
+          if (!fabric.category) throw new Error("Category is required");
+
+          await push(ref(db, COLLECTION_REFS.FABRICS), fabric);
+        } catch (error) {
+          console.error("Error adding fabric:", error);
+          throw error;
+        }
       },
 
       updateFabric: async (fabricId, updatedData) => {
-        await update(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`), {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
-        });
+        try {
+          const timestamp = serverTimestamp();
+          const fabric = {
+            ...updatedData,
+            code: (updatedData.code || "").toUpperCase(),
+            name: updatedData.name?.trim() || "",
+            description: updatedData.description?.trim() || "",
+            category: updatedData.category?.trim() || "",
+            unit: updatedData.unit || "piece",
+            lowStockThreshold: Number(updatedData.lowStockThreshold) || 20,
+            updatedAt: timestamp,
+          };
+
+          // Validate required fields
+          if (!fabric.code) throw new Error("Fabric code is required");
+          if (!fabric.name) throw new Error("Fabric name is required");
+          if (!fabric.category) throw new Error("Category is required");
+
+          await update(
+            ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`),
+            fabric
+          );
+        } catch (error) {
+          console.error("Error updating fabric:", error);
+          throw error;
+        }
       },
 
       deleteFabric: async (fabricId) => {
-        await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+        try {
+          // First delete all batches associated with this fabric
+          const fabricBatches = state.fabricBatches.filter(
+            (batch) => batch.fabricId === fabricId
+          );
+          for (const batch of fabricBatches) {
+            await remove(
+              ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
+            );
+          }
+
+          // Then delete the fabric
+          await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+        } catch (error) {
+          console.error("Error deleting fabric:", error);
+          throw error;
+        }
       },
 
       addFabricBatch: async (batchData) => {
-        if (batchData.colors && batchData.colors.length > 0) {
-          const { colors, ...rest } = batchData;
-          for (const color of colors) {
-            await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-              ...rest,
-              color: color.color,
-              quantity: parseFloat(color.quantity),
-              totalCost: parseFloat(color.quantity) * rest.unitCost,
-              createdAt: serverTimestamp(),
-            });
-          }
-        } else {
-          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), {
-            ...batchData,
-            createdAt: serverTimestamp(),
-          });
+        try {
+          const timestamp = serverTimestamp();
+          const batch = {
+            id: batchData.batchNumber,
+            fabricId: batchData.fabricId,
+            batchNumber: batchData.batchNumber,
+            unitCost: Number(batchData.unitCost) || 0,
+            totalCost: Number(batchData.totalCost) || 0,
+            supplierName: batchData.supplierName || "",
+            purchaseDate: batchData.purchaseDate,
+            unit: batchData.unit || "piece",
+            items: batchData.colorQuantities.map((item) => ({
+              colorName: item.color.trim(),
+              quantity: Number(item.quantity) || 0,
+            })),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+
+          // Validate required fields
+          if (!batch.fabricId) throw new Error("Fabric ID is required");
+          if (!batch.batchNumber) throw new Error("Batch number is required");
+          if (!batch.items?.length)
+            throw new Error("At least one color quantity is required");
+          if (!batch.unitCost) throw new Error("Unit cost is required");
+
+          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), batch);
+        } catch (error) {
+          console.error("Error adding fabric batch:", error);
+          throw error;
         }
       },
 

@@ -31,6 +31,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { ColorBatchCell } from "@/components/ui/color-batch-cell";
 import {
   ArrowLeft,
   Package,
@@ -115,22 +116,49 @@ export default function FabricViewPage() {
       };
     }
 
-    const totalQty = batches.reduce((sum, b) => sum + (b?.quantity || 0), 0);
-    const avgCost = calculateWeightedAverage(batches);
+    const totalQty = batches.reduce((sum, b) => {
+      if (!b?.items?.length) return sum;
+      return (
+        sum +
+        b.items.reduce(
+          (batchSum, item) => batchSum + (Number(item?.quantity) || 0),
+          0
+        )
+      );
+    }, 0);
+
+    const avgCost = calculateWeightedAverage(
+      batches.map((b) => ({
+        quantity:
+          b.items?.reduce(
+            (sum, item) => sum + (Number(item?.quantity) || 0),
+            0
+          ) || 0,
+        unitCost: Number(b.unitCost) || 0,
+      }))
+    );
     const currentVal = totalQty * avgCost;
 
     const history = batches
       .map((b) => {
-        if (!b || !b.id) return null;
+        if (!b?.id || !b?.items?.length) return null;
+        const totalQuantity = b.items.reduce(
+          (sum, item) => sum + (Number(item?.quantity) || 0),
+          0
+        );
         return {
           id: b.id,
           date: b.createdAt
             ? new Date(b.createdAt).toLocaleDateString()
             : "N/A",
-          price: b.unitCost || 0,
-          quantity: b.quantity || 0,
+          price: Number(b.unitCost) || 0,
+          quantity: totalQuantity,
           supplierName: b.supplierName || "N/A",
-          colors: b.colors || [],
+          items:
+            b.items.map((item) => ({
+              colorName: item.colorName || "",
+              quantity: Number(item.quantity) || 0,
+            })) || [],
         };
       })
       .filter((item) => item !== null)
@@ -140,14 +168,27 @@ export default function FabricViewPage() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const movements = [
-      ...batches.map((b) => ({
-        id: b.id,
-        date: b.createdAt,
-        type: "Purchase",
-        quantity: b.quantity,
-        totalCost: b.unitCost * b.quantity,
-        source: b.supplierName,
-      })),
+      ...batches
+        .map((b) => {
+          if (!b?.items?.length) return null;
+          const totalQuantity = b.items.reduce(
+            (sum, item) => sum + (Number(item?.quantity) || 0),
+            0
+          );
+          return {
+            id: b.id,
+            date: b.createdAt,
+            type: "Purchase",
+            quantity: totalQuantity,
+            totalCost: (Number(b.unitCost) || 0) * totalQuantity,
+            source: b.supplierName || "N/A",
+            items: b.items.map((item) => ({
+              colorName: item.colorName || "",
+              quantity: Number(item.quantity) || 0,
+            })),
+          };
+        })
+        .filter(Boolean),
       ...fabricTransactions.map((t) => ({
         id: t.id,
         date: t.date,
@@ -171,25 +212,66 @@ export default function FabricViewPage() {
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
       if (!fabric) throw new Error("Fabric not found");
-      const result = calculateFifoSale(batches, quantity, color);
-      for (const batch of result.updatedBatches) {
-        if (batch.quantity > 0) {
-          await updateFabricBatch(batch.id, {
-            quantity: batch.quantity,
-            colors: batch.colors,
-          });
+      if (!color?.trim()) throw new Error("Color is required");
+
+      // Convert batches to the format expected by calculateFifoSale
+      const processedBatches = batches
+        .map((batch) => {
+          const colorItem = batch.items?.find(
+            (item) => item.colorName === color
+          );
+          if (!colorItem) return null;
+          return {
+            id: batch.id,
+            batchNumber: batch.batchNumber,
+            color: colorItem.colorName,
+            quantity: Number(colorItem.quantity) || 0,
+            unitCost: Number(batch.unitCost) || 0,
+            createdAt: batch.createdAt,
+          };
+        })
+        .filter(Boolean);
+
+      const result = calculateFifoSale(processedBatches, quantity, color);
+
+      // Update batches
+      for (const updatedBatch of result.updatedBatches) {
+        const originalBatch = batches.find((b) => b.id === updatedBatch.id);
+        if (!originalBatch) continue;
+
+        const updatedItems = originalBatch.items.map((item) => {
+          if (item.colorName === color) {
+            return {
+              ...item,
+              quantity: Number(updatedBatch.quantity) || 0,
+            };
+          }
+          return item;
+        });
+
+        if (updatedItems.every((item) => Number(item.quantity) <= 0)) {
+          await deleteFabricBatch(updatedBatch.id);
         } else {
-          await deleteFabricBatch(batch.id);
+          await updateFabricBatch(updatedBatch.id, {
+            ...originalBatch,
+            items: updatedItems,
+            updatedAt: new Date().toISOString(),
+          });
         }
       }
+
       const saleTransaction = {
         fabricId: id,
         quantity,
-        totalCost: result.totalCost,
+        totalCost: result.costOfGoodsSold.reduce(
+          (total, item) =>
+            total + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0),
+          0
+        ),
         date: new Date().toISOString(),
         type: "FABRIC_SALE",
         batches: result.costOfGoodsSold,
-        color: color,
+        colorName: color,
       };
       await addTransaction(saleTransaction);
       toast({
@@ -567,90 +649,20 @@ export default function FabricViewPage() {
                         <TableCell>{batchItem.date}</TableCell>
                         <TableCell>{batchItem.supplierName}</TableCell>
                         <TableCell>
-                          {(() => {
-                            // Normalize color shape handling to be robust across different batch shapes
-                            const colorsArr = Array.isArray(batchItem.colors)
-                              ? batchItem.colors
-                              : [];
-
-                            const getColorName = (c) =>
-                              c?.color ||
-                              c?.name ||
-                              c?.colorName ||
-                              c?.colour ||
-                              c?.label ||
-                              "";
-
-                            const getColorQty = (c) =>
-                              typeof c?.quantity !== "undefined"
-                                ? c.quantity
-                                : c?.qty || c?.amount || "";
-
-                            if (colorsArr.length > 0) {
-                              if (colorsArr.length === 1) {
-                                const single = colorsArr[0];
-                                const name =
-                                  getColorName(single) || batchItem.color;
-                                const qty = getColorQty(single);
-                                return (
-                                  <div>
-                                    {name || "N/A"}
-                                    {qty !== "" && (
-                                      <span className="ml-2 text-sm text-muted-foreground">
-                                        ({qty})
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Button variant="link">
-                                      {colorsArr.length} colors
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent>
-                                    <div className="grid gap-4">
-                                      <div className="space-y-2">
-                                        <h4 className="font-medium leading-none">
-                                          Color Details
-                                        </h4>
-                                        <p className="text-sm text-muted-foreground">
-                                          Quantities per color in this batch.
-                                        </p>
-                                      </div>
-                                      <div className="grid gap-2">
-                                        {colorsArr.map((color, index) => (
-                                          <div
-                                            key={index}
-                                            className="grid grid-cols-2 items-center gap-4"
-                                          >
-                                            <span>
-                                              {getColorName(color) || "N/A"}
-                                            </span>
-                                            <span>
-                                              {getColorQty(color) || 0}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              );
-                            }
-
-                            // Fallback to legacy single-color field
-                            return batchItem.color || "N/A";
-                          })()}
+                          <ColorBatchCell
+                            items={fullBatch.items}
+                            unit={fabric.unit}
+                          />
                         </TableCell>
                         <TableCell className="text-right">
-                          ৳{(batchItem.price || 0).toFixed(2)}
+                          ৳{(Number(batchItem.price) || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {batchItem.quantity || 0} {fabric?.unit || ""}
+                          {batchItem.items?.reduce(
+                            (sum, item) => sum + (Number(item.quantity) || 0),
+                            0
+                          ) || 0}{" "}
+                          {fabric?.unit || ""}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">

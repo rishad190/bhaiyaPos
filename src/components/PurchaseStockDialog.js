@@ -22,10 +22,10 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
     fabricId: "",
     unitCost: "",
     supplierName: "",
-    containerName: "",
+    batchNumber: "",
     numberOfColors: "",
     colors: [],
-    unit: "METER",
+    unit: "piece",
     purchaseDate: new Date().toISOString().split("T")[0],
   });
   const [errors, setErrors] = useState({});
@@ -46,7 +46,10 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
       if (num > 0) {
         setFormData((prev) => ({
           ...prev,
-          colors: Array.from({ length: num }, () => ({ color: "", quantity: "" })),
+          colors: Array.from({ length: num }, () => ({
+            color: "",
+            quantity: "",
+          })),
         }));
       } else {
         setFormData((prev) => ({ ...prev, colors: [] }));
@@ -64,9 +67,14 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
   const validate = () => {
     const newErrors = {};
     if (!formData.fabricId) newErrors.fabricId = "Fabric is required";
-    if (!formData.containerName) newErrors.containerName = "Container name is required";
-    if (formData.colors.some(c => !c.color || !c.quantity)) {
-      newErrors.colors = "All color fields are required";
+    if (!formData.batchNumber?.trim())
+      newErrors.batchNumber = "Batch number is required";
+    if (
+      formData.colors.some(
+        (c) => !c.color?.trim() || !c.quantity || parseFloat(c.quantity) <= 0
+      )
+    ) {
+      newErrors.colors = "All colors must have valid quantities";
     }
     if (!formData.unitCost || parseFloat(formData.unitCost) <= 0)
       newErrors.unitCost = "A valid unit cost is required";
@@ -80,24 +88,30 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
     if (!validate()) return;
 
     try {
+      const timestamp = new Date().toISOString();
       const purchaseData = {
         fabricId: formData.fabricId,
+        batchNumber: formData.batchNumber,
+        colorQuantities: formData.colors.map((c) => ({
+          color: c.color.trim(),
+          quantity: parseFloat(c.quantity),
+        })),
         unitCost: parseFloat(formData.unitCost),
         supplierName: formData.supplierName,
-        containerName: formData.containerName,
         unit: formData.unit,
         purchaseDate: formData.purchaseDate,
-        createdAt: new Date().toISOString(),
-        colors: formData.colors,
-        quantity: totalColorQuantity,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        totalQuantity: totalColorQuantity,
+        totalCost: totalColorQuantity * parseFloat(formData.unitCost),
       };
-      purchaseData.totalCost = purchaseData.quantity * purchaseData.unitCost;
 
       await onPurchaseStock(purchaseData);
       setOpen(false);
       setFormData({
         fabricId: "",
         unitCost: "",
+        batchNumber: "",
         supplierName: "",
         containerName: "",
         numberOfColors: "",
@@ -154,22 +168,21 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
             />
           </div>
 
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-medium">Color-wise Details</h3>
-            <div>
-              <label className="text-sm font-medium">Container Name</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Batch Number *</label>
               <Input
-                name="containerName"
-                value={formData.containerName}
+                name="batchNumber"
+                value={formData.batchNumber}
                 onChange={handleFormChange}
-                placeholder="Enter container name"
-                className={errors.containerName ? "border-red-500" : ""}
+                placeholder="Enter batch number"
+                className={errors.batchNumber ? "border-red-500" : ""}
               />
-               {errors.containerName && (
-                <p className="text-sm text-red-500">{errors.containerName}</p>
+              {errors.batchNumber && (
+                <p className="text-sm text-red-500">{errors.batchNumber}</p>
               )}
             </div>
-            <div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Number of Colors</label>
               <Input
                 name="numberOfColors"
@@ -179,29 +192,37 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
                 placeholder="Enter number of colors"
               />
             </div>
-            {formData.colors.map((color, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  name="color"
-                  value={color.color}
-                  onChange={(e) => handleColorInputChange(index, e)}
-                  placeholder={`Color ${index + 1}`}
-                />
-                <Input
-                  name="quantity"
-                  type="number"
-                  value={color.quantity}
-                  onChange={(e) => handleColorInputChange(index, e)}
-                  placeholder="Quantity"
-                />
-              </div>
-            ))}
-            {errors.colors && (
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="font-medium">Color Quantities</h3>
+            <div className="space-y-3">
+              {formData.colors.map((color, index) => (
+                <div key={index} className="grid grid-cols-2 gap-2">
+                  <Input
+                    name="color"
+                    value={color.color}
+                    onChange={(e) => handleColorInputChange(index, e)}
+                    placeholder={`Color ${index + 1}`}
+                  />
+                  <Input
+                    name="quantity"
+                    type="number"
+                    value={color.quantity}
+                    onChange={(e) => handleColorInputChange(index, e)}
+                    placeholder="Quantity"
+                  />
+                </div>
+              ))}
+              {errors.colors && (
                 <p className="text-sm text-red-500">{errors.colors}</p>
               )}
-            <div>
-              <label className="text-sm font-medium">Total Color Quantity</label>
-              <Input readOnly value={totalColorQuantity} />
+              <div className="bg-gray-50 p-2 rounded">
+                <label className="text-sm font-medium">Total Quantity:</label>
+                <span className="ml-2 text-lg font-semibold">
+                  {totalColorQuantity}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -236,9 +257,9 @@ export function PurchaseStockDialog({ fabrics, onPurchaseStock, children }) {
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="METER">Meter</SelectItem>
-                  <SelectItem value="YARD">Yard</SelectItem>
-                  <SelectItem value="PIECE">Piece</SelectItem>
+                  <SelectItem value="piece">Piece</SelectItem>
+                  <SelectItem value="meter">Meter</SelectItem>
+                  <SelectItem value="yard">Yard</SelectItem>
                 </SelectContent>
               </Select>
               {errors.unit && (
