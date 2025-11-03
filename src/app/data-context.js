@@ -145,6 +145,27 @@ function reducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Memoized fabrics with batches
+  const fabricsWithBatches = useMemo(() => {
+    const fabrics = state.fabrics;
+    const fabricBatches = state.fabricBatches;
+
+    if (!fabrics || !fabricBatches) return [];
+
+    return Object.entries(fabrics).map(([id, fabric]) => {
+      // Find all batches for this fabric
+      const batches = Object.values(fabricBatches).filter(
+        (batch) => batch.fabricId === id
+      );
+
+      return {
+        ...fabric,
+        id,
+        batches,
+      };
+    });
+  }, [state.fabrics, state.fabricBatches]);
+
   // Firebase Subscriptions
   useEffect(() => {
     const unsubscribers = [];
@@ -298,25 +319,84 @@ export function DataProvider({ children }) {
 
         if (products && products.length > 0) {
           for (const product of products) {
-            const fabric = state.fabrics.find(
-              (f) => f.name.toLowerCase() === product.name.toLowerCase()
-            );
+            // Prefer explicit fabricId when provided (more robust). Fallback to name match.
+            let fabric = null;
+            if (product.fabricId) {
+              fabric = state.fabrics.find(
+                (f) => f && f.id === product.fabricId
+              );
+            }
+            if (!fabric && product.name) {
+              fabric = state.fabrics.find(
+                (f) =>
+                  f &&
+                  f.name &&
+                  f.name.toLowerCase() === product.name.toLowerCase()
+              );
+            }
             if (fabric) {
-              const batches = state.fabricBatches.filter(
+              // Convert DB batches (which contain items per color) into color-level batches
+              const rawBatches = state.fabricBatches.filter(
                 (b) => b.fabricId === fabric.id
               );
+
+              // Build per-color batch entries: { id, quantity, unitCost, color, createdAt }
+              const colorLevelBatches = [];
+              rawBatches.forEach((b) => {
+                (b.items || []).forEach((item) => {
+                  colorLevelBatches.push({
+                    id: b.id, // preserve parent batch id so we can map back
+                    quantity: Number(item.quantity) || 0,
+                    unitCost: Number(b.unitCost) || Number(b.costPerPiece) || 0,
+                    color: item.colorName || "",
+                    createdAt: b.createdAt || b.purchaseDate || null,
+                  });
+                });
+              });
+
+              // Run FIFO on color-level batches
               const { updatedBatches } = calculateFifoSale(
-                batches,
+                colorLevelBatches,
                 product.quantity,
-                product.color
+                product.color || null
               );
 
-              updatedBatches.forEach((batch) => {
-                const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`;
-                if (batch.quantity > 0) {
-                  updates[batchPath] = batch;
+              // Map updated color-level batches back to original batch objects
+              // Group updated quantities by parent batch id and color
+              const updatesByBatch = {};
+              updatedBatches.forEach((ub) => {
+                const batchId = ub.id;
+                if (!updatesByBatch[batchId]) updatesByBatch[batchId] = {};
+                // Keep the remaining quantity for this color in this batch
+                updatesByBatch[batchId][String(ub.color || "")] =
+                  Number(ub.quantity) || 0;
+              });
+
+              // For each raw batch, construct updated batch object or deletion
+              rawBatches.forEach((b) => {
+                const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${b.id}`;
+                const remainingByColor = updatesByBatch[b.id] || {};
+
+                // Build new items array preserving colors but updating quantities
+                const newItems = (b.items || []).map((item) => ({
+                  colorName: item.colorName,
+                  quantity: remainingByColor[item.colorName] ?? 0,
+                }));
+
+                // If all item quantities are zero, delete the batch
+                const totalRemaining = newItems.reduce(
+                  (s, it) => s + (Number(it.quantity) || 0),
+                  0
+                );
+
+                if (totalRemaining > 0) {
+                  updates[batchPath] = {
+                    ...b,
+                    items: newItems,
+                    updatedAt: new Date().toISOString(),
+                  };
                 } else {
-                  updates[batchPath] = null; // Deletes the batch
+                  updates[batchPath] = null;
                 }
               });
             }
@@ -505,7 +585,7 @@ export function DataProvider({ children }) {
         }
       },
     }),
-    []
+    [state.fabricBatches, state.fabrics]
   );
 
   // Supplier Operations
@@ -743,6 +823,8 @@ export function DataProvider({ children }) {
     () => ({
       // State
       ...state,
+      // Enhanced fabric data with batches
+      fabrics: fabricsWithBatches,
       // Operations
       ...customerOperations,
       ...transactionOperations,
@@ -754,6 +836,7 @@ export function DataProvider({ children }) {
     }),
     [
       state,
+      fabricsWithBatches,
       customerOperations,
       transactionOperations,
       fabricOperations,

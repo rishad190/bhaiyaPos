@@ -26,6 +26,7 @@ import {
 } from "@/lib/inventory-utils";
 import { Plus, Package, Search } from "lucide-react";
 import { ColorChipGroup } from "@/components/ui/color-chip";
+import { ColorBatchCell } from "@/components/ui/color-batch-cell";
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -52,14 +53,15 @@ export default function InventoryPage() {
   }, [fabrics]);
 
   const filteredFabrics = useMemo(() => {
-    if (!fabrics) return [];
+    if (!Array.isArray(fabrics)) return [];
 
     return fabrics.filter((fabric) => {
+      if (!fabric) return false;
       const searchString = searchTerm.toLowerCase();
       return (
-        fabric.name.toLowerCase().includes(searchString) ||
-        fabric.code.toLowerCase().includes(searchString) ||
-        fabric.category.toLowerCase().includes(searchString)
+        fabric.name?.toLowerCase().includes(searchString) ||
+        fabric.code?.toLowerCase().includes(searchString) ||
+        fabric.category?.toLowerCase().includes(searchString)
       );
     });
   }, [fabrics, searchTerm]);
@@ -225,16 +227,29 @@ export default function InventoryPage() {
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Total Stock</TableHead>
                 <TableHead>Colors Available</TableHead>
+                <TableHead>Batches</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredFabrics.map((fabric) => {
+                // Add defensive checks and ensure fabric has required structure
+                if (!fabric) return null;
+
                 const totalQty = calculateTotalQuantity(fabric);
                 const colorQuantities = getQuantityByColor(fabric);
                 const avgCost = calculateAverageCost(fabric);
                 const lowStock = isLowStock(fabric);
+
+                // Debug log to help diagnose issues
+                console.debug("Fabric data:", {
+                  id: fabric.id,
+                  name: fabric.name,
+                  totalQty,
+                  colorQuantities,
+                  batchCount: fabric.batches?.length,
+                });
 
                 return (
                   <TableRow
@@ -269,6 +284,51 @@ export default function InventoryPage() {
                       />
                     </TableCell>
                     <TableCell>
+                      {Array.isArray(fabric.batches) &&
+                      fabric.batches.length > 0 ? (
+                        <details className="group">
+                          <summary className="cursor-pointer text-sm text-primary">
+                            {fabric.batches.length} batch
+                            {fabric.batches.length > 1 ? "s" : ""}
+                          </summary>
+                          <div className="mt-2 space-y-3 p-2 border rounded-md bg-white shadow-sm">
+                            {fabric.batches.map((b) => (
+                              <div key={b.id} className="space-y-1">
+                                <div className="text-xs text-muted-foreground flex items-center justify-between">
+                                  <span className="font-medium">
+                                    {b.batchNumber || b.id}{" "}
+                                    {b.containerNo ? `• ${b.containerNo}` : ""}
+                                  </span>
+                                  <span>
+                                    ৳
+                                    {(
+                                      Number(b.costPerPiece) ||
+                                      Number(b.unitCost) ||
+                                      0
+                                    ).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <ColorBatchCell
+                                    items={b.items}
+                                    unit={fabric.unit}
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Purchased:{" "}
+                                  {b.purchaseDate || b.createdAt || "N/A"}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          No batches
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={lowStock ? "destructive" : "success"}>
                         {lowStock ? "Low Stock" : "In Stock"}
                       </Badge>
@@ -296,7 +356,7 @@ export default function InventoryPage() {
               })}
               {!filteredFabrics.length && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-4">
+                  <TableCell colSpan={7} className="text-center py-4">
                     No fabrics found
                   </TableCell>
                 </TableRow>

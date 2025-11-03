@@ -83,7 +83,7 @@ export default function CashMemoPage() {
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
     name: "",
-    quality: "",
+    quantity: "", // Changed from quality to quantity for consistency
     price: "",
     total: 0,
     cost: 0,
@@ -91,11 +91,35 @@ export default function CashMemoPage() {
     color: "",
   });
 
-  const availableColors = useMemo(
-    () =>
-      getAvailableColors(newProduct.name, fabrics || [], fabricBatches || []),
-    [newProduct.name, fabrics, fabricBatches]
-  );
+  const availableColors = useMemo(() => {
+    if (!newProduct.name || !fabrics) return [];
+
+    // Find the selected fabric
+    const selectedFabric = fabrics.find(
+      (f) =>
+        f && f.name && f.name.toLowerCase() === newProduct.name.toLowerCase()
+    );
+
+    if (!selectedFabric?.batches) return [];
+
+    // Get colors with quantities from batches
+    return selectedFabric.batches
+      .flatMap((batch) => batch.items || [])
+      .reduce((colors, item) => {
+        if (!item?.colorName || !item?.quantity) return colors;
+        const existing = colors.find((c) => c.color === item.colorName);
+        if (existing) {
+          existing.quantity += Number(item.quantity);
+        } else {
+          colors.push({
+            color: item.colorName,
+            quantity: Number(item.quantity),
+          });
+        }
+        return colors;
+      }, [])
+      .filter((c) => c.quantity > 0);
+  }, [newProduct.name, fabrics]);
 
   const originalContent = useRef(null);
 
@@ -110,8 +134,8 @@ export default function CashMemoPage() {
       return;
     }
 
-    const qualityNum = parseFloat(newProduct.quality);
-    if (isNaN(qualityNum) || qualityNum <= 0) {
+    const quantityNum = parseFloat(newProduct.quantity);
+    if (isNaN(quantityNum) || quantityNum <= 0) {
       toast({
         title: "Error",
         description: "Please enter a valid quantity",
@@ -131,11 +155,14 @@ export default function CashMemoPage() {
     }
     // --- End Validation ---
 
-    const total = qualityNum * priceNum;
+    const total = quantityNum * priceNum;
 
+    // Find fabric with batches from the new data structure
     const fabric = fabrics.find(
-      (f) => f.name.toLowerCase() === newProduct.name.toLowerCase()
+      (f) =>
+        f && f.name && f.name.toLowerCase() === newProduct.name.toLowerCase()
     );
+
     if (!fabric) {
       toast({
         title: "Error",
@@ -145,13 +172,44 @@ export default function CashMemoPage() {
       return;
     }
 
-    const batches = fabricBatches.filter((b) => b.fabricId === fabric.id);
+    // Batches are now directly in the fabric object
+    const batches = fabric.batches || [];
 
     // --- Try-catch for calculateFifoSale ---
     try {
+      // Build FIFO-compatible batch list (each batch has a top-level quantity)
+      const fifoBatches = (batches || []).map((batch) => {
+        const items = batch.items || [];
+        const qty = newProduct.color
+          ? items.reduce(
+              (s, it) => s + (it?.colorName === newProduct.color ? Number(it.quantity || 0) : 0),
+              0
+            )
+          : items.reduce((s, it) => s + (Number(it?.quantity) || 0), 0);
+
+        return {
+          id: batch.id || batch.batchNumber || batch.createdAt,
+          quantity: qty,
+          unitCost: Number(batch.unitCost || batch.costPerPiece || batch.unit_cost) || 0,
+          createdAt: batch.purchaseDate || batch.createdAt,
+        };
+      }).filter(b => Number(b.quantity) > 0);
+
+      // Total available stock for the selection
+      const availableStock = fifoBatches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+
+      if (availableStock < quantityNum) {
+        toast({
+          title: "Insufficient Stock",
+          description: `Only ${availableStock} units available${newProduct.color ? ` in ${newProduct.color}` : ""}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { totalCost } = calculateFifoSale(
-        batches,
-        qualityNum,
+        fifoBatches,
+        quantityNum,
         newProduct.color || null
       ); // Pass color, or null if not specified
       const profit = total - totalCost;
@@ -160,19 +218,21 @@ export default function CashMemoPage() {
         ...products,
         {
           name: newProduct.name.trim(),
-          quality: qualityNum, // Use parsed number
-          quantity: qualityNum, // Also provide `quantity` (expected by addTransaction / FIFO)
-          price: priceNum, // Use parsed number
+          quantity: quantityNum, // Use consistent quantity naming
+          fabricId: fabric.id,
+          price: priceNum,
           total,
           cost: totalCost,
           profit,
           color: newProduct.color,
+          unit: fabric.unit || "piece", // Include unit from fabric
         },
       ]);
 
+      // Reset form with all fields cleared
       setNewProduct({
         name: "",
-        quality: "",
+        quantity: "",
         price: "",
         total: 0,
         cost: 0,
@@ -328,7 +388,34 @@ export default function CashMemoPage() {
   };
 
   const handleSelectProduct = (fabric) => {
-    setNewProduct({ ...newProduct, name: fabric.name, color: "" }); // Reset color when product changes
+    // Get available colors with quantities
+    const availableColors = (fabric.batches || [])
+      .flatMap((batch) => batch.items || [])
+      .reduce((colors, item) => {
+        if (!item?.colorName || !item?.quantity) return colors;
+        const existing = colors.find((c) => c.color === item.colorName);
+        if (existing) {
+          existing.quantity += Number(item.quantity);
+        } else {
+          colors.push({
+            color: item.colorName,
+            quantity: Number(item.quantity),
+          });
+        }
+        return colors;
+      }, [])
+      .filter((c) => c.quantity > 0);
+
+    // Update the new product state
+    setNewProduct({
+      ...newProduct,
+      name: fabric.name,
+      color: "", // Reset color
+      fabricId: fabric.id,
+      unit: fabric.unit || "piece",
+      availableColors, // Store available colors for later use
+    });
+
     setOpenProductPopover(false);
   };
 
@@ -370,7 +457,7 @@ export default function CashMemoPage() {
         due: grandTotal - deposit,
         details: products
           .map(
-            (p) => `${formatProductWithColor(p)} (${p.quality} x ৳${p.price})`
+            (p) => `${formatProductWithColor(p)} (${p.quantity} x ৳${p.price})`
           )
           .join(", "),
         type: "SALE",
@@ -533,7 +620,7 @@ export default function CashMemoPage() {
                                 <div className="flex flex-col">
                                   <span>{customer.name}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    {customer.phone}
+                                    disabled={!newProduct.name}
                                   </span>
                                 </div>
                               </CommandItem>
@@ -649,15 +736,21 @@ export default function CashMemoPage() {
                               .includes(productSearchValue.toLowerCase())
                           )
                           .map((fabric) => {
-                            const batches = fabricBatches
-                              ? fabricBatches.filter(
-                                  (b) => b.fabricId === fabric.id
-                                )
-                              : []; // Add check for fabricBatches
-                            const totalQuantity = batches.reduce(
-                              (sum, b) => sum + (Number(b?.quantity) || 0),
+                            // Get total quantity across all batches and colors
+                            const totalQuantity = (fabric.batches || []).reduce(
+                              (sum, batch) => {
+                                if (!batch?.items) return sum;
+                                return (
+                                  sum +
+                                  batch.items.reduce(
+                                    (batchSum, item) =>
+                                      batchSum + (Number(item?.quantity) || 0),
+                                    0
+                                  )
+                                );
+                              },
                               0
-                            ); // Ensure quantity is number
+                            );
 
                             return (
                               <CommandItem
@@ -677,15 +770,46 @@ export default function CashMemoPage() {
                                       : "opacity-0"
                                   )}
                                 />
-                                <div className="flex justify-between w-full">
-                                  <span>{fabric.name}</span>
-                                  <span className="text-muted-foreground text-sm">
-                                    {typeof totalQuantity === "number"
-                                      ? totalQuantity.toFixed(2)
-                                      : "0.00"}{" "}
-                                    {fabric.unit}{" "}
-                                    {/* Ensure quantity is number before toFixed */}
-                                  </span>
+                                <div className="flex flex-col w-full">
+                                  <div className="flex justify-between w-full">
+                                    <span className="font-medium">
+                                      {fabric.name}
+                                    </span>
+                                    <span className="text-muted-foreground text-sm">
+                                      {totalQuantity.toFixed(2)} {fabric.unit}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2 mt-1">
+                                    {(fabric.batches || [])
+                                      .flatMap((batch) => batch.items || [])
+                                      .reduce((colors, item) => {
+                                        if (!item?.colorName || !item?.quantity)
+                                          return colors;
+                                        const existing = colors.find(
+                                          (c) => c.color === item.colorName
+                                        );
+                                        if (existing) {
+                                          existing.quantity += Number(
+                                            item.quantity
+                                          );
+                                        } else {
+                                          colors.push({
+                                            color: item.colorName,
+                                            quantity: Number(item.quantity),
+                                          });
+                                        }
+                                        return colors;
+                                      }, [])
+                                      .filter((c) => c.quantity > 0)
+                                      .map(({ color, quantity }) => (
+                                        <span
+                                          key={color}
+                                          className="text-xs px-2 py-0.5 rounded-full bg-muted"
+                                        >
+                                          {color} ({quantity})
+                                        </span>
+                                      ))}
+                                  </div>
                                 </div>
                               </CommandItem>
                             );
@@ -704,30 +828,24 @@ export default function CashMemoPage() {
                 onValueChange={(value) =>
                   setNewProduct({
                     ...newProduct,
-                    color: value === "Default" ? "" : value,
+                    color: value === "all" ? "" : value,
                   })
-                } // Handle 'Default' selection
-                disabled={!newProduct.name || availableColors.length === 0} // Disable if no product selected or no colors available
+                } // Handle 'All Colors' selection
+                disabled={!newProduct.name} // Only disable if no product selected
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select color" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableColors.length === 0 && newProduct.name && (
-                    <SelectItem value="" disabled>
-                      No colors available
-                    </SelectItem>
-                  )}
-                  {availableColors.map(({ color, quantity }) => (
-                    <SelectItem key={color} value={color}>
-                      {/* Ensure quantity is a number before calling toFixed */}
-                      {color} (
-                      {typeof quantity === "number"
-                        ? quantity.toFixed(2)
-                        : "N/A"}
-                      )
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Colors</SelectItem>
+                  {availableColors
+                    .filter(({ quantity }) => quantity > 0)
+                    .sort((a, b) => b.quantity - a.quantity)
+                    .map(({ color, quantity }) => (
+                      <SelectItem key={color} value={color}>
+                        {color} ({quantity.toFixed(2)} {newProduct.unit})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -738,10 +856,10 @@ export default function CashMemoPage() {
                 type="number"
                 min="0"
                 step="any"
-                placeholder="Quantity"
-                value={newProduct.quality}
+                placeholder="Enter quantity"
+                value={newProduct.quantity}
                 onChange={(e) =>
-                  setNewProduct({ ...newProduct, quality: e.target.value })
+                  setNewProduct({ ...newProduct, quantity: e.target.value })
                 }
                 required
                 className="mt-1"
@@ -799,7 +917,9 @@ export default function CashMemoPage() {
                       {formatColorDisplay(product.color)}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      {product.quality}
+                      {typeof product.quantity === "number"
+                        ? product.quantity.toFixed(2)
+                        : product.quantity}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       ৳{parseFloat(product.price).toLocaleString()}
