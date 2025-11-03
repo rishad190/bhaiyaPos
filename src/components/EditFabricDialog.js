@@ -36,7 +36,8 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
     if (!formData.name?.trim()) newErrors.name = "Name is required";
     if (!formData.category?.trim()) newErrors.category = "Category is required";
     if (!formData.unit?.trim()) newErrors.unit = "Unit is required";
-    if (formData.lowStockThreshold < 0) newErrors.lowStockThreshold = "Threshold must be positive";
+    if (formData.lowStockThreshold < 0)
+      newErrors.lowStockThreshold = "Threshold must be positive";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -59,12 +60,20 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
   };
 
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this fabric?")) {
+    if (
+      window.confirm(
+        "Are you sure you want to delete this fabric and all its associated batches? This action cannot be undone."
+      )
+    ) {
       try {
+        console.log(`[EditFabricDialog] Deleting fabric: ${fabric.id}`);
         await onDelete(fabric.id);
         setOpen(false);
       } catch (error) {
-        setErrors({ submit: error.message });
+        console.error("Error deleting fabric:", error);
+        setErrors({
+          submit: error.message || "Failed to delete fabric. Please try again.",
+        });
       }
     }
   };
@@ -137,7 +146,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Unit *</label>
-              <Select 
+              <Select
                 value={formData.unit}
                 onValueChange={(value) =>
                   setFormData({ ...formData, unit: value })
@@ -179,7 +188,10 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
               type="number"
               value={formData.lowStockThreshold}
               onChange={(e) =>
-                setFormData({ ...formData, lowStockThreshold: parseInt(e.target.value) || 0 })
+                setFormData({
+                  ...formData,
+                  lowStockThreshold: parseInt(e.target.value) || 0,
+                })
               }
               className={errors.lowStockThreshold ? "border-red-500" : ""}
               placeholder="Enter threshold"
@@ -188,7 +200,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
               <p className="text-sm text-red-500">{errors.lowStockThreshold}</p>
             )}
           </div>
-          
+
           {errors.submit && (
             <p className="text-sm text-red-500">{errors.submit}</p>
           )}
@@ -197,7 +209,11 @@ export function EditFabricDialog({ fabric, onSave, onDelete }) {
             <Button type="button" variant="destructive" onClick={handleDelete}>
               Delete
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
             <Button type="submit">Save Changes</Button>

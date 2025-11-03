@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -62,25 +62,45 @@ export default function Dashboard() {
       (acc, customer) => {
         const customerTransactions =
           transactions?.filter((t) => t.customerId === customer.id) || [];
+        const customerTotal = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.total) || 0),
+          0
+        );
+        const customerDeposit = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.deposit) || 0),
+          0
+        );
+        const customerDue = getCustomerDue(customer.id);
+
         return {
-          totalBill:
-            acc.totalBill +
-            customerTransactions.reduce((sum, t) => sum + (t.total || 0), 0),
-          totalDeposit:
-            acc.totalDeposit +
-            customerTransactions.reduce((sum, t) => sum + (t.deposit || 0), 0),
-          totalDue: acc.totalDue + getCustomerDue(customer.id),
+          totalBill: acc.totalBill + customerTotal,
+          totalDeposit: acc.totalDeposit + customerDeposit,
+          totalDue: acc.totalDue + customerDue,
         };
       },
       { totalBill: 0, totalDeposit: 0, totalDue: 0 }
     );
 
-    const recentTransactions = [...transactions]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
+    const recentTransactions = [...(transactions || [])]
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
       .slice(0, 5);
 
     const lowStockItems = fabrics
-      .filter((f) => f.totalQuantity < 10)
+      .filter((fabric) => {
+        // Calculate total quantity using inventory utilities
+        const totalQty =
+          fabric.batches?.reduce((total, batch) => {
+            return (
+              total +
+              (batch.items?.reduce(
+                (batchTotal, item) =>
+                  batchTotal + (Number(item?.quantity) || 0),
+                0
+              ) || 0)
+            );
+          }, 0) || 0;
+        return totalQty < 10; // Low stock threshold
+      })
       .slice(0, 5);
 
     return {
@@ -249,7 +269,9 @@ export default function Dashboard() {
 
         {/* Financial Summary */}
         <div>
-          <h2 className="text-2xl font-bold tracking-tight mb-4">Financial Summary</h2>
+          <h2 className="text-2xl font-bold tracking-tight mb-4">
+            Financial Summary
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-blue-100 border-none shadow-md hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
@@ -309,7 +331,10 @@ export default function Dashboard() {
 
         {/* Recent Activity and Low Stock */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <RecentTransactions transactions={stats.recentTransactions} customers={customers} />
+          <RecentTransactions
+            transactions={stats.recentTransactions}
+            customers={customers}
+          />
           <LowStockItems items={stats.lowStockItems} />
         </div>
       </div>

@@ -97,15 +97,33 @@ export default function CashBookPage() {
     initializeData();
   }, [dailyCashTransactions, toast]);
 
-  // Add debug logging
+  // Remove debug logging in production
   useEffect(() => {
-    console.log("Loading state:", loadingState);
-    console.log("Daily cash transactions:", dailyCashTransactions);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Loading state:", loadingState);
+      console.log(
+        "Daily cash transactions count:",
+        dailyCashTransactions?.length || 0
+      );
+    }
   }, [loadingState, dailyCashTransactions]);
 
-  // Memoize calculations for better performance
+  // Memoize calculations for better performance with defensive programming
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
+    if (
+      !Array.isArray(dailyCashTransactions) ||
+      dailyCashTransactions.length === 0
+    ) {
+      return {
+        dailyCash: [],
+        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+        monthlyTotals: [],
+      };
+    }
+
     const dailySummary = dailyCashTransactions.reduce((acc, item) => {
+      if (!item?.date) return acc;
+
       const date = item.date;
       if (!acc[date]) {
         acc[date] = {
@@ -117,8 +135,11 @@ export default function CashBookPage() {
         };
       }
 
-      acc[date].cashIn += item.cashIn || 0;
-      acc[date].cashOut += item.cashOut || 0;
+      const cashIn = Number(item.cashIn) || 0;
+      const cashOut = Number(item.cashOut) || 0;
+
+      acc[date].cashIn += cashIn;
+      acc[date].cashOut += cashOut;
       acc[date].balance = acc[date].cashIn - acc[date].cashOut;
       acc[date].dailyCash.push(item);
 
@@ -126,31 +147,33 @@ export default function CashBookPage() {
     }, {});
 
     const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
+      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
     );
 
     const financials = {
       totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashIn || 0),
+        (sum, t) => sum + (Number(t.cashIn) || 0),
         0
       ),
       totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashOut || 0),
+        (sum, t) => sum + (Number(t.cashOut) || 0),
         0
       ),
       availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
+        (sum, t) => sum + ((Number(t.cashIn) || 0) - (Number(t.cashOut) || 0)),
         0
       ),
     };
 
     const monthly = dailyCashTransactions.reduce((acc, transaction) => {
+      if (!transaction?.date) return acc;
+
       const month = transaction.date.substring(0, 7);
       if (!acc[month]) {
         acc[month] = { cashIn: 0, cashOut: 0 };
       }
-      acc[month].cashIn += transaction.cashIn || 0;
-      acc[month].cashOut += transaction.cashOut || 0;
+      acc[month].cashIn += Number(transaction.cashIn) || 0;
+      acc[month].cashOut += Number(transaction.cashOut) || 0;
       return acc;
     }, {});
 
@@ -168,8 +191,8 @@ export default function CashBookPage() {
   // Filter transactions based on search term, date, and active tab
   const filteredCash = useMemo(() => {
     return dailyCash
-      .map(day => {
-        const filteredTransactions = day.dailyCash.filter(t =>
+      .map((day) => {
+        const filteredTransactions = day.dailyCash.filter((t) =>
           searchTerm
             ? t.description.toLowerCase().includes(searchTerm.toLowerCase())
             : true
@@ -181,21 +204,29 @@ export default function CashBookPage() {
 
         const newDay = { ...day, dailyCash: filteredTransactions };
         // recalculate cashIn, cashOut, balance for the day
-        newDay.cashIn = filteredTransactions.reduce((sum, t) => sum + (t.cashIn || 0), 0);
-        newDay.cashOut = filteredTransactions.reduce((sum, t) => sum + (t.cashOut || 0), 0);
+        newDay.cashIn = filteredTransactions.reduce(
+          (sum, t) => sum + (t.cashIn || 0),
+          0
+        );
+        newDay.cashOut = filteredTransactions.reduce(
+          (sum, t) => sum + (t.cashOut || 0),
+          0
+        );
         newDay.balance = newDay.cashIn - newDay.cashOut;
 
         return newDay;
       })
       .filter(Boolean) // remove null days
       .filter((day) => {
-        const matchesDate = date ? (() => {
-          const dayDate = new Date(day.date);
-          const filterDate = new Date(date);
-          dayDate.setUTCHours(0, 0, 0, 0);
-          filterDate.setUTCHours(0, 0, 0, 0);
-          return dayDate.getTime() === filterDate.getTime();
-        })() : true;
+        const matchesDate = date
+          ? (() => {
+              const dayDate = new Date(day.date);
+              const filterDate = new Date(date);
+              dayDate.setUTCHours(0, 0, 0, 0);
+              filterDate.setUTCHours(0, 0, 0, 0);
+              return dayDate.getTime() === filterDate.getTime();
+            })()
+          : true;
 
         const matchesTab = (() => {
           switch (activeTab) {
@@ -309,7 +340,9 @@ export default function CashBookPage() {
       return dayDate >= start && dayDate <= end;
     });
 
-    const transactionsForPDF = filteredDailyCash.flatMap((day) => day.dailyCash);
+    const transactionsForPDF = filteredDailyCash.flatMap(
+      (day) => day.dailyCash
+    );
 
     const financialsForPDF = {
       totalCashIn: filteredDailyCash.reduce((sum, day) => sum + day.cashIn, 0),
@@ -699,7 +732,7 @@ export default function CashBookPage() {
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="date"
-                value={date || ''}
+                value={date || ""}
                 onChange={(e) => setDate(e.target.value)}
                 className="pl-9 w-full"
               />

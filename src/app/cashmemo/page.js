@@ -46,11 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { calculateFifoSale } from "@/lib/inventory-utils";
-import {
-  getAvailableColors,
-  formatColorDisplay,
-  formatProductWithColor,
-} from "@/lib/color-utils";
+import { formatColorDisplay, formatProductWithColor } from "@/lib/color-utils";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -124,11 +120,11 @@ export default function CashMemoPage() {
   const originalContent = useRef(null);
 
   const handleAddProduct = () => {
-    // --- Validation using toast ---
+    // --- Enhanced Validation with better error messages ---
     if (!newProduct.name.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter product name",
+        title: "Product Required",
+        description: "Please select a product from the inventory",
         variant: "destructive",
       });
       return;
@@ -137,8 +133,8 @@ export default function CashMemoPage() {
     const quantityNum = parseFloat(newProduct.quantity);
     if (isNaN(quantityNum) || quantityNum <= 0) {
       toast({
-        title: "Error",
-        description: "Please enter a valid quantity",
+        title: "Invalid Quantity",
+        description: "Please enter a valid quantity greater than 0",
         variant: "destructive",
       });
       return;
@@ -147,8 +143,30 @@ export default function CashMemoPage() {
     const priceNum = parseFloat(newProduct.price);
     if (isNaN(priceNum) || priceNum <= 0) {
       toast({
-        title: "Error",
-        description: "Please enter a valid price",
+        title: "Invalid Price",
+        description: "Please enter a valid price greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional validation for decimal precision
+    if (
+      quantityNum % 1 !== 0 &&
+      quantityNum.toString().split(".")[1]?.length > 3
+    ) {
+      toast({
+        title: "Invalid Quantity Format",
+        description: "Quantity can have up to 3 decimal places",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (priceNum % 1 !== 0 && priceNum.toString().split(".")[1]?.length > 2) {
+      toast({
+        title: "Invalid Price Format",
+        description: "Price can have up to 2 decimal places",
         variant: "destructive",
       });
       return;
@@ -178,34 +196,57 @@ export default function CashMemoPage() {
     // --- Try-catch for calculateFifoSale ---
     try {
       // Build FIFO-compatible batch list (each batch has a top-level quantity)
-      const fifoBatches = (batches || []).map((batch) => {
-        const items = batch.items || [];
-        const qty = newProduct.color
-          ? items.reduce(
-              (s, it) => s + (it?.colorName === newProduct.color ? Number(it.quantity || 0) : 0),
-              0
-            )
-          : items.reduce((s, it) => s + (Number(it?.quantity) || 0), 0);
+      const fifoBatches = (batches || [])
+        .map((batch) => {
+          const items = batch.items || [];
+          const qty = newProduct.color
+            ? items.reduce(
+                (s, it) =>
+                  s +
+                  (it?.colorName === newProduct.color
+                    ? Number(it.quantity || 0)
+                    : 0),
+                0
+              )
+            : items.reduce((s, it) => s + (Number(it?.quantity) || 0), 0);
 
-        return {
-          id: batch.id || batch.batchNumber || batch.createdAt,
-          quantity: qty,
-          unitCost: Number(batch.unitCost || batch.costPerPiece || batch.unit_cost) || 0,
-          createdAt: batch.purchaseDate || batch.createdAt,
-        };
-      }).filter(b => Number(b.quantity) > 0);
+          return {
+            id: batch.id || batch.batchNumber || batch.createdAt,
+            quantity: qty,
+            unitCost:
+              Number(batch.unitCost || batch.costPerPiece || batch.unit_cost) ||
+              0,
+            createdAt: batch.purchaseDate || batch.createdAt,
+            color: newProduct.color || null, // Add color property for FIFO filtering
+          };
+        })
+        .filter((b) => Number(b.quantity) > 0);
 
       // Total available stock for the selection
-      const availableStock = fifoBatches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+      const availableStock = fifoBatches.reduce(
+        (sum, b) => sum + Number(b.quantity || 0),
+        0
+      );
 
       if (availableStock < quantityNum) {
         toast({
           title: "Insufficient Stock",
-          description: `Only ${availableStock} units available${newProduct.color ? ` in ${newProduct.color}` : ""}`,
+          description: `Only ${availableStock} units available${
+            newProduct.color ? ` in ${newProduct.color}` : ""
+          }`,
           variant: "destructive",
         });
         return;
       }
+
+      // Debug log for stock validation
+      console.debug("[CashMemo] Stock validation passed:", {
+        fabricName: fabric.name,
+        productQuantity: quantityNum,
+        availableStock,
+        color: newProduct.color,
+        fifoBatches: fifoBatches,
+      });
 
       const { totalCost } = calculateFifoSale(
         fifoBatches,
@@ -426,17 +467,46 @@ export default function CashMemoPage() {
   const handleSaveMemo = async () => {
     if (products.length === 0) {
       toast({
-        title: "Error",
-        description: "Please add at least one product",
+        title: "No Products Added",
+        description: "Please add at least one product to create a memo",
         variant: "destructive",
       });
       return;
     }
 
-    if (!customerId) {
+    if (!customerId || !memoData.customerName.trim()) {
       toast({
-        title: "Error",
-        description: "Please select a valid customer",
+        title: "Customer Required",
+        description: "Please select or enter a valid customer",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!memoData.customerPhone.trim()) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter customer phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate deposit amount
+    const deposit = Number(memoData.deposit) || 0;
+    if (deposit < 0) {
+      toast({
+        title: "Invalid Deposit",
+        description: "Deposit amount cannot be negative",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (deposit > grandTotal) {
+      toast({
+        title: "Invalid Deposit",
+        description: "Deposit amount cannot exceed grand total",
         variant: "destructive",
       });
       return;
@@ -445,6 +515,85 @@ export default function CashMemoPage() {
     try {
       setIsSaving(true);
       const deposit = Number(memoData.deposit) || 0;
+
+      // Enhanced stock validation before saving with debug logging
+      let validationFailed = false;
+      let validationError = "";
+
+      for (const product of products) {
+        const fabric = fabrics.find(
+          (f) =>
+            f &&
+            (f.id === product.fabricId ||
+              f.name.toLowerCase() === product.name.toLowerCase())
+        );
+
+        if (!fabric) {
+          validationFailed = true;
+          validationError = `Fabric ${product.name} not found in inventory`;
+          break;
+        }
+
+        const batches = fabric.batches || [];
+        const fifoBatches = batches
+          .map((batch) => {
+            const items = batch.items || [];
+            const qty = product.color
+              ? items.reduce(
+                  (s, it) =>
+                    s +
+                    (it?.colorName === product.color
+                      ? Number(it.quantity || 0)
+                      : 0),
+                  0
+                )
+              : items.reduce((s, it) => s + (Number(it?.quantity) || 0), 0);
+
+            return {
+              id: batch.id || batch.batchNumber || batch.createdAt,
+              quantity: qty,
+              unitCost:
+                Number(
+                  batch.unitCost || batch.costPerPiece || batch.unit_cost
+                ) || 0,
+              createdAt: batch.purchaseDate || batch.createdAt,
+              color: product.color || null,
+            };
+          })
+          .filter((b) => Number(b.quantity) > 0);
+
+        const availableStock = fifoBatches.reduce(
+          (sum, b) => sum + Number(b.quantity || 0),
+          0
+        );
+
+        if (availableStock < product.quantity) {
+          validationFailed = true;
+          validationError = `Only ${availableStock} units available for ${
+            product.name
+          }${product.color ? ` in ${product.color}` : ""}`;
+          break;
+        }
+
+        // Debug log for save-time validation
+        console.debug("[CashMemo] Save-time stock validation:", {
+          fabricName: fabric.name,
+          productQuantity: product.quantity,
+          availableStock,
+          color: product.color,
+          fifoBatchesCount: fifoBatches.length,
+        });
+      }
+
+      if (validationFailed) {
+        toast({
+          title: "Stock Validation Failed",
+          description: validationError,
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
 
       // Create transaction for customer
       const transaction = {
@@ -470,6 +619,8 @@ export default function CashMemoPage() {
       if (process.env.NODE_ENV !== "production") {
         try {
           console.debug("[CashMemo] transaction payload:", transaction);
+          console.debug("[CashMemo] Current fabrics data:", fabrics);
+          console.debug("[CashMemo] Products to save:", products);
         } catch (e) {
           /* ignore logging errors */
         }
@@ -528,6 +679,14 @@ export default function CashMemoPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       <Toaster />
+      {isSaving && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg border flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <span className="text-sm font-medium">Saving memo...</span>
+          </div>
+        </div>
+      )}
       <Card className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
@@ -620,7 +779,7 @@ export default function CashMemoPage() {
                                 <div className="flex flex-col">
                                   <span>{customer.name}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    disabled={!newProduct.name}
+                                    {customer.phone}
                                   </span>
                                 </div>
                               </CommandItem>
@@ -882,7 +1041,13 @@ export default function CashMemoPage() {
               />
             </div>
             {/* Add Button */}
-            <Button onClick={handleAddProduct} className="w-full md:w-auto">
+            <Button
+              onClick={handleAddProduct}
+              className="w-full md:w-auto"
+              disabled={
+                !newProduct.name || !newProduct.quantity || !newProduct.price
+              }
+            >
               Add
             </Button>
           </div>
@@ -1022,8 +1187,7 @@ export default function CashMemoPage() {
             </>
           ) : isSaving ? (
             <>
-              <span className="mr-2 h-4 w-4 animate-spin">⏳</span>{" "}
-              {/* Using emoji for spinner */}
+              <div className="mr-2 h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
               Saving...
             </>
           ) : (

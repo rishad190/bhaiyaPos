@@ -354,11 +354,28 @@ export function DataProvider({ children }) {
                 });
               });
 
-              // Run FIFO on color-level batches
+              // Run FIFO on color-level batches with debug logging
+              console.debug("[data-context] FIFO Input:", {
+                fabricId: fabric.id,
+                fabricName: fabric.name,
+                productQuantity: product.quantity,
+                productColor: product.color,
+                colorLevelBatches: colorLevelBatches,
+                totalAvailable: colorLevelBatches.reduce(
+                  (sum, b) => sum + Number(b.quantity || 0),
+                  0
+                ),
+              });
+
               const { updatedBatches } = calculateFifoSale(
                 colorLevelBatches,
                 product.quantity,
                 product.color || null
+              );
+
+              console.debug(
+                "[data-context] FIFO Output - Updated batches:",
+                updatedBatches
               );
 
               // Map updated color-level batches back to original batch objects
@@ -378,9 +395,14 @@ export function DataProvider({ children }) {
                 const remainingByColor = updatesByBatch[b.id] || {};
 
                 // Build new items array preserving colors but updating quantities
+                // IMPORTANT: Only update quantities for colors that were in the FIFO calculation
+                // For colors not in remainingByColor, keep the original quantity
                 const newItems = (b.items || []).map((item) => ({
                   colorName: item.colorName,
-                  quantity: remainingByColor[item.colorName] ?? 0,
+                  quantity:
+                    remainingByColor[item.colorName] !== undefined
+                      ? remainingByColor[item.colorName]
+                      : Number(item.quantity) || 0,
                 }));
 
                 // If all item quantities are zero, delete the batch
@@ -410,6 +432,19 @@ export function DataProvider({ children }) {
               "[data-context] constructed updates keys:",
               Object.keys(updates)
             );
+
+            // Debug inventory updates
+            const inventoryUpdates = Object.entries(updates).filter(([key]) =>
+              key.includes(COLLECTION_REFS.FABRIC_BATCHES)
+            );
+            if (inventoryUpdates.length > 0) {
+              console.debug(
+                "[data-context] Inventory batch updates:",
+                inventoryUpdates
+              );
+            } else {
+              console.warn("[data-context] No inventory batch updates found!");
+            }
           } catch (e) {
             /* ignore logging errors */
           }
@@ -501,18 +536,33 @@ export function DataProvider({ children }) {
 
       deleteFabric: async (fabricId) => {
         try {
+          console.log(`[data-context] Deleting fabric: ${fabricId}`);
+
           // First delete all batches associated with this fabric
           const fabricBatches = state.fabricBatches.filter(
-            (batch) => batch.fabricId === fabricId
+            (batch) => batch && batch.fabricId === fabricId
           );
+
+          console.log(
+            `[data-context] Found ${fabricBatches.length} batches to delete`
+          );
+
           for (const batch of fabricBatches) {
-            await remove(
-              ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
-            );
+            if (batch && batch.id) {
+              console.log(`[data-context] Deleting batch: ${batch.id}`);
+              await remove(
+                ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
+              );
+            }
           }
 
           // Then delete the fabric
+          console.log(
+            `[data-context] Deleting fabric from: ${COLLECTION_REFS.FABRICS}/${fabricId}`
+          );
           await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+
+          console.log(`[data-context] Fabric ${fabricId} deleted successfully`);
         } catch (error) {
           console.error("Error deleting fabric:", error);
           throw error;
@@ -566,6 +616,10 @@ export function DataProvider({ children }) {
 
       deleteFabricBatch: async (batchId) => {
         try {
+          if (!batchId) {
+            throw new Error("Batch ID is required");
+          }
+
           // Get the batch data first to update fabric totals
           const batchRef = ref(
             db,
@@ -574,7 +628,10 @@ export function DataProvider({ children }) {
           const batchSnapshot = await get(batchRef);
 
           if (!batchSnapshot.exists()) {
-            throw new Error("Batch not found");
+            console.warn(
+              `Batch with ID ${batchId} not found, it may have been already deleted`
+            );
+            return; // Return gracefully if batch doesn't exist
           }
 
           // Delete the batch

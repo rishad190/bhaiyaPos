@@ -14,7 +14,7 @@ import {
 import { AddFabricDialog } from "@/components/AddFabricDialog";
 import { PurchaseStockDialog } from "@/components/PurchaseStockDialog";
 import { EditFabricDialog } from "@/components/EditFabricDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,6 @@ import {
   calculateTotalQuantity,
   getQuantityByColor,
   isLowStock,
-  calculateAverageCost,
 } from "@/lib/inventory-utils";
 import { Plus, Package, Search } from "lucide-react";
 import { ColorChipGroup } from "@/components/ui/color-chip";
@@ -162,7 +161,16 @@ export default function InventoryPage() {
   // We'll use the imported getQuantityByColor function instead
 
   if (loadingState.initial) {
-    return <div>Loading...</div>;
+    return (
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading inventory...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -182,8 +190,12 @@ export default function InventoryPage() {
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
               disabled={loadingState.actions}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Fabric
+              {loadingState.actions ? (
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              {loadingState.actions ? "Adding..." : "Add Fabric"}
             </Button>
           </AddFabricDialog>
           <PurchaseStockDialog
@@ -196,8 +208,12 @@ export default function InventoryPage() {
               variant="outline"
               disabled={loadingState.actions}
             >
-              <Package className="mr-2 h-4 w-4" />
-              Purchase Stock
+              {loadingState.actions ? (
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-primary border-t-transparent rounded-full"></div>
+              ) : (
+                <Package className="mr-2 h-4 w-4" />
+              )}
+              {loadingState.actions ? "Processing..." : "Purchase Stock"}
             </Button>
           </PurchaseStockDialog>
         </div>
@@ -239,17 +255,7 @@ export default function InventoryPage() {
 
                 const totalQty = calculateTotalQuantity(fabric);
                 const colorQuantities = getQuantityByColor(fabric);
-                const avgCost = calculateAverageCost(fabric);
                 const lowStock = isLowStock(fabric);
-
-                // Debug log to help diagnose issues
-                console.debug("Fabric data:", {
-                  id: fabric.id,
-                  name: fabric.name,
-                  totalQty,
-                  colorQuantities,
-                  batchCount: fabric.batches?.length,
-                });
 
                 return (
                   <TableRow

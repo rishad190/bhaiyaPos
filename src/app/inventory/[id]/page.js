@@ -402,6 +402,7 @@ export default function FabricViewPage() {
 
     setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
+      console.log(`[FabricViewPage] Deleting fabric: ${id}`);
       await deleteFabric(id);
       toast({
         title: "Success",
@@ -412,7 +413,8 @@ export default function FabricViewPage() {
       console.error("Error deleting fabric:", error);
       toast({
         title: "Error",
-        description: "Failed to delete fabric. Please try again.",
+        description:
+          error.message || "Failed to delete fabric. Please try again.",
         variant: "destructive",
       });
       setLoadingState((prev) => ({ ...prev, actions: false }));
