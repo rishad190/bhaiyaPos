@@ -576,7 +576,7 @@ export function DataProvider({ children }) {
           debounceTimers[path] = setTimeout(() => {
             if (snapshot.exists()) {
               const rawData = snapshot.val();
-              console.log(`[DataContext] Raw data for ${path}:`, rawData);
+              // Removed raw data logging for cleaner console
               setter(rawData);
             } else {
               console.log(`[DataContext] No data found for ${path}`);
