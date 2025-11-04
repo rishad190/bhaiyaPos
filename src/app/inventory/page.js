@@ -267,7 +267,8 @@ export default function InventoryPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from firing
                             console.log("Edit button clicked");
                             handleEditClick(fabric);
                           }}
@@ -277,7 +278,8 @@ export default function InventoryPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from firing
                             console.log("Delete button clicked");
                             handleDeleteClick(fabric.id);
                           }}
