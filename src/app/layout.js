@@ -1,9 +1,9 @@
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { ClientLayout } from "@/components/ClientLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Navbar } from "@/components/Navbar"; // Add this import
-import { Toaster } from "@/components/ui/toaster";
+import ClientRoot from "@/components/ClientRoot";
+import { Suspense } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import GlobalErrorFallback from "@/components/GlobalErrorFallback";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -29,15 +29,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={geist.className}>
       <body>
-        <ClientLayout>
-          <ProtectedRoute>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1">{children}</main>
-            </div>
-          </ProtectedRoute>
-        </ClientLayout>
-        <Toaster />
+        <ErrorBoundary
+          fallback={GlobalErrorFallback}
+          showDetails={process.env.NODE_ENV !== "production"}
+        >
+          <Suspense fallback={<div>Loading...</div>}>
+            <ClientRoot>{children}</ClientRoot>
+          </Suspense>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -32,14 +32,22 @@ import {
   RefreshCw,
   Download,
   FileText,
+  PencilIcon,
+  TrashIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/lib/utils";
+import { exportToCSV, exportToPDF, exportCashbookToPDF } from "@/utils/export";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Pagination } from "@/components/Pagination";
 
 export default function CashBookPage() {
   const {
@@ -50,10 +58,15 @@ export default function CashBookPage() {
   } = useData();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState(() => {
+  const [date, setDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
+
+  // State for PDF export date range
+  const [pdfStartDate, setPdfStartDate] = useState(date);
+  const [pdfEndDate, setPdfEndDate] = useState(date);
+
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [loadingState, setLoadingState] = useState({
     initial: true,
@@ -61,6 +74,8 @@ export default function CashBookPage() {
     actions: false,
   });
   const [activeTab, setActiveTab] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Add useEffect to handle initial loading state
   useEffect(() => {
@@ -84,15 +99,33 @@ export default function CashBookPage() {
     initializeData();
   }, [dailyCashTransactions, toast]);
 
-  // Add debug logging
+  // Remove debug logging in production
   useEffect(() => {
-    console.log("Loading state:", loadingState);
-    console.log("Daily cash transactions:", dailyCashTransactions);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Loading state:", loadingState);
+      console.log(
+        "Daily cash transactions count:",
+        dailyCashTransactions?.length || 0
+      );
+    }
   }, [loadingState, dailyCashTransactions]);
 
-  // Memoize calculations for better performance
+  // Memoize calculations for better performance with defensive programming
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
+    if (
+      !Array.isArray(dailyCashTransactions) ||
+      dailyCashTransactions.length === 0
+    ) {
+      return {
+        dailyCash: [],
+        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
+        monthlyTotals: [],
+      };
+    }
+
     const dailySummary = dailyCashTransactions.reduce((acc, item) => {
+      if (!item?.date) return acc;
+
       const date = item.date;
       if (!acc[date]) {
         acc[date] = {
@@ -104,8 +137,11 @@ export default function CashBookPage() {
         };
       }
 
-      acc[date].cashIn += item.cashIn || 0;
-      acc[date].cashOut += item.cashOut || 0;
+      const cashIn = Number(item.cashIn) || 0;
+      const cashOut = Number(item.cashOut) || 0;
+
+      acc[date].cashIn += cashIn;
+      acc[date].cashOut += cashOut;
       acc[date].balance = acc[date].cashIn - acc[date].cashOut;
       acc[date].dailyCash.push(item);
 
@@ -113,31 +149,33 @@ export default function CashBookPage() {
     }, {});
 
     const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
+      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
     );
 
     const financials = {
       totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashIn || 0),
+        (sum, t) => sum + (Number(t.cashIn) || 0),
         0
       ),
       totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (t.cashOut || 0),
+        (sum, t) => sum + (Number(t.cashOut) || 0),
         0
       ),
       availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((t.cashIn || 0) - (t.cashOut || 0)),
+        (sum, t) => sum + ((Number(t.cashIn) || 0) - (Number(t.cashOut) || 0)),
         0
       ),
     };
 
     const monthly = dailyCashTransactions.reduce((acc, transaction) => {
+      if (!transaction?.date) return acc;
+
       const month = transaction.date.substring(0, 7);
       if (!acc[month]) {
         acc[month] = { cashIn: 0, cashOut: 0 };
       }
-      acc[month].cashIn += transaction.cashIn || 0;
-      acc[month].cashOut += transaction.cashOut || 0;
+      acc[month].cashIn += Number(transaction.cashIn) || 0;
+      acc[month].cashOut += Number(transaction.cashOut) || 0;
       return acc;
     }, {});
 
@@ -152,31 +190,53 @@ export default function CashBookPage() {
     return { dailyCash, financials, monthlyTotals };
   }, [dailyCashTransactions]);
 
-  // Filter transactions based on search term, date, and active tab
-  const filteredCash = useMemo(() => {
-    return dailyCash.filter((day) => {
-      const matchesSearch = searchTerm
-        ? day.dailyCash.some((t) =>
-            t.description.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        : true;
+  const { groupedEntries, sortedDates } = useMemo(() => {
+    if (!Array.isArray(dailyCashTransactions)) {
+      return { groupedEntries: {}, sortedDates: [] };
+    }
 
-      const matchesDate = dateFilter ? day.date === dateFilter : true;
+    let filteredTransactions = dailyCashTransactions;
 
-      const matchesTab = (() => {
-        switch (activeTab) {
-          case "in":
-            return day.cashIn > 0;
-          case "out":
-            return day.cashOut > 0;
-          default:
-            return true;
-        }
-      })();
+    if (date) {
+      filteredTransactions = filteredTransactions.filter(
+        (transaction) => transaction.date === date
+      );
+    }
 
-      return matchesSearch && matchesDate && matchesTab;
-    });
-  }, [dailyCash, searchTerm, dateFilter, activeTab]);
+    if (searchTerm) {
+      filteredTransactions = filteredTransactions.filter((transaction) =>
+        transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    const grouped = filteredTransactions.reduce((acc, entry) => {
+      const entryDate = entry.date;
+      if (!acc[entryDate]) {
+        acc[entryDate] = { income: [], expense: [] };
+      }
+      if (entry.cashIn > 0) {
+        acc[entryDate].income.push({ ...entry, amount: entry.cashIn });
+      }
+      if (entry.cashOut > 0) {
+        acc[entryDate].expense.push({ ...entry, amount: entry.cashOut });
+      }
+      return acc;
+    }, {});
+
+    const sorted = Object.keys(grouped).sort(
+      (a, b) => new Date(b) - new Date(a)
+    );
+
+    return { groupedEntries: grouped, sortedDates: sorted };
+  }, [dailyCashTransactions, date, searchTerm]);
+
+  const handleEditClick = (entry) => {
+    setEditingTransaction(entry);
+  };
+
+  const handleDeleteClick = (id) => {
+    handleDeleteTransaction(id);
+  };
 
   const handleAddTransaction = async (transaction) => {
     setLoadingState((prev) => ({ ...prev, actions: true }));
@@ -242,6 +302,10 @@ export default function CashBookPage() {
     }
   };
 
+  const handleClearFilter = () => {
+    setDate(null);
+  };
+
   const handleExportCSV = () => {
     const data = dailyCashTransactions.map((t) => ({
       Date: formatDate(t.date),
@@ -254,13 +318,41 @@ export default function CashBookPage() {
   };
 
   const handleExportPDF = () => {
+    const start = new Date(pdfStartDate);
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(pdfEndDate);
+    end.setUTCHours(0, 0, 0, 0);
+
+    const filteredDailyCash = dailyCash.filter((day) => {
+      const dayDate = new Date(day.date);
+      dayDate.setUTCHours(0, 0, 0, 0);
+      return dayDate >= start && dayDate <= end;
+    });
+
+    const transactionsForPDF = filteredDailyCash.flatMap(
+      (day) => day.dailyCash
+    );
+
+    const financialsForPDF = {
+      totalCashIn: filteredDailyCash.reduce((sum, day) => sum + day.cashIn, 0),
+      totalCashOut: filteredDailyCash.reduce(
+        (sum, day) => sum + day.cashOut,
+        0
+      ),
+      availableCash: filteredDailyCash.reduce(
+        (sum, day) => sum + day.balance,
+        0
+      ),
+    };
+
     const data = {
       title: "Cash Book Report",
       date: new Date().toLocaleDateString(),
-      transactions: dailyCashTransactions,
-      summary: financials,
-      dailyCash: dailyCash, // Include daily cash calculations
-      selectedDate: dateFilter || null, // Include selected date filter
+      transactions: transactionsForPDF,
+      summary: financialsForPDF,
+      dailyCash: filteredDailyCash,
+      startDate: pdfStartDate,
+      endDate: pdfEndDate,
     };
     exportCashbookToPDF(data);
   };
@@ -410,17 +502,55 @@ export default function CashBookPage() {
               Add Transaction
             </Button>
           </AddCashTransactionDialog>
-          <Button
-            onClick={handleExportPDF}
-            className="w-full md:w-auto"
-            variant="outline"
-            disabled={loadingState.actions}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            {dateFilter
-              ? `Export PDF (${formatDate(dateFilter)})`
-              : "Export PDF"}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                className="w-full md:w-auto"
+                variant="outline"
+                disabled={loadingState.actions}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {pdfStartDate && pdfEndDate
+                  ? `Export PDF (${formatDate(pdfStartDate)} - ${formatDate(
+                      pdfEndDate
+                    )})`
+                  : "Export PDF"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4">
+              <div className="space-y-4">
+                <h4 className="font-medium leading-none">Export PDF</h4>
+                <p className="text-sm text-muted-foreground">
+                  Select a date range for the PDF report.
+                </p>
+                <div className="grid gap-2">
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label htmlFor="pdf-start-date">Start Date</label>
+                    <Input
+                      id="pdf-start-date"
+                      type="date"
+                      value={pdfStartDate}
+                      onChange={(e) => setPdfStartDate(e.target.value)}
+                      className="col-span-2 h-8"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label htmlFor="pdf-end-date">End Date</label>
+                    <Input
+                      id="pdf-end-date"
+                      type="date"
+                      value={pdfEndDate}
+                      onChange={(e) => setPdfEndDate(e.target.value)}
+                      className="col-span-2 h-8"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleExportPDF} className="w-full">
+                  Export
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             onClick={handleExportCSV}
             className="w-full md:w-auto"
@@ -447,7 +577,7 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
-                ৳{financials.totalCashIn.toLocaleString()}
+                ৳{financials.totalCashIn}
               </p>
               <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
                 All time income
@@ -468,7 +598,7 @@ export default function CashBookPage() {
             </div>
             <div className="p-4">
               <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
-                ৳{financials.totalCashOut.toLocaleString()}
+                ৳{financials.totalCashOut}
               </p>
               <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
                 All time expenses
@@ -513,7 +643,7 @@ export default function CashBookPage() {
                     : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                ৳{financials.availableCash.toLocaleString()}
+                ৳{financials.availableCash}
               </p>
               <p
                 className={`text-xs ${
@@ -553,10 +683,10 @@ export default function CashBookPage() {
                       })}
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                      ৳{cashIn.toLocaleString()}
+                      {cashIn}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                      ৳{cashOut.toLocaleString()}
+                      {cashOut}
                     </TableCell>
                     <TableCell
                       className={`text-right font-medium ${
@@ -587,28 +717,19 @@ export default function CashBookPage() {
                 className="pl-9 w-full"
               />
             </div>
-            <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="pl-9 w-full md:w-[200px]"
-                />
-              </div>
-              {dateFilter && (
-                <Button
-                  variant="outline"
-                  onClick={() => setDateFilter("")}
-                  className="w-full md:w-auto"
-                  size="icon"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Clear Date</span>
-                </Button>
-              )}
+            <div className="relative flex-1">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={date || ""}
+                onChange={(e) => setDate(e.target.value)}
+                className="pl-9 w-full"
+              />
             </div>
+            <Button variant="ghost" onClick={handleClearFilter}>
+              <X className="mr-2 h-4 w-4" />
+              Clear Filter
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -624,303 +745,163 @@ export default function CashBookPage() {
 
       {/* Transactions Table */}
       <Card className="border-none shadow-md">
-        <CardContent className="p-6">
-          {loadingState.transactions ? (
-            <TableSkeleton />
-          ) : (
-            <div className="space-y-4">
-              {/* Mobile View */}
-              <div className="block md:hidden">
-                {filteredCash.map((day) => (
+        <CardContent>
+          <div className="space-y-4">
+            {sortedDates.length > 0 ? (
+              sortedDates.map((date) => {
+                const { income, expense } = groupedEntries[date];
+                const dailyIncome = income.reduce(
+                  (sum, i) => sum + i.amount,
+                  0
+                );
+                const dailyExpense = expense.reduce(
+                  (sum, e) => sum + e.amount,
+                  0
+                );
+
+                return (
                   <div
-                    key={day.date}
-                    className="bg-white rounded-lg shadow mb-4"
+                    key={date}
+                    className="border rounded-lg overflow-hidden shadow-sm"
                   >
-                    {/* Summary Card */}
-                    <div className="grid grid-cols-2 gap-2 p-4 border-b">
-                      <div>
-                        <div className="text-sm text-gray-500">Date</div>
-                        <div className="font-medium">
-                          {formatDate(day.date)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Balance</div>
-                        <div className="font-medium">
-                          ৳{day.balance.toLocaleString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Cash In</div>
-                        <div className="text-green-600">
-                          ৳{day.cashIn.toLocaleString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Cash Out</div>
-                        <div className="text-red-600">
-                          ৳{day.cashOut.toLocaleString()}
-                        </div>
-                      </div>
+                    <div className="bg-muted/50 px-4 py-2 border-b">
+                      <h3 className="font-semibold text-lg">
+                        {new Date(date + "T00:00:00").toLocaleDateString(
+                          "en-US",
+                          {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          }
+                        )}
+                      </h3>
                     </div>
-
-                    {/* Mobile View - Transactions List */}
-                    <div className="divide-y divide-gray-100">
-                      {day.dailyCash
-                        .filter((t) => t.cashIn > 0)
-                        .map((t) => (
-                          <div
-                            key={`in-${t.id}`}
-                            className="flex flex-col gap-2 py-2 px-4"
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium">
-                                {t.description}
-                              </span>
-                              <div className="flex gap-2 text-sm">
-                                <span className="text-green-600">
-                                  ৳+{t.cashIn.toLocaleString()}
-                                </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2">
+                      <div className="p-4 md:border-r">
+                        <h4 className="font-medium mb-2 text-green-600">
+                          INCOME
+                        </h4>
+                        <div className="space-y-2 min-h-[50px]">
+                          {income.length > 0 ? (
+                            income.map((entry) => (
+                              <div
+                                key={entry.id}
+                                className="flex justify-between items-center text-sm group"
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    {entry.description}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {entry.category}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">
+                                    ৳{entry.amount.toFixed(2)}
+                                  </span>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => handleEditClick(entry)}
+                                    >
+                                      <PencilIcon className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-destructive"
+                                      onClick={() =>
+                                        handleDeleteClick(entry.id)
+                                      }
+                                    >
+                                      <TrashIcon className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTransaction(t);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-500"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteTransaction(t.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        ))}
-
-                      {day.dailyCash
-                        .filter((t) => t.cashOut > 0)
-                        .map((t) => (
-                          <div
-                            key={`out-${t.id}`}
-                            className="flex flex-col gap-2 py-2 px-4"
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-medium">
-                                {t.description}
-                              </span>
-                              <div className="flex gap-2 text-sm">
-                                <span className="text-red-600">
-                                  ৳-{t.cashOut.toLocaleString()}
-                                </span>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              No income.
+                            </p>
+                          )}
+                        </div>
+                        <div className="border-t mt-2 pt-2 flex justify-between font-bold text-green-600">
+                          <span>Daily Total</span>
+                          <span>৳{dailyIncome.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h4 className="font-medium mb-2 text-destructive">
+                          EXPENSE
+                        </h4>
+                        <div className="space-y-2 min-h-[50px]">
+                          {expense.length > 0 ? (
+                            expense.map((entry) => (
+                              <div
+                                key={entry.id}
+                                className="flex justify-between items-center text-sm group"
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    {entry.description}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {entry.category}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">
+                                    ৳{entry.amount.toFixed(2)}
+                                  </span>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => handleEditClick(entry)}
+                                    >
+                                      <PencilIcon className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-destructive"
+                                      onClick={() =>
+                                        handleDeleteClick(entry.id)
+                                      }
+                                    >
+                                      <TrashIcon className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTransaction(t);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-500"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteTransaction(t.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        ))}
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              No expenses.
+                            </p>
+                          )}
+                        </div>
+                        <div className="border-t mt-2 pt-2 flex justify-between font-bold text-destructive">
+                          <span>Daily Total</span>
+                          <span>৳{dailyExpense.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))}
+                );
+              })
+            ) : (
+              <div className="text-center py-16 text-muted-foreground">
+                No entries found matching your filters.
               </div>
-
-              {/* Desktop View */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">
-                        Date
-                      </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
-                        Cash In
-                      </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
-                        Cash Out
-                      </TableHead>
-                      <TableHead className="text-right whitespace-nowrap min-w-[100px]">
-                        Balance
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[200px]">
-                        Details
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCash.map((day) => (
-                      <TableRow key={day.date} className="border-b">
-                        <TableCell className="whitespace-nowrap font-medium">
-                          {formatDate(day.date)}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap text-green-600">
-                          ৳{day.cashIn.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap text-red-600">
-                          ৳{day.cashOut.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap font-medium">
-                          ৳{day.balance.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
-                            {day.dailyCash
-                              .filter((t) => t.cashIn > 0)
-                              .map((t) => (
-                                <div
-                                  key={`in-${t.id}`}
-                                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
-                                    >
-                                      In
-                                    </Badge>
-                                    <span className="font-medium">
-                                      {t.description}
-                                    </span>
-                                    <span className="text-green-600 dark:text-green-400 text-sm font-medium">
-                                      ৳{t.cashIn.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                      >
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingTransaction(t);
-                                        }}
-                                      >
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-red-500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteTransaction(t.id);
-                                        }}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              ))}
-
-                            {day.dailyCash
-                              .filter((t) => t.cashOut > 0)
-                              .map((t) => (
-                                <div
-                                  key={`out-${t.id}`}
-                                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
-                                    >
-                                      Out
-                                    </Badge>
-                                    <span className="font-medium">
-                                      {t.description}
-                                    </span>
-                                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">
-                                      ৳{t.cashOut.toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
-                                      >
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingTransaction(t);
-                                        }}
-                                      >
-                                        Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        className="text-red-500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteTransaction(t.id);
-                                        }}
-                                      >
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 

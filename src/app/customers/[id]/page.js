@@ -40,12 +40,20 @@ import {
   CreditCard,
   FileText,
   MoreVertical,
+  ArrowUpDown,
+  Plus,
 } from "lucide-react";
-import { formatDate, exportToCSV } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { exportToCSV, exportToPDF } from "@/utils/export";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
-
-import { exportToPDF } from "@/utils/export";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CustomerDetail() {
   const params = useParams();
@@ -57,7 +65,6 @@ export default function CustomerDetail() {
     addTransaction,
     deleteTransaction,
     updateTransaction,
-    getCustomerDue,
   } = useData();
 
   const [loadingState, setLoadingState] = useState({
@@ -68,24 +75,35 @@ export default function CustomerDetail() {
   const [storeFilter, setStoreFilter] = useState(
     TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL
   );
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'asc' });
 
   const customer = customers?.find((c) => c.id === params.id);
 
-  const customerTransactionsWithBalance = useMemo(() => {
+  const sortedTransactions = useMemo(() => {
     if (!transactions) return [];
+    let sortableItems = [...transactions.filter(t => t.customerId === params.id)];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [transactions, params.id, sortConfig]);
 
-    return transactions
-      .filter((t) => t.customerId === params.id)
+  const customerTransactionsWithBalance = useMemo(() => {
+    return sortedTransactions
       .filter(
         (t) =>
           storeFilter === TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL ||
           t.storeId === storeFilter
       )
-      .sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateA - dateB; // Sort by date ascending (oldest to newest)
-      })
       .reduce((acc, transaction) => {
         const previousBalance =
           acc.length > 0 ? acc[acc.length - 1].cumulativeBalance : 0;
@@ -97,7 +115,7 @@ export default function CustomerDetail() {
           },
         ];
       }, []);
-  }, [transactions, params.id, storeFilter]);
+  }, [sortedTransactions, storeFilter]);
 
   useEffect(() => {
     if (customer && transactions) {
@@ -120,6 +138,7 @@ export default function CustomerDetail() {
         title: "Success",
         description: "Transaction added successfully",
       });
+      setIsAddingTransaction(false);
     } catch (error) {
       console.error(ERROR_MESSAGES.ADD_ERROR, error);
       toast({
@@ -157,31 +176,7 @@ export default function CustomerDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
-
-      if (!transactionId) {
-        throw new Error("Transaction ID is required");
-      }
-
-      const trimmedMemo = updatedData.memoNumber?.trim();
-      const totalAmount = parseFloat(updatedData.total);
-      const depositAmount = parseFloat(updatedData.deposit);
-
-      if (isNaN(totalAmount) || isNaN(depositAmount)) {
-        throw new Error("Invalid amount values");
-      }
-
-      const processedData = {
-        ...updatedData,
-        memoNumber: trimmedMemo,
-        total: totalAmount,
-        deposit: depositAmount,
-        due: totalAmount - depositAmount,
-        customerId: params.id,
-        id: transactionId,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await updateTransaction(transactionId, processedData);
+      await updateTransaction(transactionId, { ...updatedData, customerId: params.id });
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -200,22 +195,24 @@ export default function CustomerDetail() {
 
   const handleExportCSV = () => {
     const data = customerTransactionsWithBalance.map((t) => ({
-      Date: new Date(t.date)
-        .toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        })
-        .replace(/\//g, "-"),
+      Date: formatDate(t.date),
       Memo: t.memoNumber,
       Details: t.details,
-      Total: `${t.total.toLocaleString()}`,
-      Deposit: `${t.deposit.toLocaleString()}`,
-      Due: `${t.due.toLocaleString()}`,
-      Balance: `${t.cumulativeBalance.toLocaleString()}`,
+      Total: t.total.toLocaleString(),
+      Deposit: t.deposit.toLocaleString(),
+      Due: t.due.toLocaleString(),
+      Balance: t.cumulativeBalance.toLocaleString(),
       Store: t.storeId,
     }));
     exportToCSV(data, `${customer?.name}-transactions-${params.id}.csv`);
+  };
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
 
   if (loadingState.initial) {
@@ -332,13 +329,11 @@ export default function CustomerDetail() {
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-blue-50 border-none shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-blue-600">
-                        Total Bill
-                      </span>
-                      <DollarSign className="h-4 w-4 text-blue-600" />
-                    </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-blue-600">Total Bill</CardTitle>
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
                     <div className="text-2xl font-bold text-blue-700">
                       ৳
                       {customerTransactionsWithBalance
@@ -349,13 +344,11 @@ export default function CustomerDetail() {
                 </Card>
 
                 <Card className="bg-green-50 border-none shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-green-600">
-                        Total Deposit
-                      </span>
-                      <CreditCard className="h-4 w-4 text-green-600" />
-                    </div>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-green-600">Total Deposit</CardTitle>
+                    <CreditCard className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
                     <div className="text-2xl font-bold text-green-700">
                       ৳
                       {customerTransactionsWithBalance
@@ -366,30 +359,13 @@ export default function CustomerDetail() {
                 </Card>
 
                 <Card
-                  className={`${
-                    totalDue > 0 ? "bg-red-50" : "bg-green-50"
-                  } border-none shadow-sm`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span
-                        className={`text-sm font-medium ${
-                          totalDue > 0 ? "text-red-600" : "text-green-600"
-                        }`}
-                      >
-                        Total Due
-                      </span>
-                      <FileText
-                        className={`h-4 w-4 ${
-                          totalDue > 0 ? "text-red-600" : "text-green-600"
-                        }`}
-                      />
-                    </div>
-                    <div
-                      className={`text-2xl font-bold ${
-                        totalDue > 0 ? "text-red-700" : "text-green-700"
-                      }`}
-                    >
+                  className={`border-none shadow-sm ${totalDue > 0 ? "bg-red-50" : "bg-green-50"}`}>
+                  <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2`}>
+                    <CardTitle className={`text-sm font-medium ${totalDue > 0 ? "text-red-600" : "text-green-600"}`}>Total Due</CardTitle>
+                    <FileText className={`h-4 w-4 ${totalDue > 0 ? "text-red-600" : "text-green-600"}`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${totalDue > 0 ? "text-red-700" : "text-green-700"}`}>
                       ৳{totalDue.toLocaleString()}
                     </div>
                   </CardContent>
@@ -397,21 +373,16 @@ export default function CustomerDetail() {
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t">
-                <select
-                  className="w-full sm:w-[180px] border rounded-md px-4 py-2"
-                  value={storeFilter}
-                  onChange={(e) => setStoreFilter(e.target.value)}
-                >
-                  <option value={TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL}>
-                    All Stores
-                  </option>
-                  <option value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE1}>
-                    Store 1
-                  </option>
-                  <option value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE2}>
-                    Store 2
-                  </option>
-                </select>
+                <Select value={storeFilter} onValueChange={setStoreFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter by store..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL}>All Stores</SelectItem>
+                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE1}>Store 1</SelectItem>
+                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE2}>Store 2</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
@@ -435,11 +406,10 @@ export default function CustomerDetail() {
                     <FileText className="mr-2 h-4 w-4" />
                     Export PDF
                   </Button>
-                  <AddTransactionDialog
-                    customerId={params.id}
-                    onAddTransaction={handleAddTransaction}
-                    isLoading={loadingState.action}
-                  />
+                  <Button onClick={() => setIsAddingTransaction(true)} disabled={loadingState.action}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Transaction
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -451,20 +421,24 @@ export default function CustomerDetail() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="whitespace-nowrap">Memo Number</TableHead>
+                <TableHead className="whitespace-nowrap cursor-pointer" onClick={() => requestSort('date')}>
+                  Date <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                </TableHead>
+                <TableHead className="whitespace-nowrap cursor-pointer" onClick={() => requestSort('memoNumber')}>
+                  Memo Number <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                </TableHead>
                 <TableHead className="whitespace-nowrap">Details</TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Total Bill
+                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('total')}>
+                  Total Bill <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Deposit
+                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('deposit')}>
+                  Deposit <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Due Amount
+                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('due')}>
+                  Due Amount <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  Balance
+                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('cumulativeBalance')}>
+                  Balance <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
                 <TableHead className="whitespace-nowrap">Store</TableHead>
                 <TableHead className="whitespace-nowrap">Actions</TableHead>
@@ -477,13 +451,7 @@ export default function CustomerDetail() {
                 customerTransactionsWithBalance.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="whitespace-nowrap">
-                      {new Date(transaction.date)
-                        .toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })
-                        .replace(/\//g, "-")}
+                      {formatDate(transaction.date)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {transaction.memoNumber}
@@ -555,6 +523,16 @@ export default function CustomerDetail() {
             </TableBody>
           </Table>
         </div>
+
+        {isAddingTransaction && (
+          <AddTransactionDialog
+            open={isAddingTransaction}
+            onOpenChange={setIsAddingTransaction}
+            customerId={params.id}
+            onAddTransaction={handleAddTransaction}
+            isLoading={loadingState.action}
+          />
+        )}
 
         {/* Footer Section */}
         <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

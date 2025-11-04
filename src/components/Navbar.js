@@ -24,8 +24,47 @@ import {
   Menu,
   X,
   Bell,
-  User,
+  TrendingUp,
 } from "lucide-react";
+import { UserNav } from "./UserNav";
+
+const navItems = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    href: "/customers",
+    label: "Customers",
+    icon: Users,
+  },
+  {
+    href: "/cashbook",
+    label: "Cash Book",
+    icon: BookOpen,
+  },
+  {
+    href: "/suppliers",
+    label: "Suppliers",
+    icon: Package,
+  },
+  {
+    href: "/inventory",
+    label: "Inventory",
+    icon: Package,
+  },
+  {
+    href: "/inventory-profit",
+    label: "Inventory Profit",
+    icon: TrendingUp,
+  },
+  {
+    href: "/cashmemo",
+    label: "Cash Memo",
+    icon: Receipt,
+  },
+];
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -66,39 +105,6 @@ export function Navbar() {
   if (!isAuthenticated) {
     return null;
   }
-
-  const navItems = [
-    {
-      href: "/",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      href: "/cashbook",
-      label: "Cash Book",
-      icon: BookOpen,
-    },
-    {
-      href: "/suppliers",
-      label: "Suppliers",
-      icon: Users,
-    },
-    {
-      href: "/inventory",
-      label: "Inventory",
-      icon: Package,
-    },
-    {
-      href: "/cashmemo",
-      label: "Cash Memo",
-      icon: Receipt,
-    },
-    {
-      name: "Settings",
-      href: "/settings",
-      icon: Settings,
-    },
-  ];
 
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
@@ -173,30 +179,7 @@ export function Navbar() {
             </DropdownMenu>
 
             {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative"
-                  aria-label="User menu"
-                >
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserNav handleLogout={handleLogout} router={router} />
           </div>
 
           {/* Mobile Navigation Toggle */}

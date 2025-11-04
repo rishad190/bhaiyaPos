@@ -1,5 +1,5 @@
+"use client";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,298 +17,289 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Plus, Minus, Package } from "lucide-react";
 
-// Update the component props to include suppliers
 export function PurchaseStockDialog({
-  fabrics,
+  fabrics = [],
   suppliers = [],
   onPurchaseStock,
+  children,
 }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fabricId: "",
-    quantity: "",
-    unitCost: "",
-    supplierId: "",
-    supplierName: "",
-    supplierPhone: "",
-    invoiceNumber: "",
+    containerNo: "",
     purchaseDate: new Date().toISOString().split("T")[0],
+    costPerPiece: "",
+    supplierId: "",
+    items: [{ colorName: "", quantity: "" }],
   });
-  const [errors, setErrors] = useState({});
-  const [isNewSupplier, setIsNewSupplier] = useState(false);
 
-  // Update validate function to include supplier validation
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.fabricId) newErrors.fabricId = "Please select a fabric";
-    if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
-      newErrors.quantity = "Please enter a valid quantity";
-    }
-    if (!formData.unitCost || parseFloat(formData.unitCost) <= 0) {
-      newErrors.unitCost = "Please enter a valid unit cost";
-    }
-    if (!formData.invoiceNumber?.trim()) {
-      newErrors.invoiceNumber = "Invoice number is required";
-    }
-    if (!isNewSupplier && !formData.supplierId) {
-      newErrors.supplierId = "Please select a supplier";
-    }
-    if (isNewSupplier) {
-      if (!formData.supplierName?.trim()) {
-        newErrors.supplierName = "Supplier name is required";
-      }
-      if (!formData.supplierPhone?.trim()) {
-        newErrors.supplierPhone = "Supplier phone is required";
-      }
-    }
+  const handleAddItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      items: [...prev.items, { colorName: "", quantity: "" }],
+    }));
+  };
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleRemoveItem = (index) => {
+    if (formData.items.length > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        items: prev.items.filter((_, i) => i !== index),
+      }));
+    }
+  };
+
+  const handleItemChange = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      ),
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!formData.fabricId || !formData.containerNo || !formData.costPerPiece) {
+      alert("Please fill in all required fields");
+      return;
+    }
 
+    // Validate items
+    for (const item of formData.items) {
+      if (!item.colorName || !item.quantity || parseFloat(item.quantity) <= 0) {
+        alert("Please fill in all color items with valid quantities");
+        return;
+      }
+    }
+
+    setLoading(true);
     try {
-      // Find selected supplier if using existing supplier
-      const selectedSupplier = !isNewSupplier
-        ? suppliers.find((s) => s.id === formData.supplierId)
-        : null;
-
       await onPurchaseStock({
         ...formData,
-        // Include supplier name from either selected supplier or new supplier input
-        supplierName: !isNewSupplier
-          ? selectedSupplier?.name
-          : formData.supplierName,
-        quantity: parseFloat(formData.quantity),
-        unitCost: parseFloat(formData.unitCost),
-        totalCost:
-          parseFloat(formData.quantity) * parseFloat(formData.unitCost),
-        createdAt: new Date().toISOString(),
+        items: formData.items.map((item) => ({
+          ...item,
+          quantity: parseFloat(item.quantity),
+        })),
       });
-
-      // Reset form
       setOpen(false);
+      // Reset form
       setFormData({
         fabricId: "",
-        quantity: "",
-        unitCost: "",
-        supplierId: "",
-        supplierName: "",
-        supplierPhone: "",
-        invoiceNumber: "",
+        containerNo: "",
         purchaseDate: new Date().toISOString().split("T")[0],
+        costPerPiece: "",
+        supplierId: "",
+        items: [{ colorName: "", quantity: "" }],
       });
     } catch (error) {
-      setErrors({ submit: error.message });
+      console.error("Error purchasing stock:", error);
+      alert("Failed to purchase stock. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const selectedFabric = fabrics.find((f) => f.id === formData.fabricId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>+ Purchase Stock</Button>
+        {children || (
+          <Button variant="outline">
+            <Package className="mr-2 h-4 w-4" />
+            Purchase Stock
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Purchase Stock</DialogTitle>
+          <DialogTitle>Purchase New Stock</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Fabric Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Fabric *</label>
+            <Label htmlFor="fabricId">Fabric *</Label>
             <Select
               value={formData.fabricId}
               onValueChange={(value) =>
-                setFormData({ ...formData, fabricId: value })
+                setFormData((prev) => ({ ...prev, fabricId: value }))
               }
             >
-              <SelectTrigger
-                className={errors.fabricId ? "border-red-500" : ""}
-              >
+              <SelectTrigger>
                 <SelectValue placeholder="Select fabric" />
               </SelectTrigger>
               <SelectContent>
                 {fabrics.map((fabric) => (
                   <SelectItem key={fabric.id} value={fabric.id}>
-                    {fabric.code} - {fabric.name}
+                    {fabric.name} ({fabric.code})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.fabricId && (
-              <p className="text-sm text-red-500">{errors.fabricId}</p>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Invoice Number *</label>
-            <Input
-              value={formData.invoiceNumber}
-              onChange={(e) =>
-                setFormData({ ...formData, invoiceNumber: e.target.value })
-              }
-              className={errors.invoiceNumber ? "border-red-500" : ""}
-              placeholder="Enter invoice number"
-            />
-            {errors.invoiceNumber && (
-              <p className="text-sm text-red-500">{errors.invoiceNumber}</p>
-            )}
-          </div>
-
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium">Supplier Details</h3>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsNewSupplier(!isNewSupplier);
+          {/* Container Details */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="containerNo">Container No. *</Label>
+              <Input
+                id="containerNo"
+                value={formData.containerNo}
+                onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    supplierId: "",
-                    supplierName: "",
-                    supplierPhone: "",
-                  }));
-                }}
+                    containerNo: e.target.value,
+                  }))
+                }
+                placeholder="Enter container number"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="purchaseDate">Purchase Date</Label>
+              <Input
+                id="purchaseDate"
+                type="date"
+                value={formData.purchaseDate}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    purchaseDate: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          {/* Cost and Supplier */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="costPerPiece">Cost Per Piece (৳) *</Label>
+              <Input
+                id="costPerPiece"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.costPerPiece}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    costPerPiece: e.target.value,
+                  }))
+                }
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="supplierId">Supplier</Label>
+              <Select
+                value={formData.supplierId}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, supplierId: value }))
+                }
               >
-                {isNewSupplier ? "Select Existing" : "Add New"}
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No Supplier</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Color Items */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Color Items *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddItem}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Color
               </Button>
             </div>
 
-            {!isNewSupplier ? (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Select Supplier *</label>
-                <Select
-                  value={formData.supplierId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, supplierId: value })
-                  }
-                >
-                  <SelectTrigger
-                    className={errors.supplierId ? "border-red-500" : ""}
+            {formData.items.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-4 p-3 border rounded-lg"
+              >
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor={`color-${index}`}>Color Name</Label>
+                  <Input
+                    id={`color-${index}`}
+                    value={item.colorName}
+                    onChange={(e) =>
+                      handleItemChange(index, "colorName", e.target.value)
+                    }
+                    placeholder="Enter color name"
+                    required
+                  />
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor={`quantity-${index}`}>
+                    Quantity ({selectedFabric?.unit || "pieces"})
+                  </Label>
+                  <Input
+                    id={`quantity-${index}`}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={item.quantity}
+                    onChange={(e) =>
+                      handleItemChange(index, "quantity", e.target.value)
+                    }
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                {formData.items.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveItem(index)}
+                    className="mt-6"
                   >
-                    <SelectValue placeholder="Select supplier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers?.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name} - {supplier.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.supplierId && (
-                  <p className="text-sm text-red-500">{errors.supplierId}</p>
+                    <Minus className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Supplier Name *</label>
-                  <Input
-                    value={formData.supplierName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, supplierName: e.target.value })
-                    }
-                    className={errors.supplierName ? "border-red-500" : ""}
-                    placeholder="Enter supplier name"
-                  />
-                  {errors.supplierName && (
-                    <p className="text-sm text-red-500">
-                      {errors.supplierName}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Phone Number *</label>
-                  <Input
-                    value={formData.supplierPhone}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        supplierPhone: e.target.value,
-                      })
-                    }
-                    className={errors.supplierPhone ? "border-red-500" : ""}
-                    placeholder="Enter phone number"
-                  />
-                  {errors.supplierPhone && (
-                    <p className="text-sm text-red-500">
-                      {errors.supplierPhone}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
+            ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Quantity *</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: e.target.value })
-                }
-                className={errors.quantity ? "border-red-500" : ""}
-                placeholder="Enter quantity"
-              />
-              {errors.quantity && (
-                <p className="text-sm text-red-500">{errors.quantity}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Unit Cost *</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.unitCost}
-                onChange={(e) =>
-                  setFormData({ ...formData, unitCost: e.target.value })
-                }
-                className={errors.unitCost ? "border-red-500" : ""}
-                placeholder="Enter unit cost"
-              />
-              {errors.unitCost && (
-                <p className="text-sm text-red-500">{errors.unitCost}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Purchase Date</label>
-            <Input
-              type="date"
-              value={formData.purchaseDate}
-              onChange={(e) =>
-                setFormData({ ...formData, purchaseDate: e.target.value })
-              }
-            />
-          </div>
-
-          {errors.submit && (
-            <p className="text-sm text-red-500">{errors.submit}</p>
-          )}
-
-          <div className="flex justify-end gap-3">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit">Purchase Stock</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Purchasing..." : "Purchase Stock"}
+            </Button>
           </div>
         </form>
       </DialogContent>

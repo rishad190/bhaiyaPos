@@ -1,5 +1,5 @@
+"use client";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,162 +17,180 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Plus } from "lucide-react";
 
-export function AddFabricDialog({ onAddFabric }) {
+export function AddFabricDialog({ onAddFabric, children }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    code: "",
     name: "",
+    code: "",
+    category: "",
     description: "",
-    unit: "METER",
-    category: "COTTON",
+    unit: "piece",
   });
-  const [errors, setErrors] = useState({});
 
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.code?.trim()) newErrors.code = "Code is required";
-    if (!formData.name?.trim()) newErrors.name = "Name is required";
-    if (!formData.unit) newErrors.unit = "Unit is required";
-    if (!formData.category) newErrors.category = "Category is required";
+  const fabricUnits = [
+    { value: "piece", label: "Piece" },
+    { value: "meter", label: "Meter" },
+    { value: "yard", label: "Yard" },
+    { value: "kg", label: "Kilogram" },
+  ];
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const fabricCategories = [
+    "Cotton",
+    "Silk",
+    "Wool",
+    "Linen",
+    "Polyester",
+    "Nylon",
+    "Rayon",
+    "Denim",
+    "Chiffon",
+    "Satin",
+    "Other",
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
 
+    // Validate required fields
+    if (!formData.name.trim() || !formData.code.trim() || !formData.category) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
     try {
-      await onAddFabric({
-        ...formData,
-        code: formData.code.toUpperCase(),
-        createdAt: new Date().toISOString(),
-      });
+      await onAddFabric(formData);
       setOpen(false);
+      // Reset form
       setFormData({
-        code: "",
         name: "",
+        code: "",
+        category: "",
         description: "",
-        unit: "METER",
-        category: "COTTON",
+        unit: "piece",
       });
     } catch (error) {
-      setErrors({ submit: error.message });
+      console.error("Error adding fabric:", error);
+      alert("Failed to add fabric. Please try again.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>+ New Fabric</Button>
+        {children || (
+          <Button className="bg-primary hover:bg-primary/90 text-white">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Fabric
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Fabric</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Fabric Name */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Fabric Code *</label>
+            <Label htmlFor="name">Fabric Name *</Label>
             <Input
-              value={formData.code}
-              onChange={(e) =>
-                setFormData({ ...formData, code: e.target.value })
-              }
-              className={errors.code ? "border-red-500" : ""}
-              placeholder="Enter fabric code"
-            />
-            {errors.code && (
-              <p className="text-sm text-red-500">{errors.code}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name *</label>
-            <Input
+              id="name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className={errors.name ? "border-red-500" : ""}
+              onChange={(e) => handleChange("name", e.target.value)}
               placeholder="Enter fabric name"
+              required
             />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name}</p>
-            )}
           </div>
 
+          {/* Fabric Code */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
+            <Label htmlFor="code">Fabric Code *</Label>
             <Input
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Enter description"
+              id="code"
+              value={formData.code}
+              onChange={(e) => handleChange("code", e.target.value)}
+              placeholder="Enter unique code"
+              required
             />
           </div>
 
+          {/* Category */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Unit *</label>
-            <Select
-              value={formData.unit}
-              onValueChange={(value) =>
-                setFormData({ ...formData, unit: value })
-              }
-            >
-              <SelectTrigger className={errors.unit ? "border-red-500" : ""}>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="METER">Meter</SelectItem>
-                <SelectItem value="YARD">Yard</SelectItem>
-                <SelectItem value="PIECE">Piece</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.unit && (
-              <p className="text-sm text-red-500">{errors.unit}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category *</label>
+            <Label htmlFor="category">Category *</Label>
             <Select
               value={formData.category}
-              onValueChange={(value) =>
-                setFormData({ ...formData, category: value })
-              }
+              onValueChange={(value) => handleChange("category", value)}
             >
-              <SelectTrigger
-                className={errors.category ? "border-red-500" : ""}
-              >
+              <SelectTrigger>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="COTTON">Cotton</SelectItem>
-                <SelectItem value="POLYESTER">Polyester</SelectItem>
-                <SelectItem value="MIXED">Mixed</SelectItem>
+                {fabricCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            {errors.category && (
-              <p className="text-sm text-red-500">{errors.category}</p>
-            )}
           </div>
 
-          {errors.submit && (
-            <p className="text-sm text-red-500">{errors.submit}</p>
-          )}
+          {/* Unit */}
+          <div className="space-y-2">
+            <Label htmlFor="unit">Unit *</Label>
+            <Select
+              value={formData.unit}
+              onValueChange={(value) => handleChange("unit", value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {fabricUnits.map((unit) => (
+                  <SelectItem key={unit.value} value={unit.value}>
+                    {unit.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="flex justify-end gap-3">
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              value={formData.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              placeholder="Enter fabric description (optional)"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit">Add Fabric</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Adding..." : "Add Fabric"}
+            </Button>
           </div>
         </form>
       </DialogContent>

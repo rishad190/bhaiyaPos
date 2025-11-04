@@ -76,7 +76,7 @@ export function DataProvider({ children }) {
   const getCustomerDue = (customerId) => {
     return transactions
       .filter((t) => t.customerId === customerId)
-      .reduce((total, t) => total + (parseFloat(t.due) || 0), 0);
+      .reduce((total, t) => total + (Number(t.due) || 0), 0);
   };
 
   const value = {
@@ -92,3 +92,11 @@ export function DataProvider({ children }) {
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
+
+export const useData = () => {
+  const context = useContext(DataContext);
+  if (!context) {
+    throw new Error("useData must be used within a DataProvider");
+  }
+  return context;
+};
