@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calculateFifoSale } from "@/lib/inventory-utils";
+
 import { formatColorDisplay, formatProductWithColor } from "@/lib/color-utils";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -53,8 +53,13 @@ import { useToast } from "@/hooks/use-toast";
 export default function CashMemoPage() {
   const router = useRouter();
   const { toast } = useToast(); // Get toast function
-  const { customers, addTransaction, addDailyCashTransaction, fabrics } =
-    useData();
+  const {
+    customers,
+    addTransaction,
+    addDailyCashTransaction,
+    fabrics,
+    reduceInventory,
+  } = useData();
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -621,11 +626,14 @@ export default function CashMemoPage() {
         }
       }
 
-      // Wait for transaction to be added (and inventory updated within addTransaction)
-      const transactionResult = await addTransaction(transaction);
+      // Wait for transaction to be added
+      const transactionId = await addTransaction(transaction);
+
+      // Reduce inventory after successful transaction
+      await reduceInventory(products);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
-      if (deposit > 0 && transactionResult) {
+      if (deposit > 0 && transactionId) {
         const cashTransaction = {
           date: memoData.date,
           description: `Cash Memo: ${memoData.memoNumber} - ${memoData.customerName}`,

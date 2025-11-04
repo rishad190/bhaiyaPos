@@ -21,16 +21,53 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   FileText,
-  Download,
   RefreshCw,
   History,
   Database,
 } from "lucide-react";
 import { backupService } from "@/services/backupService";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QuickStatCard } from "@/components/QuickStatCard";
-import { RecentTransactions } from "@/components/RecentTransactions";
-import { LowStockItems } from "@/components/LowStockItems";
+import dynamic from "next/dynamic";
+
+// Dynamically import heavy components
+const QuickStatCard = dynamic(
+  () => import("@/components/QuickStatCard").then((mod) => mod.QuickStatCard),
+  {
+    loading: () => (
+      <Card className="border-none shadow-md">
+        <CardContent className="p-6">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </CardContent>
+      </Card>
+    ),
+    ssr: false,
+  }
+);
+
+const RecentTransactions = dynamic(
+  () => import("@/components/RecentTransactions").then((mod) => mod.RecentTransactions),
+  {
+    loading: () => (
+      <Card className="border-none shadow-md">
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    ),
+    ssr: false,
+  }
+);
 
 export default function Dashboard() {
   const router = useRouter();
@@ -54,7 +91,6 @@ export default function Dashboard() {
         totalFabrics: 0,
         totalSuppliers: 0,
         recentTransactions: [],
-        lowStockItems: [],
       };
     }
 
@@ -85,31 +121,12 @@ export default function Dashboard() {
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
       .slice(0, 5);
 
-    const lowStockItems = fabrics
-      .filter((fabric) => {
-        // Calculate total quantity using inventory utilities
-        const totalQty =
-          fabric.batches?.reduce((total, batch) => {
-            return (
-              total +
-              (batch.items?.reduce(
-                (batchTotal, item) =>
-                  batchTotal + (Number(item?.quantity) || 0),
-                0
-              ) || 0)
-            );
-          }, 0) || 0;
-        return totalQty < 10; // Low stock threshold
-      })
-      .slice(0, 5);
-
     return {
       ...totals,
       totalCustomers: customers.length,
       totalFabrics: fabrics.length,
       totalSuppliers: suppliers.length,
       recentTransactions,
-      lowStockItems,
     };
   }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
 
@@ -335,7 +352,6 @@ export default function Dashboard() {
             transactions={stats.recentTransactions}
             customers={customers}
           />
-          <LowStockItems items={stats.lowStockItems} />
         </div>
       </div>
     </ErrorBoundary>

@@ -1,9 +1,7 @@
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { ClientLayout } from "@/components/ClientLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Navbar } from "@/components/Navbar"; // Add this import
-import { Toaster } from "@/components/ui/toaster";
+import ClientRoot from "@/components/ClientRoot";
+import { Suspense } from "react";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -29,15 +27,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={geist.className}>
       <body>
-        <ClientLayout>
-          <ProtectedRoute>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1">{children}</main>
-            </div>
-          </ProtectedRoute>
-        </ClientLayout>
-        <Toaster />
+        <Suspense fallback={<div>Loading...</div>}>
+          <ClientRoot>{children}</ClientRoot>
+        </Suspense>
       </body>
     </html>
   );

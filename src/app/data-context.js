@@ -20,10 +20,12 @@ import {
   query,
   orderByChild,
   equalTo,
+  onDisconnect,
+  goOffline,
+  goOnline,
 } from "firebase/database";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { calculateFifoSale } from "@/lib/inventory-utils";
 
 // Create context
 const DataContext = createContext(null);
@@ -33,10 +35,38 @@ const COLLECTION_REFS = {
   CUSTOMERS: "customers",
   TRANSACTIONS: "transactions",
   DAILY_CASH: "dailyCash",
-  FABRIC_BATCHES: "fabricBatches",
-  FABRICS: "fabrics",
+
   SUPPLIERS: "suppliers",
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
+
+  FABRICS: "fabrics",
+  FABRIC_BATCHES: "fabricBatches",
+  SETTINGS: "settings",
+  PERFORMANCE_METRICS: "performanceMetrics",
+};
+
+// Connection state constants
+const CONNECTION_STATES = {
+  CONNECTED: "connected",
+  CONNECTING: "connecting",
+  DISCONNECTED: "disconnected",
+  OFFLINE: "offline",
+};
+
+// Performance thresholds
+const PERFORMANCE_THRESHOLDS = {
+  SLOW_OPERATION: 2000, // 2 seconds
+  VERY_SLOW_OPERATION: 5000, // 5 seconds
+  DEBOUNCE_DELAY: 300, // 300ms
+};
+
+// Error types for better error handling
+const ERROR_TYPES = {
+  NETWORK: "network_error",
+  VALIDATION: "validation_error",
+  PERMISSION: "permission_error",
+  NOT_FOUND: "not_found_error",
+  CONFLICT: "conflict_error",
 };
 
 // Add settings to the initial state
@@ -44,12 +74,22 @@ const initialState = {
   customers: [],
   transactions: [],
   dailyCashTransactions: [],
-  fabricBatches: [],
-  fabrics: [],
+
   suppliers: [],
   supplierTransactions: [],
+  fabrics: [],
+  fabricBatches: [],
   loading: true,
   error: null,
+  connectionState: CONNECTION_STATES.CONNECTING,
+  offlineQueue: [],
+  pendingOperations: new Set(),
+  performanceMetrics: {
+    operationCount: 0,
+    slowOperations: 0,
+    averageResponseTime: 0,
+    lastOperationTime: null,
+  },
   settings: {
     store: {
       storeName: "",
@@ -98,18 +138,7 @@ function reducer(state, action) {
         dailyCashTransactions: action.payload,
         loading: false,
       };
-    case "SET_FABRIC_BATCHES":
-      return {
-        ...state,
-        fabricBatches: action.payload,
-        loading: false,
-      };
-    case "SET_FABRICS":
-      return {
-        ...state,
-        fabrics: action.payload,
-        loading: false,
-      };
+
     case "SET_SUPPLIERS":
       return {
         ...state,
@@ -120,6 +149,18 @@ function reducer(state, action) {
       return {
         ...state,
         supplierTransactions: action.payload,
+        loading: false,
+      };
+    case "SET_FABRICS":
+      return {
+        ...state,
+        fabrics: action.payload,
+        loading: false,
+      };
+    case "SET_FABRIC_BATCHES":
+      return {
+        ...state,
+        fabricBatches: action.payload,
         loading: false,
       };
     case "SET_ERROR":
@@ -136,64 +177,281 @@ function reducer(state, action) {
           ...action.payload,
         },
       };
+    case "SET_CONNECTION_STATE":
+      return {
+        ...state,
+        connectionState: action.payload,
+      };
+    case "ADD_TO_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: [...state.offlineQueue, action.payload],
+      };
+    case "REMOVE_FROM_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: state.offlineQueue.filter(
+          (_, index) => index !== action.payload
+        ),
+      };
+    case "CLEAR_OFFLINE_QUEUE":
+      return {
+        ...state,
+        offlineQueue: [],
+      };
+    case "ADD_PENDING_OPERATION":
+      return {
+        ...state,
+        pendingOperations: new Set([
+          ...state.pendingOperations,
+          action.payload,
+        ]),
+      };
+    case "REMOVE_PENDING_OPERATION":
+      const newPendingOps = new Set(state.pendingOperations);
+      newPendingOps.delete(action.payload);
+      return {
+        ...state,
+        pendingOperations: newPendingOps,
+      };
+    case "UPDATE_PERFORMANCE_METRICS":
+      return {
+        ...state,
+        performanceMetrics: {
+          ...state.performanceMetrics,
+          ...action.payload,
+        },
+      };
     default:
       return state;
   }
 }
 
+// Helper functions for validation and performance
+const validateFabricData = (fabricData) => {
+  const errors = [];
+  if (!fabricData.name?.trim()) errors.push("Fabric name is required");
+  if (!fabricData.category?.trim()) errors.push("Category is required");
+  if (!fabricData.unit?.trim()) errors.push("Unit is required");
+  return errors;
+};
+
+const validateBatchData = (batchData) => {
+  const errors = [];
+  if (!batchData.fabricId) errors.push("Fabric ID is required");
+  if (
+    !batchData.items ||
+    !Array.isArray(batchData.items) ||
+    batchData.items.length === 0
+  ) {
+    errors.push("At least one item is required");
+  }
+  if (batchData.items) {
+    batchData.items.forEach((item, index) => {
+      if (!item.colorName?.trim())
+        errors.push(`Item ${index + 1}: Color name is required`);
+      if (!item.quantity || item.quantity <= 0)
+        errors.push(`Item ${index + 1}: Valid quantity is required`);
+    });
+  }
+  return errors;
+};
+
+const validateTransactionData = (transactionData) => {
+  const errors = [];
+  if (!transactionData.customerId) errors.push("Customer ID is required");
+  if (!transactionData.total || transactionData.total <= 0)
+    errors.push("Valid total amount is required");
+  return errors;
+};
+
+const trackPerformance = (operationName, startTime, dispatch) => {
+  const endTime = Date.now();
+  const duration = endTime - startTime;
+
+  const isSlow = duration > PERFORMANCE_THRESHOLDS.SLOW_OPERATION;
+  const isVerySlow = duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
+
+  dispatch({
+    type: "UPDATE_PERFORMANCE_METRICS",
+    payload: {
+      operationCount: state.performanceMetrics.operationCount + 1,
+      slowOperations:
+        state.performanceMetrics.slowOperations + (isSlow ? 1 : 0),
+      averageResponseTime:
+        (state.performanceMetrics.averageResponseTime *
+          state.performanceMetrics.operationCount +
+          duration) /
+        (state.performanceMetrics.operationCount + 1),
+      lastOperationTime: new Date().toISOString(),
+    },
+  });
+
+  if (isVerySlow) {
+    console.warn(
+      `[Performance] Very slow operation: ${operationName} took ${duration}ms`
+    );
+  } else if (isSlow) {
+    console.info(
+      `[Performance] Slow operation: ${operationName} took ${duration}ms`
+    );
+  }
+
+  return duration;
+};
+
 // Export the provider component
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Memoized fabrics with batches in unified structure
-  const fabricsWithBatches = useMemo(() => {
-    const fabrics = state.fabrics;
-    const fabricBatches = state.fabricBatches;
+  // Connection state monitoring
+  useEffect(() => {
+    const connectedRef = ref(db, ".info/connected");
+    const connectionUnsubscribe = onValue(connectedRef, (snapshot) => {
+      const connected = snapshot.val();
+      dispatch({
+        type: "SET_CONNECTION_STATE",
+        payload: connected
+          ? CONNECTION_STATES.CONNECTED
+          : CONNECTION_STATES.DISCONNECTED,
+      });
 
-    if (!fabrics || !fabricBatches) return [];
-
-    return Object.entries(fabrics).map(([id, fabric]) => {
-      // Find all batches for this fabric and transform to unified structure
-      const batches = Object.values(fabricBatches)
-        .filter((batch) => batch && batch.fabricId === id)
-        .map((batch) => ({
-          id: batch.id || batch.batchNumber,
-          batchNumber: batch.batchNumber,
-          containerNo: batch.containerNo,
-          purchaseDate: batch.purchaseDate,
-          costPerPiece:
-            Number(batch.unitCost) || Number(batch.costPerPiece) || 0,
-          unitCost: Number(batch.unitCost) || Number(batch.costPerPiece) || 0,
-          totalCost: Number(batch.totalCost) || 0,
-          supplierName: batch.supplierName || "",
-          unit: batch.unit || fabric.unit || "piece",
-          items: (batch.items || []).map((item) => ({
-            colorName: item.colorName || "",
-            quantity: Number(item.quantity) || 0,
-          })),
-          createdAt: batch.createdAt,
-          updatedAt: batch.updatedAt,
-        }));
-
-      // Return unified fabric object structure
-      return {
-        id,
-        name: fabric.name || "",
-        code: fabric.code || "",
-        category: fabric.category || "",
-        unit: fabric.unit || "piece",
-        description: fabric.description || "",
-        lowStockThreshold: Number(fabric.lowStockThreshold) || 20,
-        batches: batches,
-        createdAt: fabric.createdAt,
-        updatedAt: fabric.updatedAt,
-      };
+      if (connected) {
+        console.log("[DataContext] Firebase connection established");
+      } else {
+        console.warn("[DataContext] Firebase connection lost");
+      }
     });
-  }, [state.fabrics, state.fabricBatches]);
 
-  // Firebase Subscriptions
+    return () => connectionUnsubscribe();
+  }, [dispatch]);
+
+  // Process offline queue when connection is restored
+  const processOfflineQueue = useCallback(async () => {
+    if (state.offlineQueue.length === 0) return;
+
+    console.log(
+      `[DataContext] Processing ${state.offlineQueue.length} offline operations`
+    );
+
+    const successfulOperations = [];
+    const failedOperations = [];
+
+    for (let i = 0; i < state.offlineQueue.length; i++) {
+      const operation = state.offlineQueue[i];
+      try {
+        await operation.fn();
+        successfulOperations.push(i);
+        console.log(
+          `[DataContext] Offline operation ${i} completed successfully`
+        );
+      } catch (error) {
+        failedOperations.push({ index: i, error });
+        console.error(`[DataContext] Offline operation ${i} failed:`, error);
+      }
+    }
+
+    // Remove successful operations from queue
+    successfulOperations.forEach((index) => {
+      dispatch({ type: "REMOVE_FROM_OFFLINE_QUEUE", payload: index });
+    });
+
+    if (failedOperations.length > 0) {
+      console.warn(
+        `[DataContext] ${failedOperations.length} offline operations failed`
+      );
+    }
+  }, [state.offlineQueue]);
+
+  // Atomic transaction helper
+  const executeAtomicOperation = useCallback(
+    async (operationName, operationFn, fallbackFn = null) => {
+      const operationId = `${operationName}_${Date.now()}`;
+      const startTime = Date.now();
+
+      dispatch({ type: "ADD_PENDING_OPERATION", payload: operationId });
+
+      try {
+        // Check connection state
+        if (state.connectionState === CONNECTION_STATES.DISCONNECTED) {
+          // Queue for offline processing
+          dispatch({
+            type: "ADD_TO_OFFLINE_QUEUE",
+            payload: {
+              id: operationId,
+              name: operationName,
+              fn: operationFn,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          throw new Error("Operation queued for offline processing");
+        }
+
+        const result = await operationFn();
+
+        // Track performance
+        const duration = Date.now() - startTime;
+        const isSlow = duration > PERFORMANCE_THRESHOLDS.SLOW_OPERATION;
+        const isVerySlow =
+          duration > PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION;
+
+        dispatch({
+          type: "UPDATE_PERFORMANCE_METRICS",
+          payload: {
+            operationCount: state.performanceMetrics.operationCount + 1,
+            slowOperations:
+              state.performanceMetrics.slowOperations + (isSlow ? 1 : 0),
+            averageResponseTime:
+              (state.performanceMetrics.averageResponseTime *
+                state.performanceMetrics.operationCount +
+                duration) /
+              (state.performanceMetrics.operationCount + 1),
+            lastOperationTime: new Date().toISOString(),
+          },
+        });
+
+        if (isVerySlow) {
+          console.warn(
+            `[Performance] Very slow operation: ${operationName} took ${duration}ms`
+          );
+        } else if (isSlow) {
+          console.info(
+            `[Performance] Slow operation: ${operationName} took ${duration}ms`
+          );
+        }
+
+        return result;
+      } catch (error) {
+        console.error(
+          `[DataContext] Atomic operation failed: ${operationName}`,
+          error
+        );
+
+        // Execute fallback if provided
+        if (fallbackFn && typeof fallbackFn === "function") {
+          try {
+            await fallbackFn();
+          } catch (fallbackError) {
+            console.error(
+              `[DataContext] Fallback operation failed: ${operationName}`,
+              fallbackError
+            );
+          }
+        }
+
+        throw error;
+      } finally {
+        dispatch({ type: "REMOVE_PENDING_OPERATION", payload: operationId });
+      }
+    },
+    [state.connectionState, state.performanceMetrics, dispatch]
+  );
+
+  // Debounced Firebase Subscriptions
   useEffect(() => {
     const unsubscribers = [];
+    const debounceTimers = {};
+
     const collections = [
       {
         path: COLLECTION_REFS.CUSTOMERS,
@@ -209,17 +467,17 @@ export function DataProvider({ children }) {
           dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: data }),
       },
       {
-        path: COLLECTION_REFS.FABRIC_BATCHES,
-        setter: (data) =>
-          dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
+        path: COLLECTION_REFS.SUPPLIERS,
+        setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
       },
       {
         path: COLLECTION_REFS.FABRICS,
         setter: (data) => dispatch({ type: "SET_FABRICS", payload: data }),
       },
       {
-        path: COLLECTION_REFS.SUPPLIERS,
-        setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
+        path: COLLECTION_REFS.FABRIC_BATCHES,
+        setter: (data) =>
+          dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
       },
     ];
 
@@ -227,15 +485,24 @@ export function DataProvider({ children }) {
       collections.forEach(({ path, setter }) => {
         const collectionRef = ref(db, path);
         const unsubscribe = onValue(collectionRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-              id,
-              ...value,
-            }));
-            setter(data);
-          } else {
-            setter([]);
+          // Debounce rapid updates to improve performance
+          if (debounceTimers[path]) {
+            clearTimeout(debounceTimers[path]);
           }
+
+          debounceTimers[path] = setTimeout(() => {
+            if (snapshot.exists()) {
+              const data = Object.entries(snapshot.val()).map(
+                ([id, value]) => ({
+                  id,
+                  ...value,
+                })
+              );
+              setter(data);
+            } else {
+              setter([]);
+            }
+          }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
         });
         unsubscribers.push(unsubscribe);
       });
@@ -249,19 +516,28 @@ export function DataProvider({ children }) {
       COLLECTION_REFS.SUPPLIER_TRANSACTIONS
     );
     const unsubscribe = onValue(supplierTransactionsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = Object.entries(snapshot.val()).map(([id, value]) => ({
-          id,
-          ...value,
-        }));
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
-      } else {
-        dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
+      if (debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS]) {
+        clearTimeout(debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS]);
       }
+
+      debounceTimers[COLLECTION_REFS.SUPPLIER_TRANSACTIONS] = setTimeout(() => {
+        if (snapshot.exists()) {
+          const data = Object.entries(snapshot.val()).map(([id, value]) => ({
+            id,
+            ...value,
+          }));
+          dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: data });
+        } else {
+          dispatch({ type: "SET_SUPPLIER_TRANSACTIONS", payload: [] });
+        }
+      }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
     });
     unsubscribers.push(unsubscribe);
 
-    return () => unsubscribers.forEach((unsub) => unsub());
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+      Object.values(debounceTimers).forEach((timer) => clearTimeout(timer));
+    };
   }, [dispatch]);
 
   // Add memoization for customer dues
@@ -282,42 +558,100 @@ export function DataProvider({ children }) {
     [customerDues]
   );
 
-  // Customer Operations
+  // Batch-level locking for inventory management
+  const acquireBatchLock = useCallback(async (batchId) => {
+    const lockRef = ref(db, `locks/batches/${batchId}`);
+    try {
+      await set(lockRef, {
+        lockedAt: serverTimestamp(),
+        sessionId: Math.random().toString(36).substr(2, 9),
+      });
+      return true;
+    } catch (error) {
+      console.warn(
+        `[DataContext] Could not acquire lock for batch ${batchId}:`,
+        error
+      );
+      return false;
+    }
+  }, []);
+
+  const releaseBatchLock = useCallback(async (batchId) => {
+    const lockRef = ref(db, `locks/batches/${batchId}`);
+    try {
+      await remove(lockRef);
+    } catch (error) {
+      console.warn(
+        `[DataContext] Could not release lock for batch ${batchId}:`,
+        error
+      );
+    }
+  }, []);
+
+  // Customer Operations with atomic execution and validation
   const customerOperations = useMemo(
     () => ({
       addCustomer: async (customerData) => {
-        const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
-        const newCustomerRef = push(customersRef);
-        await set(newCustomerRef, {
-          ...customerData,
-          createdAt: new Date().toISOString(),
+        // Validate customer data
+        const validationErrors = [];
+        if (!customerData.name?.trim())
+          validationErrors.push("Customer name is required");
+        if (!customerData.phone?.trim())
+          validationErrors.push("Phone number is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addCustomer", async () => {
+          const customersRef = ref(db, COLLECTION_REFS.CUSTOMERS);
+          const newCustomerRef = push(customersRef);
+          await set(newCustomerRef, {
+            ...customerData,
+            createdAt: new Date().toISOString(),
+          });
+          return newCustomerRef.key;
         });
-        return newCustomerRef.key;
       },
 
       updateCustomer: async (customerId, updatedData) => {
-        const customerRef = ref(
-          db,
-          `${COLLECTION_REFS.CUSTOMERS}/${customerId}`
-        );
-        await update(customerRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
+        // Validate customer data
+        const validationErrors = [];
+        if (!updatedData.name?.trim())
+          validationErrors.push("Customer name is required");
+        if (!updatedData.phone?.trim())
+          validationErrors.push("Phone number is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("updateCustomer", async () => {
+          const customerRef = ref(
+            db,
+            `${COLLECTION_REFS.CUSTOMERS}/${customerId}`
+          );
+          await update(customerRef, {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          });
         });
       },
 
       deleteCustomer: async (customerId) => {
-        // First delete associated transactions
-        const customerTransactions = state.transactions.filter(
-          (t) => t.customerId === customerId
-        );
-        for (const transaction of customerTransactions) {
-          await remove(
-            ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+        return executeAtomicOperation("deleteCustomer", async () => {
+          // First delete associated transactions
+          const customerTransactions = state.transactions.filter(
+            (t) => t.customerId === customerId
           );
-        }
-        // Then delete the customer
-        await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
+          for (const transaction of customerTransactions) {
+            await remove(
+              ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transaction.id}`)
+            );
+          }
+          // Then delete the customer
+          await remove(ref(db, `${COLLECTION_REFS.CUSTOMERS}/${customerId}`));
+        });
       },
 
       getCustomerDue,
@@ -325,358 +659,77 @@ export function DataProvider({ children }) {
     [state.transactions, getCustomerDue]
   );
 
-  // Transaction Operations
+  // Transaction Operations with atomic execution and validation
   const transactionOperations = useMemo(
     () => ({
       addTransaction: async (transactionData) => {
-        const { products, ...restTransactionData } = transactionData;
-        const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
-        const newTransactionRef = push(transactionsRef);
-
-        const newTransaction = {
-          ...restTransactionData,
-          createdAt: new Date().toISOString(),
-        };
-
-        const updates = {};
-        updates[`${COLLECTION_REFS.TRANSACTIONS}/${newTransactionRef.key}`] =
-          newTransaction;
-
-        if (products && products.length > 0) {
-          for (const product of products) {
-            // Prefer explicit fabricId when provided (more robust). Fallback to name match.
-            let fabric = null;
-            if (product.fabricId) {
-              fabric = state.fabrics.find(
-                (f) => f && f.id === product.fabricId
-              );
-            }
-            if (!fabric && product.name) {
-              fabric = state.fabrics.find(
-                (f) =>
-                  f &&
-                  f.name &&
-                  f.name.toLowerCase() === product.name.toLowerCase()
-              );
-            }
-            if (fabric) {
-              // Convert DB batches (which contain items per color) into color-level batches
-              const rawBatches = state.fabricBatches.filter(
-                (b) => b.fabricId === fabric.id
-              );
-
-              // Build per-color batch entries: { id, quantity, unitCost, color, createdAt }
-              const colorLevelBatches = [];
-              rawBatches.forEach((b) => {
-                (b.items || []).forEach((item) => {
-                  colorLevelBatches.push({
-                    id: b.id, // preserve parent batch id so we can map back
-                    quantity: Number(item.quantity) || 0,
-                    unitCost: Number(b.unitCost) || Number(b.costPerPiece) || 0,
-                    color: item.colorName || "",
-                    createdAt: b.createdAt || b.purchaseDate || null,
-                  });
-                });
-              });
-
-              // Run FIFO on color-level batches with debug logging
-              console.debug("[data-context] FIFO Input:", {
-                fabricId: fabric.id,
-                fabricName: fabric.name,
-                productQuantity: product.quantity,
-                productColor: product.color,
-                colorLevelBatches: colorLevelBatches,
-                totalAvailable: colorLevelBatches.reduce(
-                  (sum, b) => sum + Number(b.quantity || 0),
-                  0
-                ),
-              });
-
-              const { updatedBatches } = calculateFifoSale(
-                colorLevelBatches,
-                product.quantity,
-                product.color || null
-              );
-
-              console.debug(
-                "[data-context] FIFO Output - Updated batches:",
-                updatedBatches
-              );
-
-              // Map updated color-level batches back to original batch objects
-              // Group updated quantities by parent batch id and color
-              const updatesByBatch = {};
-              updatedBatches.forEach((ub) => {
-                const batchId = ub.id;
-                if (!updatesByBatch[batchId]) updatesByBatch[batchId] = {};
-                // Keep the remaining quantity for this color in this batch
-                updatesByBatch[batchId][String(ub.color || "")] =
-                  Number(ub.quantity) || 0;
-              });
-
-              // For each raw batch, construct updated batch object or deletion
-              rawBatches.forEach((b) => {
-                const batchPath = `${COLLECTION_REFS.FABRIC_BATCHES}/${b.id}`;
-                const remainingByColor = updatesByBatch[b.id] || {};
-
-                // Build new items array preserving colors but updating quantities
-                // IMPORTANT: Only update quantities for colors that were in the FIFO calculation
-                // For colors not in remainingByColor, keep the original quantity
-                const newItems = (b.items || []).map((item) => ({
-                  colorName: item.colorName,
-                  quantity:
-                    remainingByColor[item.colorName] !== undefined
-                      ? remainingByColor[item.colorName]
-                      : Number(item.quantity) || 0,
-                }));
-
-                // If all item quantities are zero, delete the batch
-                const totalRemaining = newItems.reduce(
-                  (s, it) => s + (Number(it.quantity) || 0),
-                  0
-                );
-
-                if (totalRemaining > 0) {
-                  updates[batchPath] = {
-                    ...b,
-                    items: newItems,
-                    updatedAt: new Date().toISOString(),
-                  };
-                } else {
-                  updates[batchPath] = null;
-                }
-              });
-            }
-          }
+        // Validate transaction data
+        const validationErrors = validateTransactionData(transactionData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
-        if (process.env.NODE_ENV !== "production") {
-          try {
-            console.debug("[data-context] addTransaction products:", products);
-            console.debug(
-              "[data-context] constructed updates keys:",
-              Object.keys(updates)
-            );
+        return executeAtomicOperation("addTransaction", async () => {
+          const transactionsRef = ref(db, COLLECTION_REFS.TRANSACTIONS);
+          const newTransactionRef = push(transactionsRef);
 
-            // Debug inventory updates
-            const inventoryUpdates = Object.entries(updates).filter(([key]) =>
-              key.includes(COLLECTION_REFS.FABRIC_BATCHES)
-            );
-            if (inventoryUpdates.length > 0) {
-              console.debug(
-                "[data-context] Inventory batch updates:",
-                inventoryUpdates
-              );
-            } else {
-              console.warn("[data-context] No inventory batch updates found!");
-            }
-          } catch (e) {
-            /* ignore logging errors */
-          }
-        }
+          const newTransaction = {
+            ...transactionData,
+            createdAt: new Date().toISOString(),
+          };
 
-        await update(ref(db), updates);
+          await set(newTransactionRef, newTransaction);
 
-        return newTransactionRef.key;
+          return newTransactionRef.key;
+        });
       },
 
       updateTransaction: async (transactionId, updatedData) => {
-        const transactionRef = ref(
-          db,
-          `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
-        );
-        await update(transactionRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
+        // Validate transaction data
+        const validationErrors = validateTransactionData(updatedData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("updateTransaction", async () => {
+          const transactionRef = ref(
+            db,
+            `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`
+          );
+          await update(transactionRef, {
+            ...updatedData,
+            updatedAt: serverTimestamp(),
+          });
         });
       },
 
       deleteTransaction: async (transactionId) => {
-        await remove(
-          ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`)
-        );
-      },
-    }),
-    [state.fabrics, state.fabricBatches]
-  );
-
-  // Fabric Operations
-  const fabricOperations = useMemo(
-    () => ({
-      addFabric: async (fabricData) => {
-        try {
-          const timestamp = serverTimestamp();
-          const fabric = {
-            code: (fabricData.code || "").toUpperCase(),
-            name: fabricData.name?.trim() || "",
-            description: fabricData.description?.trim() || "",
-            category: fabricData.category?.trim() || "",
-            unit: fabricData.unit || "piece",
-            lowStockThreshold: Number(fabricData.lowStockThreshold) || 20,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          };
-
-          // Validate required fields
-          if (!fabric.code) throw new Error("Fabric code is required");
-          if (!fabric.name) throw new Error("Fabric name is required");
-          if (!fabric.category) throw new Error("Category is required");
-
-          await push(ref(db, COLLECTION_REFS.FABRICS), fabric);
-        } catch (error) {
-          console.error("Error adding fabric:", error);
-          throw error;
-        }
-      },
-
-      updateFabric: async (fabricId, updatedData) => {
-        try {
-          const timestamp = serverTimestamp();
-          const fabric = {
-            ...updatedData,
-            code: (updatedData.code || "").toUpperCase(),
-            name: updatedData.name?.trim() || "",
-            description: updatedData.description?.trim() || "",
-            category: updatedData.category?.trim() || "",
-            unit: updatedData.unit || "piece",
-            lowStockThreshold: Number(updatedData.lowStockThreshold) || 20,
-            updatedAt: timestamp,
-          };
-
-          // Validate required fields
-          if (!fabric.code) throw new Error("Fabric code is required");
-          if (!fabric.name) throw new Error("Fabric name is required");
-          if (!fabric.category) throw new Error("Category is required");
-
-          await update(
-            ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`),
-            fabric
+        return executeAtomicOperation("deleteTransaction", async () => {
+          await remove(
+            ref(db, `${COLLECTION_REFS.TRANSACTIONS}/${transactionId}`)
           );
-        } catch (error) {
-          console.error("Error updating fabric:", error);
-          throw error;
-        }
-      },
-
-      deleteFabric: async (fabricId) => {
-        try {
-          console.log(`[data-context] Deleting fabric: ${fabricId}`);
-
-          // First delete all batches associated with this fabric
-          const fabricBatches = state.fabricBatches.filter(
-            (batch) => batch && batch.fabricId === fabricId
-          );
-
-          console.log(
-            `[data-context] Found ${fabricBatches.length} batches to delete`
-          );
-
-          for (const batch of fabricBatches) {
-            if (batch && batch.id) {
-              console.log(`[data-context] Deleting batch: ${batch.id}`);
-              await remove(
-                ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
-              );
-            }
-          }
-
-          // Then delete the fabric
-          console.log(
-            `[data-context] Deleting fabric from: ${COLLECTION_REFS.FABRICS}/${fabricId}`
-          );
-          await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
-
-          console.log(`[data-context] Fabric ${fabricId} deleted successfully`);
-        } catch (error) {
-          console.error("Error deleting fabric:", error);
-          throw error;
-        }
-      },
-
-      addFabricBatch: async (batchData) => {
-        try {
-          const timestamp = serverTimestamp();
-          const batch = {
-            fabricId: batchData.fabricId,
-            batchNumber: batchData.batchNumber,
-            containerNo: batchData.containerNo || "", // Provide default value
-            unitCost:
-              Number(batchData.unitCost) || Number(batchData.costPerPiece) || 0,
-            costPerPiece:
-              Number(batchData.costPerPiece) || Number(batchData.unitCost) || 0,
-            totalCost: Number(batchData.totalCost) || 0,
-            supplierName: batchData.supplierName || "",
-            purchaseDate: batchData.purchaseDate,
-            unit: batchData.unit || "piece",
-            items: batchData.colorQuantities.map((item) => ({
-              colorName: item.color.trim(),
-              quantity: Number(item.quantity) || 0,
-            })),
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          };
-
-          // Validate required fields
-          if (!batch.fabricId) throw new Error("Fabric ID is required");
-          if (!batch.batchNumber) throw new Error("Batch number is required");
-          if (!batch.items?.length)
-            throw new Error("At least one color quantity is required");
-          if (!batch.unitCost) throw new Error("Unit cost is required");
-
-          await push(ref(db, COLLECTION_REFS.FABRIC_BATCHES), batch);
-        } catch (error) {
-          console.error("Error adding fabric batch:", error);
-          throw error;
-        }
-      },
-
-      updateFabricBatch: async (batchId, updatedData) => {
-        const batchRef = ref(
-          db,
-          `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
-        );
-        await update(batchRef, {
-          ...updatedData,
-          updatedAt: serverTimestamp(),
         });
       },
-
-      deleteFabricBatch: async (batchId) => {
-        try {
-          if (!batchId) {
-            throw new Error("Batch ID is required");
-          }
-
-          // Get the batch data first to update fabric totals
-          const batchRef = ref(
-            db,
-            `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
-          );
-          const batchSnapshot = await get(batchRef);
-
-          if (!batchSnapshot.exists()) {
-            console.warn(
-              `Batch with ID ${batchId} not found, it may have been already deleted`
-            );
-            return; // Return gracefully if batch doesn't exist
-          }
-
-          // Delete the batch
-          await remove(batchRef);
-        } catch (error) {
-          console.error("Error deleting fabric batch:", error);
-          throw error;
-        }
-      },
     }),
-    [state.fabricBatches, state.fabrics]
+    [state.transactions, getCustomerDue]
   );
 
-  // Supplier Operations
+  // Supplier Operations with atomic execution and validation
   const supplierOperations = useMemo(
     () => ({
       addSupplier: async (supplierData) => {
-        try {
+        // Validate supplier data
+        const validationErrors = [];
+        if (!supplierData.name?.trim())
+          validationErrors.push("Supplier name is required");
+        if (!supplierData.phone?.trim())
+          validationErrors.push("Phone number is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addSupplier", async () => {
           const suppliersRef = ref(db, COLLECTION_REFS.SUPPLIERS);
           const newSupplierRef = push(suppliersRef);
           await set(newSupplierRef, {
@@ -685,14 +738,22 @@ export function DataProvider({ children }) {
             createdAt: serverTimestamp(),
           });
           return newSupplierRef.key;
-        } catch (error) {
-          console.error("Error adding supplier:", error);
-          throw error;
-        }
+        });
       },
 
       updateSupplier: async (supplierId, updatedData) => {
-        try {
+        // Validate supplier data
+        const validationErrors = [];
+        if (!updatedData.name?.trim())
+          validationErrors.push("Supplier name is required");
+        if (!updatedData.phone?.trim())
+          validationErrors.push("Phone number is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("updateSupplier", async () => {
           const supplierRef = ref(
             db,
             `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
@@ -701,14 +762,11 @@ export function DataProvider({ children }) {
             ...updatedData,
             updatedAt: serverTimestamp(),
           });
-        } catch (error) {
-          console.error("Error updating supplier:", error);
-          throw error;
-        }
+        });
       },
 
       deleteSupplier: async (supplierId) => {
-        try {
+        return executeAtomicOperation("deleteSupplier", async () => {
           // First delete associated transactions
           const supplierTransactions = state.transactions.filter(
             (t) => t.supplierId === supplierId
@@ -725,14 +783,22 @@ export function DataProvider({ children }) {
 
           // Then delete the supplier
           await remove(ref(db, `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`));
-        } catch (error) {
-          console.error("Error deleting supplier:", error);
-          throw error;
-        }
+        });
       },
 
       addSupplierTransaction: async (transaction) => {
-        try {
+        // Validate supplier transaction data
+        const validationErrors = [];
+        if (!transaction.supplierId)
+          validationErrors.push("Supplier ID is required");
+        if (!transaction.totalAmount || transaction.totalAmount <= 0)
+          validationErrors.push("Valid total amount is required");
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addSupplierTransaction", async () => {
           const transactionsRef = ref(
             db,
             COLLECTION_REFS.SUPPLIER_TRANSACTIONS
@@ -764,10 +830,7 @@ export function DataProvider({ children }) {
           }
 
           return newTransactionRef.key;
-        } catch (error) {
-          console.error("Error adding supplier transaction:", error);
-          throw error;
-        }
+        });
       },
 
       deleteSupplierTransaction: async (
@@ -776,7 +839,7 @@ export function DataProvider({ children }) {
         amount,
         paidAmount
       ) => {
-        try {
+        return executeAtomicOperation("deleteSupplierTransaction", async () => {
           // Delete transaction
           await remove(
             ref(db, `${COLLECTION_REFS.SUPPLIER_TRANSACTIONS}/${transactionId}`)
@@ -802,19 +865,30 @@ export function DataProvider({ children }) {
               updatedAt: serverTimestamp(),
             });
           }
-        } catch (error) {
-          console.error("Error deleting supplier transaction:", error);
-          throw error;
-        }
+        });
       },
     }),
     [state.transactions]
   );
 
+  // Daily Cash Operations with atomic execution and validation
   const dailyCashOperations = useMemo(
     () => ({
       addDailyCashTransaction: async (transaction) => {
-        try {
+        // Validate daily cash transaction data
+        const validationErrors = [];
+        if (!transaction.date) validationErrors.push("Date is required");
+        if (!transaction.description?.trim())
+          validationErrors.push("Description is required");
+        if ((transaction.cashIn || 0) < 0 || (transaction.cashOut || 0) < 0) {
+          validationErrors.push("Cash amounts cannot be negative");
+        }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addDailyCashTransaction", async () => {
           const dailyCashRef = ref(db, COLLECTION_REFS.DAILY_CASH);
           const newTransactionRef = push(dailyCashRef);
           await set(newTransactionRef, {
@@ -847,46 +921,70 @@ export function DataProvider({ children }) {
           }
 
           return newTransactionRef.key;
-        } catch (error) {
-          console.error("Error adding daily cash transaction:", error);
-          throw error;
-        }
+        });
       },
 
       deleteDailyCashTransaction: async (transactionId) => {
-        try {
-          const transactionRef = ref(
-            db,
-            `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
-          );
-          await remove(transactionRef);
-        } catch (error) {
-          console.error("Error deleting daily cash transaction:", error);
-          throw error;
-        }
+        return executeAtomicOperation(
+          "deleteDailyCashTransaction",
+          async () => {
+            const transactionRef = ref(
+              db,
+              `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+            );
+            await remove(transactionRef);
+          }
+        );
       },
 
       updateDailyCashTransaction: async (transactionId, updatedData) => {
-        try {
-          const transactionRef = ref(
-            db,
-            `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
-          );
-          await update(transactionRef, {
-            ...updatedData,
-            updatedAt: serverTimestamp(),
-          });
-        } catch (error) {
-          console.error("Error updating daily cash transaction:", error);
-          throw error;
+        // Validate daily cash transaction data
+        const validationErrors = [];
+        if (!updatedData.date) validationErrors.push("Date is required");
+        if (!updatedData.description?.trim())
+          validationErrors.push("Description is required");
+        if ((updatedData.cashIn || 0) < 0 || (updatedData.cashOut || 0) < 0) {
+          validationErrors.push("Cash amounts cannot be negative");
         }
+
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation(
+          "updateDailyCashTransaction",
+          async () => {
+            const transactionRef = ref(
+              db,
+              `${COLLECTION_REFS.DAILY_CASH}/${transactionId}`
+            );
+            await update(transactionRef, {
+              ...updatedData,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        );
       },
     }),
     []
   );
 
+  // Settings Operations with atomic execution and validation
   const updateSettings = useCallback(async (newSettings) => {
-    try {
+    // Validate settings data
+    const validationErrors = [];
+    if (!newSettings.store?.storeName?.trim())
+      validationErrors.push("Store name is required");
+    if (!newSettings.store?.address?.trim())
+      validationErrors.push("Store address is required");
+    if (!newSettings.store?.phone?.trim())
+      validationErrors.push("Store phone is required");
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+    }
+
+    return executeAtomicOperation("updateSettings", async () => {
       // Update settings in Firebase
       await updateDoc(doc(db, "settings", "app"), newSettings);
 
@@ -897,35 +995,256 @@ export function DataProvider({ children }) {
       });
 
       return true;
-    } catch (error) {
-      console.error("Error updating settings:", error);
-      throw error;
-    }
+    });
   }, []);
+
+  // Fabric Operations with atomic execution, validation, and batch-level locking
+  const fabricOperations = useMemo(
+    () => ({
+      addFabric: async (fabricData) => {
+        // Validate fabric data
+        const validationErrors = validateFabricData(fabricData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addFabric", async () => {
+          const fabricsRef = ref(db, COLLECTION_REFS.FABRICS);
+          const newFabricRef = push(fabricsRef);
+          await set(newFabricRef, {
+            ...fabricData,
+            id: newFabricRef.key,
+            createdAt: new Date().toISOString(),
+          });
+          return newFabricRef.key;
+        });
+      },
+
+      updateFabric: async (fabricId, updatedData) => {
+        // Validate fabric data
+        const validationErrors = validateFabricData(updatedData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("updateFabric", async () => {
+          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
+          await update(fabricRef, {
+            ...updatedData,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+      },
+
+      deleteFabric: async (fabricId) => {
+        return executeAtomicOperation("deleteFabric", async () => {
+          // First delete associated batches
+          const fabricBatches = state.fabricBatches.filter(
+            (b) => b.fabricId === fabricId
+          );
+          for (const batch of fabricBatches) {
+            await remove(
+              ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
+            );
+          }
+          // Then delete the fabric
+          await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
+        });
+      },
+
+      addFabricBatch: async (batchData) => {
+        // Validate batch data
+        const validationErrors = validateBatchData(batchData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("addFabricBatch", async () => {
+          const batchesRef = ref(db, COLLECTION_REFS.FABRIC_BATCHES);
+          const newBatchRef = push(batchesRef);
+          await set(newBatchRef, {
+            ...batchData,
+            id: newBatchRef.key,
+            createdAt: new Date().toISOString(),
+          });
+          return newBatchRef.key;
+        });
+      },
+
+      updateFabricBatch: async (batchId, updatedData) => {
+        // Validate batch data
+        const validationErrors = validateBatchData(updatedData);
+        if (validationErrors.length > 0) {
+          throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
+        }
+
+        return executeAtomicOperation("updateFabricBatch", async () => {
+          const batchRef = ref(
+            db,
+            `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
+          );
+          await update(batchRef, {
+            ...updatedData,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+      },
+
+      reduceInventory: async (saleProducts) => {
+        return executeAtomicOperation("reduceInventory", async () => {
+          console.log(
+            "[DataContext] Reducing inventory for products:",
+            saleProducts
+          );
+
+          // Get current fabric batches to work with the latest data
+          const batchesRef = ref(db, COLLECTION_REFS.FABRIC_BATCHES);
+          const snapshot = await get(batchesRef);
+          const allBatches = snapshot.exists()
+            ? Object.entries(snapshot.val()).map(([id, value]) => ({
+                id,
+                ...value,
+              }))
+            : [];
+
+          const updatePromises = [];
+          const lockedBatches = new Set();
+
+          try {
+            for (const product of saleProducts) {
+              console.log(
+                `[DataContext] Processing product: ${product.name}, quantity: ${product.quantity}, color: ${product.color}`
+              );
+
+              // Find batches for this fabric
+              const fabricBatches = allBatches.filter(
+                (batch) => batch.fabricId === product.fabricId
+              );
+
+              if (fabricBatches.length === 0) {
+                console.warn(
+                  `[DataContext] No batches found for fabric: ${product.fabricId}`
+                );
+                continue;
+              }
+
+              let remainingQuantity = product.quantity;
+
+              // Sort batches by purchase date (FIFO)
+              const sortedBatches = fabricBatches.sort(
+                (a, b) =>
+                  new Date(a.purchaseDate || a.createdAt) -
+                  new Date(b.purchaseDate || b.createdAt)
+              );
+
+              for (const batch of sortedBatches) {
+                if (remainingQuantity <= 0) break;
+
+                // Acquire lock for this batch
+                const lockAcquired = await acquireBatchLock(batch.id);
+                if (!lockAcquired) {
+                  throw new Error(
+                    `Could not acquire lock for batch ${batch.id}. Please try again.`
+                  );
+                }
+                lockedBatches.add(batch.id);
+
+                if (!batch.items || !Array.isArray(batch.items)) {
+                  console.warn(
+                    `[DataContext] Batch ${batch.id} has no items array`
+                  );
+                  continue;
+                }
+
+                // Find items that match the color (if specified) or any item if no color
+                const eligibleItems = batch.items.filter((item) => {
+                  if (product.color) {
+                    return (
+                      item.colorName === product.color &&
+                      (item.quantity || 0) > 0
+                    );
+                  }
+                  return (item.quantity || 0) > 0;
+                });
+
+                for (const item of eligibleItems) {
+                  if (remainingQuantity <= 0) break;
+
+                  const availableQuantity = item.quantity || 0;
+                  const quantityToReduce = Math.min(
+                    availableQuantity,
+                    remainingQuantity
+                  );
+
+                  if (quantityToReduce > 0) {
+                    // Update the item quantity
+                    item.quantity = availableQuantity - quantityToReduce;
+                    remainingQuantity -= quantityToReduce;
+
+                    console.log(
+                      `[DataContext] Reduced ${quantityToReduce} from batch ${
+                        batch.id
+                      }, item: ${item.colorName || "no color"}`
+                    );
+                  }
+                }
+
+                // If we modified any items in this batch, add to update promises
+                if (remainingQuantity < product.quantity) {
+                  updatePromises.push(
+                    updateFabricBatch(batch.id, { items: batch.items })
+                  );
+                }
+              }
+
+              if (remainingQuantity > 0) {
+                console.warn(
+                  `[DataContext] Could not reduce full quantity for ${product.name}. Remaining: ${remainingQuantity}`
+                );
+                throw new Error(
+                  `Insufficient stock for ${product.name}. Only ${
+                    product.quantity - remainingQuantity
+                  } units available.`
+                );
+              }
+            }
+
+            // Wait for all batch updates to complete
+            await Promise.all(updatePromises);
+            console.log(
+              "[DataContext] Inventory reduction completed successfully"
+            );
+          } finally {
+            // Release all acquired locks
+            for (const batchId of lockedBatches) {
+              await releaseBatchLock(batchId);
+            }
+          }
+        });
+      },
+    }),
+    [state.fabricBatches]
+  );
 
   const contextValue = useMemo(
     () => ({
       // State
       ...state,
-      // Enhanced fabric data with batches
-      fabrics: fabricsWithBatches,
-      // Operations
       ...customerOperations,
       ...transactionOperations,
-      ...fabricOperations,
       ...supplierOperations,
       ...dailyCashOperations,
+      ...fabricOperations,
       settings: state.settings,
       updateSettings,
     }),
     [
       state,
-      fabricsWithBatches,
       customerOperations,
       transactionOperations,
-      fabricOperations,
       supplierOperations,
       dailyCashOperations,
+      fabricOperations,
       updateSettings,
     ]
   );
