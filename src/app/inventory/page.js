@@ -226,7 +226,13 @@ export default function InventoryPage() {
                   <TableRow
                     key={fabric.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/inventory/${fabric.id}`)}
+                    onClick={() => {
+                      console.log(
+                        "Row clicked - Navigating to fabric:",
+                        fabric.id
+                      );
+                      router.push(`/inventory/${fabric.id}`);
+                    }}
                   >
                     <TableCell className="font-medium">
                       <div>{fabric.name}</div>
@@ -248,11 +254,10 @@ export default function InventoryPage() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from interfering
+                            e.stopPropagation(); // Prevent row click from firing
                             console.log(
-                              "Navigating to fabric:",
-                              fabric.id,
-                              fabric.name
+                              "View button clicked - Navigating to fabric:",
+                              fabric.id
                             );
                             router.push(`/inventory/${fabric.id}`);
                           }}
@@ -262,8 +267,8 @@ export default function InventoryPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from interfering
+                          onClick={() => {
+                            console.log("Edit button clicked");
                             handleEditClick(fabric);
                           }}
                         >
@@ -272,8 +277,8 @@ export default function InventoryPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from interfering
+                          onClick={() => {
+                            console.log("Delete button clicked");
                             handleDeleteClick(fabric.id);
                           }}
                         >

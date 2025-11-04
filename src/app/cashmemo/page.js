@@ -272,7 +272,7 @@ export default function CashMemoPage() {
         {
           name: newProduct.name.trim(),
           quantity: quantityNum, // Use consistent quantity naming
-          fabricId: fabric.id,
+          fabricId: fabric.id, // Directly use fabric.id
           price: priceNum,
           total,
           cost: totalCost,
@@ -441,6 +441,19 @@ export default function CashMemoPage() {
   };
 
   const handleSelectProduct = (fabric) => {
+    // Validate fabric ID before proceeding
+    if (!fabric.id || fabric.id === "0" || fabric.id === "") {
+      console.error("[CashMemo] Invalid fabric ID selected:", fabric);
+      toast({
+        title: "Invalid Product",
+        description:
+          "Selected product has an invalid ID. Please choose a different product.",
+        variant: "destructive",
+      });
+      setOpenProductPopover(false);
+      return;
+    }
+
     // Get available colors with quantities
     const availableColors = (fabric.batches || [])
       .flatMap((batch) => batch.items || [])
@@ -458,6 +471,13 @@ export default function CashMemoPage() {
         return colors;
       }, [])
       .filter((c) => c.quantity > 0);
+
+    // Debug log for fabric selection
+    console.debug("[CashMemo] Selected fabric:", {
+      name: fabric.name,
+      id: fabric.id,
+      availableColorsCount: availableColors.length,
+    });
 
     // Update the new product state
     setNewProduct({
@@ -533,16 +553,30 @@ export default function CashMemoPage() {
       let validationError = "";
 
       for (const product of products) {
-        // First try to find by fabricId, then by name as fallback
-        const fabric =
-          fabrics.find((f) => f && f.id === product.fabricId) ||
-          fabrics.find(
-            (f) => f && f.name.toLowerCase() === product.name.toLowerCase()
+        // Enhanced fabric lookup with better error handling
+        let fabric = null;
+
+        // First try to find by fabricId
+        if (product.fabricId) {
+          fabric = fabrics.find((f) => f && f.id === product.fabricId);
+        }
+
+        // If not found by fabricId, try by name
+        if (!fabric && product.name) {
+          fabric = fabrics.find(
+            (f) =>
+              f && f.name && f.name.toLowerCase() === product.name.toLowerCase()
           );
+
+          // If found by name, update the product's fabricId for consistency
+          if (fabric && fabric.id) {
+            product.fabricId = fabric.id;
+          }
+        }
 
         if (!fabric) {
           validationFailed = true;
-          validationError = `Fabric ${product.name} not found in inventory`;
+          validationError = `Fabric "${product.name}" not found in inventory. Please select a valid product.`;
           break;
         }
 
@@ -627,12 +661,38 @@ export default function CashMemoPage() {
         products: products, // Include product details for inventory update logic
       };
 
-      // Debug: in dev show transaction payload to help validate product shapes
+      // Enhanced debugging for fabric validation
       if (process.env.NODE_ENV !== "production") {
         try {
           console.debug("[CashMemo] transaction payload:", transaction);
           console.debug("[CashMemo] Current fabrics data:", fabrics);
           console.debug("[CashMemo] Products to save:", products);
+
+          // Validate fabric IDs before proceeding
+          const invalidProducts = products.filter((p) => !p.fabricId);
+          if (invalidProducts.length > 0) {
+            console.error(
+              "[CashMemo] Products missing fabricId:",
+              invalidProducts
+            );
+          }
+
+          // Verify fabrics exist
+          for (const product of products) {
+            const fabric = fabrics.find((f) => f && f.id === product.fabricId);
+            if (!fabric) {
+              console.error(
+                `[CashMemo] Fabric not found for product:`,
+                product
+              );
+            } else {
+              console.debug(
+                `[CashMemo] Found fabric for ${product.name}:`,
+                fabric.name,
+                fabric.id
+              );
+            }
+          }
         } catch (e) {
           /* ignore logging errors */
         }
@@ -641,8 +701,62 @@ export default function CashMemoPage() {
       // Wait for transaction to be added
       const transactionId = await addTransaction(transaction);
 
+      // Double-check fabric IDs before reducing inventory
+      const productsWithValidFabricIds = products
+        .map((product) => {
+          // Ensure fabricId is set and valid
+          if (
+            !product.fabricId ||
+            product.fabricId === "0" ||
+            product.fabricId === ""
+          ) {
+            console.warn("[CashMemo] Product with invalid fabricId:", product);
+            const fabric = fabrics.find(
+              (f) =>
+                f &&
+                f.id &&
+                f.id !== "0" &&
+                f.id !== "" &&
+                f.name.toLowerCase() === product.name.toLowerCase()
+            );
+            if (fabric) {
+              console.log(
+                `[CashMemo] Fixed fabricId for ${product.name}: ${fabric.id}`
+              );
+              return { ...product, fabricId: fabric.id };
+            } else {
+              console.error(
+                `[CashMemo] No valid fabric found for ${product.name}`
+              );
+              return null;
+            }
+          }
+          return product;
+        })
+        .filter(
+          (product) =>
+            product &&
+            product.fabricId &&
+            product.fabricId !== "0" &&
+            product.fabricId !== ""
+        );
+
+      if (productsWithValidFabricIds.length !== products.length) {
+        const invalidCount =
+          products.length - productsWithValidFabricIds.length;
+        throw new Error(
+          `${invalidCount} product(s) have invalid fabric IDs. Please reselect the products.`
+        );
+      }
+
+      // Debug log before reducing inventory
+      console.debug(
+        "[CashMemo] Products with valid fabric IDs:",
+        productsWithValidFabricIds
+      );
+
       // Reduce inventory after successful transaction
-      await reduceInventory(products);
+      await reduceInventory(productsWithValidFabricIds);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
       if (deposit > 0 && transactionId) {
@@ -912,10 +1026,13 @@ export default function CashMemoPage() {
                         <CommandEmpty>No product found.</CommandEmpty>
                         <CommandGroup>
                           {fabrics
-                            ?.filter((fabric) =>
-                              fabric.name
-                                .toLowerCase()
-                                .includes(productSearchValue.toLowerCase())
+                            ?.filter(
+                              (fabric) =>
+                                fabric &&
+                                fabric.name &&
+                                fabric.name
+                                  .toLowerCase()
+                                  .includes(productSearchValue.toLowerCase())
                             )
                             .map((fabric) => {
                               // Get total quantity across all batches and colors

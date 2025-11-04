@@ -85,7 +85,7 @@ export default function Dashboard() {
   const [backupLoading, setBackupLoading] = useState(false);
 
   const stats = useMemo(() => {
-    if (!customers || !transactions || !fabrics || !suppliers) {
+    if (!Array.isArray(customers) || !transactions || !fabrics || !suppliers) {
       return {
         totalBill: 0,
         totalDeposit: 0,

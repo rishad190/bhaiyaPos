@@ -450,43 +450,113 @@ export function DataProvider({ children }) {
     const collections = [
       {
         path: COLLECTION_REFS.CUSTOMERS,
-        setter: (data) => dispatch({ type: "SET_CUSTOMERS", payload: data }),
+        setter: (data) => {
+          // Convert customers object to array format for components
+          if (data && typeof data === "object") {
+            const customersArray = Object.entries(data)
+              .map(([id, customerData]) => ({
+                id,
+                ...customerData,
+              }))
+              .filter(Boolean); // Remove null entries
+            dispatch({ type: "SET_CUSTOMERS", payload: customersArray });
+          } else {
+            dispatch({ type: "SET_CUSTOMERS", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.TRANSACTIONS,
-        setter: (data) => dispatch({ type: "SET_TRANSACTIONS", payload: data }),
+        setter: (data) => {
+          // Convert transactions object to array format for components
+          if (data && typeof data === "object") {
+            const transactionsArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_TRANSACTIONS", payload: transactionsArray });
+          } else {
+            dispatch({ type: "SET_TRANSACTIONS", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.DAILY_CASH,
-        setter: (data) =>
-          dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: data }),
+        setter: (data) => {
+          // Convert daily cash transactions object to array format for components
+          if (data && typeof data === "object") {
+            const dailyCashArray = Object.entries(data)
+              .map(([id, transactionData]) => ({
+                id,
+                ...transactionData,
+              }))
+              .filter(Boolean);
+            dispatch({
+              type: "SET_DAILY_CASH_TRANSACTIONS",
+              payload: dailyCashArray,
+            });
+          } else {
+            dispatch({ type: "SET_DAILY_CASH_TRANSACTIONS", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.SUPPLIERS,
-        setter: (data) => dispatch({ type: "SET_SUPPLIERS", payload: data }),
+        setter: (data) => {
+          // Convert suppliers object to array format for components
+          if (data && typeof data === "object") {
+            const suppliersArray = Object.entries(data)
+              .map(([id, supplierData]) => ({
+                id,
+                ...supplierData,
+              }))
+              .filter(Boolean);
+            dispatch({ type: "SET_SUPPLIERS", payload: suppliersArray });
+          } else {
+            dispatch({ type: "SET_SUPPLIERS", payload: [] });
+          }
+        },
       },
       {
         path: COLLECTION_REFS.FABRICS,
         setter: (data) => {
           // Convert flattened fabric structure to array format for components
           if (data && typeof data === "object") {
-            const fabricsArray = Object.entries(data).map(
-              ([id, fabricData]) => ({
-                id,
-                ...fabricData,
-                // Ensure batches is an array for compatibility
-                batches: fabricData.batches
-                  ? Object.entries(fabricData.batches).map(
-                      ([batchId, batch]) => ({
-                        id: batchId,
-                        ...batch,
-                      })
-                    )
-                  : [],
+            const fabricsArray = Object.entries(data)
+              .map(([id, fabricData]) => {
+                // Remove any existing id field from fabricData to avoid conflicts
+                const { id: existingId, ...cleanFabricData } = fabricData;
+
+                // Only include fabrics that have a valid Firebase ID
+                if (!id || id === "" || id === "0") {
+                  console.warn(
+                    `[DataContext] Skipping fabric with invalid ID:`,
+                    { id, fabricData }
+                  );
+                  return null;
+                }
+
+                return {
+                  id,
+                  ...cleanFabricData,
+                  // Ensure batches is an array for compatibility
+                  batches: cleanFabricData.batches
+                    ? Object.entries(cleanFabricData.batches).map(
+                        ([batchId, batch]) => ({
+                          id: batchId,
+                          ...batch,
+                        })
+                      )
+                    : [],
+                };
               })
-            );
+              .filter(Boolean); // Remove null entries
+
             dispatch({ type: "SET_FABRICS", payload: fabricsArray });
           } else {
+            console.log("[DataContext] No fabric data found");
             dispatch({ type: "SET_FABRICS", payload: [] });
           }
         },
@@ -505,14 +575,11 @@ export function DataProvider({ children }) {
 
           debounceTimers[path] = setTimeout(() => {
             if (snapshot.exists()) {
-              const data = Object.entries(snapshot.val()).map(
-                ([id, value]) => ({
-                  id,
-                  ...value,
-                })
-              );
-              setter(data);
+              const rawData = snapshot.val();
+              console.log(`[DataContext] Raw data for ${path}:`, rawData);
+              setter(rawData);
             } else {
+              console.log(`[DataContext] No data found for ${path}`);
               setter([]);
             }
           }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
@@ -556,10 +623,20 @@ export function DataProvider({ children }) {
   // Add memoization for customer dues
   const customerDues = useMemo(() => {
     const dues = {};
-    state.customers?.forEach((customer) => {
-      dues[customer.id] = state.transactions
-        ?.filter((t) => t.customerId === customer.id)
-        .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+
+    // Handle both array and object formats for customers
+    const customersArray = Array.isArray(state.customers)
+      ? state.customers
+      : state.customers && typeof state.customers === "object"
+      ? Object.values(state.customers)
+      : [];
+
+    customersArray?.forEach((customer) => {
+      if (customer && customer.id) {
+        dues[customer.id] = state.transactions
+          ?.filter((t) => t.customerId === customer.id)
+          .reduce((total, t) => total + ((t.total || 0) - (t.deposit || 0)), 0);
+      }
     });
     return dues;
   }, [state.customers, state.transactions]);
@@ -1146,6 +1223,11 @@ export function DataProvider({ children }) {
             saleProducts
           );
 
+          // Validate input products
+          if (!Array.isArray(saleProducts) || saleProducts.length === 0) {
+            throw new Error("No products provided for inventory reduction");
+          }
+
           const updatePromises = [];
           const lockedBatches = new Set();
 
@@ -1155,6 +1237,19 @@ export function DataProvider({ children }) {
                 `[DataContext] Processing product: ${product.name}, quantity: ${product.quantity}, color: ${product.color}`
               );
 
+              // Validate product data
+              if (!product.fabricId) {
+                throw new Error(
+                  `Product "${product.name}" has no fabric ID. Please select a valid product.`
+                );
+              }
+
+              if (!product.quantity || product.quantity <= 0) {
+                throw new Error(
+                  `Invalid quantity for product "${product.name}"`
+                );
+              }
+
               const fabricRef = ref(
                 db,
                 `${COLLECTION_REFS.FABRICS}/${product.fabricId}`
@@ -1162,7 +1257,9 @@ export function DataProvider({ children }) {
               const fabricSnapshot = await get(fabricRef);
 
               if (!fabricSnapshot.exists()) {
-                throw new Error(`Fabric ${product.fabricId} not found`);
+                throw new Error(
+                  `Fabric "${product.name}" (ID: ${product.fabricId}) not found in database`
+                );
               }
 
               const fabricData = fabricSnapshot.val();
@@ -1171,7 +1268,7 @@ export function DataProvider({ children }) {
                 Object.keys(fabricData.batches).length === 0
               ) {
                 throw new Error(
-                  `No batches found for fabric ${product.fabricId}. Please purchase stock for this fabric first.`
+                  `No batches found for fabric "${product.name}". Please purchase stock for this fabric first.`
                 );
               }
 
@@ -1245,6 +1342,7 @@ export function DataProvider({ children }) {
                       product.fabricId,
                       batch.batchId,
                       {
+                        fabricId: product.fabricId, // Add this line
                         items: batch.items,
                       }
                     )
