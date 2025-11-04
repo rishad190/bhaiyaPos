@@ -9,7 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary, DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useData } from "@/app/data-context";
 import { useToast } from "@/hooks/use-toast";
 import { formatLargeNumber } from "@/lib/utils";
@@ -49,7 +49,10 @@ const QuickStatCard = dynamic(
 );
 
 const RecentTransactions = dynamic(
-  () => import("@/components/RecentTransactions").then((mod) => mod.RecentTransactions),
+  () =>
+    import("@/components/RecentTransactions").then(
+      (mod) => mod.RecentTransactions
+    ),
   {
     loading: () => (
       <Card className="border-none shadow-md">
@@ -215,7 +218,7 @@ export default function Dashboard() {
   }
 
   return (
-    <ErrorBoundary>
+    <DataErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -354,6 +357,6 @@ export default function Dashboard() {
           />
         </div>
       </div>
-    </ErrorBoundary>
+    </DataErrorBoundary>
   );
 }

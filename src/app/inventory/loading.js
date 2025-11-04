@@ -1,5 +1,5 @@
-import LoadingFallback from "@/components/LoadingFallback";
+import { InventoryLoading } from "@/components/LoadingSystem";
 
-export default function InventoryLoading() {
-  return <LoadingFallback />;
+export default function InventoryLoadingPage() {
+  return <InventoryLoading />;
 }

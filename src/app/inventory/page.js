@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
 import {
   Table,
   TableBody,
@@ -174,130 +175,150 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      <Card className="border-none shadow-md">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <CardTitle className="text-3xl font-bold tracking-tight">
-                Fabric Inventory
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Manage your fabric stock here.
-              </CardDescription>
+    <InventoryErrorBoundary>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
+        <Card className="border-none shadow-md">
+          <CardHeader>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <CardTitle className="text-3xl font-bold tracking-tight">
+                  Fabric Inventory
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Manage your fabric stock here.
+                </CardDescription>
+              </div>
+              <Button
+                onClick={handleAddClick}
+                className="bg-primary hover:bg-primary/90 text-white w-full md:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Fabric
+              </Button>
             </div>
-            <Button
-              onClick={handleAddClick}
-              className="bg-primary hover:bg-primary/90 text-white w-full md:w-auto"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Fabric
-            </Button>
-          </div>
 
-          <div className="mt-4">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, code, or category..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+            <div className="mt-4">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, code, or category..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
 
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFabrics.map((fabric) => (
-                <TableRow key={fabric.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">
-                    <div>{fabric.name}</div>
-                    {fabric.description && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {fabric.description}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{fabric.code}</TableCell>
-                  <TableCell>{fabric.category}</TableCell>
-                  <TableCell className="text-right">
-                    {calculateTotalQuantity(fabric).toFixed(2)}{" "}
-                    {fabric.unit || "pieces"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/inventory/${fabric.id}`)}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditClick(fabric)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteClick(fabric.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {!filteredFabrics.length && (
+          <CardContent>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No fabrics found.{" "}
-                    {searchTerm && "Try adjusting your search terms."}
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Current Stock</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredFabrics.map((fabric) => (
+                  <TableRow
+                    key={fabric.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/inventory/${fabric.id}`)}
+                  >
+                    <TableCell className="font-medium">
+                      <div>{fabric.name}</div>
+                      {fabric.description && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {fabric.description}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>{fabric.code}</TableCell>
+                    <TableCell>{fabric.category}</TableCell>
+                    <TableCell className="text-right">
+                      {calculateTotalQuantity(fabric).toFixed(2)}{" "}
+                      {fabric.unit || "pieces"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from interfering
+                            console.log(
+                              "Navigating to fabric:",
+                              fabric.id,
+                              fabric.name
+                            );
+                            router.push(`/inventory/${fabric.id}`);
+                          }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from interfering
+                            handleEditClick(fabric);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click from interfering
+                            handleDeleteClick(fabric.id);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
 
-      {/* Fabric Form Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingFabric ? "Edit Fabric" : "Add New Fabric"}
-            </DialogTitle>
-          </DialogHeader>
-          <FabricForm
-            fabric={editingFabric}
-            onSave={handleSaveFabric}
-            onCancel={() => {
-              setIsDialogOpen(false);
-              setEditingFabric(null);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-    </div>
+                {!filteredFabrics.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      No fabrics found.{" "}
+                      {searchTerm && "Try adjusting your search terms."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Fabric Form Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingFabric ? "Edit Fabric" : "Add New Fabric"}
+              </DialogTitle>
+            </DialogHeader>
+            <FabricForm
+              fabric={editingFabric}
+              onSave={handleSaveFabric}
+              onCancel={() => {
+                setIsDialogOpen(false);
+                setEditingFabric(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+    </InventoryErrorBoundary>
   );
 }

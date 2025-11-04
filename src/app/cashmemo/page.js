@@ -3,6 +3,7 @@ import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
+import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
 
 import {
   Table,
@@ -46,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { calculateFifoSale } from "@/lib/inventory-utils";
 import { formatColorDisplay, formatProductWithColor } from "@/lib/color-utils";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -176,10 +178,15 @@ export default function CashMemoPage() {
     const total = quantityNum * priceNum;
 
     // Find fabric with batches from the new data structure
-    const fabric = fabrics.find(
-      (f) =>
-        f && f.name && f.name.toLowerCase() === newProduct.name.toLowerCase()
-    );
+    // First try to find by fabricId if available, otherwise by name
+    const fabric = newProduct.fabricId
+      ? fabrics.find((f) => f && f.id === newProduct.fabricId)
+      : fabrics.find(
+          (f) =>
+            f &&
+            f.name &&
+            f.name.toLowerCase() === newProduct.name.toLowerCase()
+        );
 
     if (!fabric) {
       toast({
@@ -188,6 +195,11 @@ export default function CashMemoPage() {
         variant: "destructive",
       });
       return;
+    }
+
+    // Ensure fabricId is set
+    if (!newProduct.fabricId) {
+      setNewProduct((prev) => ({ ...prev, fabricId: fabric.id }));
     }
 
     // Batches are now directly in the fabric object
@@ -521,12 +533,12 @@ export default function CashMemoPage() {
       let validationError = "";
 
       for (const product of products) {
-        const fabric = fabrics.find(
-          (f) =>
-            f &&
-            (f.id === product.fabricId ||
-              f.name.toLowerCase() === product.name.toLowerCase())
-        );
+        // First try to find by fabricId, then by name as fallback
+        const fabric =
+          fabrics.find((f) => f && f.id === product.fabricId) ||
+          fabrics.find(
+            (f) => f && f.name.toLowerCase() === product.name.toLowerCase()
+          );
 
         if (!fabric) {
           validationFailed = true;
@@ -680,63 +692,207 @@ export default function CashMemoPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
-      <Toaster />
-      {isSaving && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg border flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <span className="text-sm font-medium">Saving memo...</span>
+    <TransactionErrorBoundary>
+      <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
+        <Toaster />
+        {isSaving && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-lg shadow-lg border flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              <span className="text-sm font-medium">Saving memo...</span>
+            </div>
           </div>
-        </div>
-      )}
-      <Card className="p-4 md:p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        )}
+        <Card className="p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Date</label>
+                <Input
+                  type="date"
+                  value={memoData.date}
+                  onChange={(e) =>
+                    setMemoData({ ...memoData, date: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Customer Name</label>
+                <Input
+                  value={memoData.customerName}
+                  onChange={(e) =>
+                    setMemoData({ ...memoData, customerName: e.target.value })
+                  }
+                  placeholder="Enter customer name"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Phone Number</label>
+                <div className="relative">
+                  <Popover
+                    open={openPhonePopover}
+                    onOpenChange={setOpenPhonePopover}
+                  >
+                    <PopoverTrigger asChild>
+                      <div className="flex items-center">
+                        <Input
+                          value={memoData.customerPhone}
+                          onChange={(e) => {
+                            handlePhoneChange(e);
+                            setPhoneSearchValue(e.target.value);
+                          }}
+                          placeholder="Enter or search phone number"
+                          className="w-full"
+                        />
+                        <Button
+                          variant="ghost"
+                          role="combobox"
+                          aria-expanded={openPhonePopover}
+                          className="absolute right-0 h-full px-3"
+                          onClick={() => setOpenPhonePopover(!openPhonePopover)}
+                        >
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      align="start"
+                    >
+                      <Command
+                        shouldFilter={false} /* Filtering done via state */
+                      >
+                        <CommandInput
+                          placeholder="Search customers..."
+                          value={phoneSearchValue}
+                          onValueChange={setPhoneSearchValue}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No customer found.</CommandEmpty>
+                          <CommandGroup>
+                            {customers
+                              ?.filter(
+                                (customer) =>
+                                  customer.phone.includes(phoneSearchValue) ||
+                                  customer.name
+                                    .toLowerCase()
+                                    .includes(phoneSearchValue.toLowerCase())
+                              )
+                              .map((customer) => (
+                                <CommandItem
+                                  key={customer.id}
+                                  value={`${customer.name} ${customer.phone}`} // Unique value for selection
+                                  onSelect={() =>
+                                    handleSelectCustomer(customer)
+                                  }
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      customerId === customer.id // Check against customerId
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{customer.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {customer.phone}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Deposit Amount</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={memoData.deposit}
+                  onChange={(e) =>
+                    setMemoData({
+                      ...memoData,
+                      deposit: e.target.value,
+                    })
+                  }
+                  placeholder="Enter deposit amount"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Memo Number</label>
+                <Input
+                  value={memoData.memoNumber}
+                  onChange={(e) =>
+                    setMemoData({ ...memoData, memoNumber: e.target.value })
+                  }
+                  placeholder="Enter memo number"
+                  className="bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Address</label>
+                <Input
+                  value={memoData.customerAddress}
+                  onChange={(e) =>
+                    setMemoData({
+                      ...memoData,
+                      customerAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Enter address"
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 md:p-6">
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Date</label>
-              <Input
-                type="date"
-                value={memoData.date}
-                onChange={(e) =>
-                  setMemoData({ ...memoData, date: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Customer Name</label>
-              <Input
-                value={memoData.customerName}
-                onChange={(e) =>
-                  setMemoData({ ...memoData, customerName: e.target.value })
-                }
-                placeholder="Enter customer name"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Phone Number</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-end">
+              {/* Product Name Search/Select */}
               <div className="relative">
+                <label className="text-sm font-medium">Product Name *</label>
                 <Popover
-                  open={openPhonePopover}
-                  onOpenChange={setOpenPhonePopover}
+                  open={openProductPopover}
+                  onOpenChange={setOpenProductPopover}
                 >
                   <PopoverTrigger asChild>
-                    <div className="flex items-center">
+                    <div className="relative flex items-center mt-1">
                       <Input
-                        value={memoData.customerPhone}
+                        placeholder="Search or select product..."
+                        value={productSearchValue || newProduct.name} // Display search value or selected name
                         onChange={(e) => {
-                          handlePhoneChange(e);
-                          setPhoneSearchValue(e.target.value);
+                          setProductSearchValue(e.target.value);
+                          // Optionally clear selected product name if user starts typing
+                          if (
+                            newProduct.name &&
+                            e.target.value !== newProduct.name
+                          ) {
+                            setNewProduct({ ...newProduct, name: "" });
+                          }
+                          setOpenProductPopover(true); // Open popover when typing
                         }}
-                        placeholder="Enter or search phone number"
-                        className="w-full"
+                        required
+                        className="w-full pr-10" // Add padding for the button
                       />
                       <Button
                         variant="ghost"
                         role="combobox"
-                        aria-expanded={openPhonePopover}
+                        aria-expanded={openProductPopover}
                         className="absolute right-0 h-full px-3"
-                        onClick={() => setOpenPhonePopover(!openPhonePopover)}
+                        onClick={() =>
+                          setOpenProductPopover(!openProductPopover)
+                        }
                       >
                         <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -746,161 +902,26 @@ export default function CashMemoPage() {
                     className="w-[--radix-popover-trigger-width] p-0"
                     align="start"
                   >
-                    <Command
-                      shouldFilter={false} /* Filtering done via state */
-                    >
+                    <Command shouldFilter={false}>
                       <CommandInput
-                        placeholder="Search customers..."
-                        value={phoneSearchValue}
-                        onValueChange={setPhoneSearchValue}
+                        placeholder="Search products..."
+                        value={productSearchValue}
+                        onValueChange={setProductSearchValue}
                       />
                       <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandEmpty>No product found.</CommandEmpty>
                         <CommandGroup>
-                          {customers
-                            ?.filter(
-                              (customer) =>
-                                customer.phone.includes(phoneSearchValue) ||
-                                customer.name
-                                  .toLowerCase()
-                                  .includes(phoneSearchValue.toLowerCase())
+                          {fabrics
+                            ?.filter((fabric) =>
+                              fabric.name
+                                .toLowerCase()
+                                .includes(productSearchValue.toLowerCase())
                             )
-                            .map((customer) => (
-                              <CommandItem
-                                key={customer.id}
-                                value={`${customer.name} ${customer.phone}`} // Unique value for selection
-                                onSelect={() => handleSelectCustomer(customer)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    customerId === customer.id // Check against customerId
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{customer.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {customer.phone}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Deposit Amount</label>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                value={memoData.deposit}
-                onChange={(e) =>
-                  setMemoData({
-                    ...memoData,
-                    deposit: e.target.value,
-                  })
-                }
-                placeholder="Enter deposit amount"
-                className="w-full"
-              />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Memo Number</label>
-              <Input
-                value={memoData.memoNumber}
-                onChange={(e) =>
-                  setMemoData({ ...memoData, memoNumber: e.target.value })
-                }
-                placeholder="Enter memo number"
-                className="bg-gray-50"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Address</label>
-              <Input
-                value={memoData.customerAddress}
-                onChange={(e) =>
-                  setMemoData({ ...memoData, customerAddress: e.target.value })
-                }
-                placeholder="Enter address"
-              />
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-4 md:p-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-end">
-            {/* Product Name Search/Select */}
-            <div className="relative">
-              <label className="text-sm font-medium">Product Name *</label>
-              <Popover
-                open={openProductPopover}
-                onOpenChange={setOpenProductPopover}
-              >
-                <PopoverTrigger asChild>
-                  <div className="relative flex items-center mt-1">
-                    <Input
-                      placeholder="Search or select product..."
-                      value={productSearchValue || newProduct.name} // Display search value or selected name
-                      onChange={(e) => {
-                        setProductSearchValue(e.target.value);
-                        // Optionally clear selected product name if user starts typing
-                        if (
-                          newProduct.name &&
-                          e.target.value !== newProduct.name
-                        ) {
-                          setNewProduct({ ...newProduct, name: "" });
-                        }
-                        setOpenProductPopover(true); // Open popover when typing
-                      }}
-                      required
-                      className="w-full pr-10" // Add padding for the button
-                    />
-                    <Button
-                      variant="ghost"
-                      role="combobox"
-                      aria-expanded={openProductPopover}
-                      className="absolute right-0 h-full px-3"
-                      onClick={() => setOpenProductPopover(!openProductPopover)}
-                    >
-                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[--radix-popover-trigger-width] p-0"
-                  align="start"
-                >
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Search products..."
-                      value={productSearchValue}
-                      onValueChange={setProductSearchValue}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No product found.</CommandEmpty>
-                      <CommandGroup>
-                        {fabrics
-                          ?.filter((fabric) =>
-                            fabric.name
-                              .toLowerCase()
-                              .includes(productSearchValue.toLowerCase())
-                          )
-                          .map((fabric) => {
-                            // Get total quantity across all batches and colors
-                            const totalQuantity = (fabric.batches || []).reduce(
-                              (sum, batch) => {
+                            .map((fabric) => {
+                              // Get total quantity across all batches and colors
+                              const totalQuantity = (
+                                fabric.batches || []
+                              ).reduce((sum, batch) => {
                                 if (!batch?.items) return sum;
                                 return (
                                   sum +
@@ -910,306 +931,308 @@ export default function CashMemoPage() {
                                     0
                                   )
                                 );
-                              },
-                              0
-                            );
+                              }, 0);
 
-                            return (
-                              <CommandItem
-                                key={fabric.id}
-                                value={fabric.name} // Use name for selection value
-                                onSelect={() => {
-                                  handleSelectProduct(fabric);
-                                  setProductSearchValue(fabric.name); // Update search input on select
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    newProduct.name.toLowerCase() ===
-                                      fabric.name.toLowerCase()
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col w-full">
-                                  <div className="flex justify-between w-full">
-                                    <span className="font-medium">
-                                      {fabric.name}
-                                    </span>
-                                    <span className="text-muted-foreground text-sm">
-                                      {totalQuantity.toFixed(2)} {fabric.unit}
-                                    </span>
-                                  </div>
-                                  <div className="flex gap-2 mt-1">
-                                    {(fabric.batches || [])
-                                      .flatMap((batch) => batch.items || [])
-                                      .reduce((colors, item) => {
-                                        if (!item?.colorName || !item?.quantity)
-                                          return colors;
-                                        const existing = colors.find(
-                                          (c) => c.color === item.colorName
-                                        );
-                                        if (existing) {
-                                          existing.quantity += Number(
-                                            item.quantity
+                              return (
+                                <CommandItem
+                                  key={fabric.id}
+                                  value={fabric.name} // Use name for selection value
+                                  onSelect={() => {
+                                    handleSelectProduct(fabric);
+                                    setProductSearchValue(fabric.name); // Update search input on select
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      newProduct.name.toLowerCase() ===
+                                        fabric.name.toLowerCase()
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col w-full">
+                                    <div className="flex justify-between w-full">
+                                      <span className="font-medium">
+                                        {fabric.name}
+                                      </span>
+                                      <span className="text-muted-foreground text-sm">
+                                        {totalQuantity.toFixed(2)} {fabric.unit}
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-2 mt-1">
+                                      {(fabric.batches || [])
+                                        .flatMap((batch) => batch.items || [])
+                                        .reduce((colors, item) => {
+                                          if (
+                                            !item?.colorName ||
+                                            !item?.quantity
+                                          )
+                                            return colors;
+                                          const existing = colors.find(
+                                            (c) => c.color === item.colorName
                                           );
-                                        } else {
-                                          colors.push({
-                                            color: item.colorName,
-                                            quantity: Number(item.quantity),
-                                          });
-                                        }
-                                        return colors;
-                                      }, [])
-                                      .filter((c) => c.quantity > 0)
-                                      .map(({ color, quantity }) => (
-                                        <span
-                                          key={color}
-                                          className="text-xs px-2 py-0.5 rounded-full bg-muted"
-                                        >
-                                          {color} ({quantity})
-                                        </span>
-                                      ))}
+                                          if (existing) {
+                                            existing.quantity += Number(
+                                              item.quantity
+                                            );
+                                          } else {
+                                            colors.push({
+                                              color: item.colorName,
+                                              quantity: Number(item.quantity),
+                                            });
+                                          }
+                                          return colors;
+                                        }, [])
+                                        .filter((c) => c.quantity > 0)
+                                        .map(({ color, quantity }) => (
+                                          <span
+                                            key={color}
+                                            className="text-xs px-2 py-0.5 rounded-full bg-muted"
+                                          >
+                                            {color} ({quantity})
+                                          </span>
+                                        ))}
+                                    </div>
                                   </div>
-                                </div>
-                              </CommandItem>
-                            );
-                          })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            {/* Color Select */}
-            <div>
-              <label className="text-sm font-medium">Color</label>
-              <Select
-                value={newProduct.color}
-                onValueChange={(value) =>
-                  setNewProduct({
-                    ...newProduct,
-                    color: value === "all" ? "" : value,
-                  })
-                } // Handle 'All Colors' selection
-                disabled={!newProduct.name} // Only disable if no product selected
+                                </CommandItem>
+                              );
+                            })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {/* Color Select */}
+              <div>
+                <label className="text-sm font-medium">Color</label>
+                <Select
+                  value={newProduct.color}
+                  onValueChange={(value) =>
+                    setNewProduct({
+                      ...newProduct,
+                      color: value === "all" ? "" : value,
+                    })
+                  } // Handle 'All Colors' selection
+                  disabled={!newProduct.name} // Only disable if no product selected
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select color" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Colors</SelectItem>
+                    {availableColors
+                      .filter(({ quantity }) => quantity > 0)
+                      .sort((a, b) => b.quantity - a.quantity)
+                      .map(({ color, quantity }) => (
+                        <SelectItem key={color} value={color}>
+                          {color} ({quantity.toFixed(2)} {newProduct.unit})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Quantity Input */}
+              <div>
+                <label className="text-sm font-medium">Quantity *</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Enter quantity"
+                  value={newProduct.quantity}
+                  onChange={(e) =>
+                    setNewProduct({ ...newProduct, quantity: e.target.value })
+                  }
+                  required
+                  className="mt-1"
+                />
+              </div>
+              {/* Price Input */}
+              <div>
+                <label className="text-sm font-medium">Price *</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Price"
+                  value={newProduct.price}
+                  onChange={(e) =>
+                    setNewProduct({ ...newProduct, price: e.target.value })
+                  }
+                  required
+                  className="mt-1"
+                />
+              </div>
+              {/* Add Button */}
+              <Button
+                onClick={handleAddProduct}
+                className="w-full md:w-auto"
+                disabled={
+                  !newProduct.name || !newProduct.quantity || !newProduct.price
+                }
               >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Colors</SelectItem>
-                  {availableColors
-                    .filter(({ quantity }) => quantity > 0)
-                    .sort((a, b) => b.quantity - a.quantity)
-                    .map(({ color, quantity }) => (
-                      <SelectItem key={color} value={color}>
-                        {color} ({quantity.toFixed(2)} {newProduct.unit})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                Add
+              </Button>
             </div>
-            {/* Quantity Input */}
-            <div>
-              <label className="text-sm font-medium">Quantity *</label>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Enter quantity"
-                value={newProduct.quantity}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, quantity: e.target.value })
-                }
-                required
-                className="mt-1"
-              />
-            </div>
-            {/* Price Input */}
-            <div>
-              <label className="text-sm font-medium">Price *</label>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Price"
-                value={newProduct.price}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, price: e.target.value })
-                }
-                required
-                className="mt-1"
-              />
-            </div>
-            {/* Add Button */}
-            <Button
-              onClick={handleAddProduct}
-              className="w-full md:w-auto"
-              disabled={
-                !newProduct.name || !newProduct.quantity || !newProduct.price
-              }
-            >
-              Add
-            </Button>
-          </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">Product</TableHead>
-                  <TableHead className="whitespace-nowrap">Color</TableHead>
-                  <TableHead className="text-right whitespace-nowrap">
-                    Quantity
-                  </TableHead>
-                  <TableHead className="text-right whitespace-nowrap">
-                    Price
-                  </TableHead>
-                  <TableHead className="text-right whitespace-nowrap">
-                    Total
-                  </TableHead>
-                  <TableHead className="text-right whitespace-nowrap">
-                    Profit
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="whitespace-nowrap">
-                      {product.name}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Product</TableHead>
+                    <TableHead className="whitespace-nowrap">Color</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Quantity
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Price
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Total
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      Profit
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="whitespace-nowrap">
+                        {product.name}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatColorDisplay(product.color)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {typeof product.quantity === "number"
+                          ? product.quantity.toFixed(2)
+                          : product.quantity}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        ৳{parseFloat(product.price).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        ৳{product.total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        ৳
+                        {product.profit.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        {/* Ensure profit shows decimals */}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-right font-bold">
+                      Grand Total:
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {formatColorDisplay(product.color)}
+                    <TableCell className="text-right font-bold whitespace-nowrap">
+                      ৳{grandTotal.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      {typeof product.quantity === "number"
-                        ? product.quantity.toFixed(2)
-                        : product.quantity}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-right font-bold text-green-600"
+                    >
+                      Total Profit:
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{parseFloat(product.price).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{product.total.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell className="text-right font-bold whitespace-nowrap text-green-600">
                       ৳
-                      {product.profit.toLocaleString(undefined, {
+                      {totalProfit.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}{" "}
                       {/* Ensure profit shows decimals */}
                     </TableCell>
                   </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell colSpan={5} className="text-right font-bold">
-                    Grand Total:
-                  </TableCell>
-                  <TableCell className="text-right font-bold whitespace-nowrap">
-                    ৳{grandTotal.toLocaleString()}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-right font-bold text-green-600"
-                  >
-                    Total Profit:
-                  </TableCell>
-                  <TableCell className="text-right font-bold whitespace-nowrap text-green-600">
-                    ৳
-                    {totalProfit.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    {/* Ensure profit shows decimals */}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-right font-medium text-green-600"
-                  >
-                    Deposit:
-                  </TableCell>
-                  <TableCell className="text-right font-medium whitespace-nowrap text-green-600">
-                    ৳{Number(memoData.deposit || 0).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-right font-medium text-red-600"
-                  >
-                    Due Amount:
-                  </TableCell>
-                  <TableCell className="text-right font-medium whitespace-nowrap text-red-600">
-                    ৳
-                    {(
-                      grandTotal - Number(memoData.deposit || 0)
-                    ).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-right font-medium text-green-600"
+                    >
+                      Deposit:
+                    </TableCell>
+                    <TableCell className="text-right font-medium whitespace-nowrap text-green-600">
+                      ৳{Number(memoData.deposit || 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-right font-medium text-red-600"
+                    >
+                      Due Amount:
+                    </TableCell>
+                    <TableCell className="text-right font-medium whitespace-nowrap text-red-600">
+                      ৳
+                      {(
+                        grandTotal - Number(memoData.deposit || 0)
+                      ).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           </div>
+        </Card>
+
+        <div className="flex flex-col sm:flex-row justify-end gap-4">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto print:hidden"
+            onClick={handlePrint}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            Print Memo
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto print:hidden"
+            // onClick={handleExportPDF} // PDF Export functionality might need review/implementation
+            disabled // Disable if not implemented
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            Export PDF
+          </Button>
+          <Button
+            className="w-full sm:w-auto print:hidden"
+            onClick={handleSaveMemo}
+            disabled={isSaving || saveSuccess || products.length === 0}
+          >
+            {saveSuccess ? (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Saved!
+              </>
+            ) : isSaving ? (
+              <>
+                <div className="mr-2 h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Memo
+              </>
+            )}
+          </Button>
         </div>
-      </Card>
 
-      <div className="flex flex-col sm:flex-row justify-end gap-4">
-        <Button
-          variant="outline"
-          className="w-full sm:w-auto print:hidden"
-          onClick={handlePrint}
-        >
-          <Printer className="mr-2 h-4 w-4" />
-          Print Memo
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full sm:w-auto print:hidden"
-          // onClick={handleExportPDF} // PDF Export functionality might need review/implementation
-          disabled // Disable if not implemented
-        >
-          <FileDown className="mr-2 h-4 w-4" />
-          Export PDF
-        </Button>
-        <Button
-          className="w-full sm:w-auto print:hidden"
-          onClick={handleSaveMemo}
-          disabled={isSaving || saveSuccess || products.length === 0}
-        >
-          {saveSuccess ? (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Saved!
-            </>
-          ) : isSaving ? (
-            <>
-              <div className="mr-2 h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full"></div>
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              Save Memo
-            </>
-          )}
-        </Button>
+        {/* Print Section (Hidden on screen) */}
+        <div id="print-section" className="hidden print:block">
+          <CashMemoPrint
+            memoData={memoData}
+            products={products}
+            grandTotal={grandTotal}
+          />
+        </div>
       </div>
-
-      {/* Print Section (Hidden on screen) */}
-      <div id="print-section" className="hidden print:block">
-        <CashMemoPrint
-          memoData={memoData}
-          products={products}
-          grandTotal={grandTotal}
-        />
-      </div>
-    </div>
+    </TransactionErrorBoundary>
   );
 }

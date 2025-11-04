@@ -24,33 +24,19 @@ import { calculateTotalQuantity } from "@/lib/inventory-utils";
 export default function FabricDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { fabrics, fabricBatches } = useData();
+  const { fabrics } = useData();
 
-  // Find the current fabric
+  // Find the current fabric with its batches (new flattened structure)
   const fabric = useMemo(() => {
     return fabrics?.find((f) => f.id === params.id);
   }, [fabrics, params.id]);
 
-  // Get batches for this fabric
-  const fabricBatchesList = useMemo(() => {
-    return fabricBatches?.filter((batch) => batch.fabricId === params.id) || [];
-  }, [fabricBatches, params.id]);
-
-  // Combine fabric data with batches for the unified structure
-  const fabricWithBatches = useMemo(() => {
-    if (!fabric) return null;
-    return {
-      ...fabric,
-      batches: fabricBatchesList,
-    };
-  }, [fabric, fabricBatchesList]);
-
   const totalStock = useMemo(() => {
-    if (!fabricWithBatches) return 0;
-    return calculateTotalQuantity(fabricWithBatches);
-  }, [fabricWithBatches]);
+    if (!fabric) return 0;
+    return calculateTotalQuantity(fabric);
+  }, [fabric]);
 
-  if (!fabricWithBatches) {
+  if (!fabric) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
@@ -73,13 +59,13 @@ export default function FabricDetailPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold">
-            {fabricWithBatches.name}
+            {fabric.name}
             <span className="text-lg text-muted-foreground ml-2">
-              ({fabricWithBatches.code})
+              ({fabric.code})
             </span>
           </h2>
           <p className="text-muted-foreground">
-            {fabricWithBatches.category} - {fabricWithBatches.description}
+            {fabric.category} - {fabric.description}
           </p>
         </div>
         <Button variant="outline" onClick={() => router.push("/inventory")}>
@@ -96,7 +82,7 @@ export default function FabricDetailPage() {
           <div className="text-4xl font-bold">
             {totalStock.toFixed(2)}
             <span className="text-2xl text-muted-foreground ml-2">
-              {fabricWithBatches.unit || "pieces"}
+              {fabric.unit || "pieces"}
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -107,8 +93,8 @@ export default function FabricDetailPage() {
 
       <div className="space-y-4">
         <h3 className="text-2xl font-semibold">Container Details</h3>
-        {fabricBatchesList.length > 0 ? (
-          fabricBatchesList.map((batch) => {
+        {fabric.batches && fabric.batches.length > 0 ? (
+          fabric.batches.map((batch) => {
             const batchTotalQuantity = (batch.items || []).reduce(
               (sum, item) => sum + (Number(item.quantity) || 0),
               0
@@ -136,8 +122,7 @@ export default function FabricDetailPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-lg">
-                      {batchTotalQuantity.toFixed(2)}{" "}
-                      {fabricWithBatches.unit || "pieces"}
+                      {batchTotalQuantity.toFixed(2)} {fabric.unit || "pieces"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       in this container
@@ -151,7 +136,7 @@ export default function FabricDetailPage() {
                         <TableRow>
                           <TableHead className="w-[70%]">Color</TableHead>
                           <TableHead className="text-right">
-                            Quantity ({fabricWithBatches.unit || "pieces"})
+                            Quantity ({fabric.unit || "pieces"})
                           </TableHead>
                         </TableRow>
                       </TableHeader>

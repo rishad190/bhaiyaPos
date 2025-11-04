@@ -78,7 +78,7 @@ const initialState = {
   suppliers: [],
   supplierTransactions: [],
   fabrics: [],
-  fabricBatches: [],
+  // Remove fabricBatches from initial state as batches are now nested in fabrics
   loading: true,
   error: null,
   connectionState: CONNECTION_STATES.CONNECTING,
@@ -157,12 +157,7 @@ function reducer(state, action) {
         fabrics: action.payload,
         loading: false,
       };
-    case "SET_FABRIC_BATCHES":
-      return {
-        ...state,
-        fabricBatches: action.payload,
-        loading: false,
-      };
+    // Remove SET_FABRIC_BATCHES case as batches are now nested in fabrics
     case "SET_ERROR":
       return {
         ...state,
@@ -472,13 +467,31 @@ export function DataProvider({ children }) {
       },
       {
         path: COLLECTION_REFS.FABRICS,
-        setter: (data) => dispatch({ type: "SET_FABRICS", payload: data }),
+        setter: (data) => {
+          // Convert flattened fabric structure to array format for components
+          if (data && typeof data === "object") {
+            const fabricsArray = Object.entries(data).map(
+              ([id, fabricData]) => ({
+                id,
+                ...fabricData,
+                // Ensure batches is an array for compatibility
+                batches: fabricData.batches
+                  ? Object.entries(fabricData.batches).map(
+                      ([batchId, batch]) => ({
+                        id: batchId,
+                        ...batch,
+                      })
+                    )
+                  : [],
+              })
+            );
+            dispatch({ type: "SET_FABRICS", payload: fabricsArray });
+          } else {
+            dispatch({ type: "SET_FABRICS", payload: [] });
+          }
+        },
       },
-      {
-        path: COLLECTION_REFS.FABRIC_BATCHES,
-        setter: (data) =>
-          dispatch({ type: "SET_FABRIC_BATCHES", payload: data }),
-      },
+      // Remove separate fabricBatches listener as batches are now nested in fabrics
     ];
 
     try {
@@ -999,6 +1012,7 @@ export function DataProvider({ children }) {
   }, []);
 
   // Fabric Operations with atomic execution, validation, and batch-level locking
+  // Updated for flattened structure where batches are nested within fabrics
   const fabricOperations = useMemo(
     () => ({
       addFabric: async (fabricData) => {
@@ -1011,12 +1025,15 @@ export function DataProvider({ children }) {
         return executeAtomicOperation("addFabric", async () => {
           const fabricsRef = ref(db, COLLECTION_REFS.FABRICS);
           const newFabricRef = push(fabricsRef);
+          const fabricId = newFabricRef.key;
+
+          // Create fabric with empty batches object
           await set(newFabricRef, {
             ...fabricData,
-            id: newFabricRef.key,
+            batches: {},
             createdAt: new Date().toISOString(),
           });
-          return newFabricRef.key;
+          return fabricId;
         });
       },
 
@@ -1038,16 +1055,7 @@ export function DataProvider({ children }) {
 
       deleteFabric: async (fabricId) => {
         return executeAtomicOperation("deleteFabric", async () => {
-          // First delete associated batches
-          const fabricBatches = state.fabricBatches.filter(
-            (b) => b.fabricId === fabricId
-          );
-          for (const batch of fabricBatches) {
-            await remove(
-              ref(db, `${COLLECTION_REFS.FABRIC_BATCHES}/${batch.id}`)
-            );
-          }
-          // Then delete the fabric
+          // With flattened structure, batches are automatically deleted when fabric is deleted
           await remove(ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`));
         });
       },
@@ -1059,19 +1067,40 @@ export function DataProvider({ children }) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
         }
 
+        const { fabricId, ...batchDetails } = batchData;
+
         return executeAtomicOperation("addFabricBatch", async () => {
-          const batchesRef = ref(db, COLLECTION_REFS.FABRIC_BATCHES);
-          const newBatchRef = push(batchesRef);
-          await set(newBatchRef, {
-            ...batchData,
-            id: newBatchRef.key,
-            createdAt: new Date().toISOString(),
+          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
+          const fabricSnapshot = await get(fabricRef);
+
+          if (!fabricSnapshot.exists()) {
+            throw new Error(`Fabric with ID ${fabricId} not found`);
+          }
+
+          const fabricData = fabricSnapshot.val();
+          const batchId = `batch_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+
+          // Add batch to fabric's batches object
+          const updatedBatches = {
+            ...(fabricData.batches || {}),
+            [batchId]: {
+              ...batchDetails,
+              createdAt: new Date().toISOString(),
+            },
+          };
+
+          await update(fabricRef, {
+            batches: updatedBatches,
+            updatedAt: new Date().toISOString(),
           });
-          return newBatchRef.key;
+
+          return batchId;
         });
       },
 
-      updateFabricBatch: async (batchId, updatedData) => {
+      updateFabricBatch: async (fabricId, batchId, updatedData) => {
         // Validate batch data
         const validationErrors = validateBatchData(updatedData);
         if (validationErrors.length > 0) {
@@ -1079,12 +1108,32 @@ export function DataProvider({ children }) {
         }
 
         return executeAtomicOperation("updateFabricBatch", async () => {
-          const batchRef = ref(
-            db,
-            `${COLLECTION_REFS.FABRIC_BATCHES}/${batchId}`
-          );
-          await update(batchRef, {
-            ...updatedData,
+          const fabricRef = ref(db, `${COLLECTION_REFS.FABRICS}/${fabricId}`);
+          const fabricSnapshot = await get(fabricRef);
+
+          if (!fabricSnapshot.exists()) {
+            throw new Error(`Fabric with ID ${fabricId} not found`);
+          }
+
+          const fabricData = fabricSnapshot.val();
+          if (!fabricData.batches || !fabricData.batches[batchId]) {
+            throw new Error(
+              `Batch with ID ${batchId} not found in fabric ${fabricId}`
+            );
+          }
+
+          // Update the specific batch
+          const updatedBatches = {
+            ...fabricData.batches,
+            [batchId]: {
+              ...fabricData.batches[batchId],
+              ...updatedData,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+
+          await update(fabricRef, {
+            batches: updatedBatches,
             updatedAt: new Date().toISOString(),
           });
         });
@@ -1097,16 +1146,6 @@ export function DataProvider({ children }) {
             saleProducts
           );
 
-          // Get current fabric batches to work with the latest data
-          const batchesRef = ref(db, COLLECTION_REFS.FABRIC_BATCHES);
-          const snapshot = await get(batchesRef);
-          const allBatches = snapshot.exists()
-            ? Object.entries(snapshot.val()).map(([id, value]) => ({
-                id,
-                ...value,
-              }))
-            : [];
-
           const updatePromises = [];
           const lockedBatches = new Set();
 
@@ -1116,42 +1155,52 @@ export function DataProvider({ children }) {
                 `[DataContext] Processing product: ${product.name}, quantity: ${product.quantity}, color: ${product.color}`
               );
 
-              // Find batches for this fabric
-              const fabricBatches = allBatches.filter(
-                (batch) => batch.fabricId === product.fabricId
+              const fabricRef = ref(
+                db,
+                `${COLLECTION_REFS.FABRICS}/${product.fabricId}`
               );
+              const fabricSnapshot = await get(fabricRef);
 
-              if (fabricBatches.length === 0) {
-                console.warn(
-                  `[DataContext] No batches found for fabric: ${product.fabricId}`
+              if (!fabricSnapshot.exists()) {
+                throw new Error(`Fabric ${product.fabricId} not found`);
+              }
+
+              const fabricData = fabricSnapshot.val();
+              if (
+                !fabricData.batches ||
+                Object.keys(fabricData.batches).length === 0
+              ) {
+                throw new Error(
+                  `No batches found for fabric ${product.fabricId}. Please purchase stock for this fabric first.`
                 );
-                continue;
               }
 
               let remainingQuantity = product.quantity;
 
               // Sort batches by purchase date (FIFO)
-              const sortedBatches = fabricBatches.sort(
-                (a, b) =>
-                  new Date(a.purchaseDate || a.createdAt) -
-                  new Date(b.purchaseDate || b.createdAt)
-              );
+              const sortedBatches = Object.entries(fabricData.batches)
+                .map(([batchId, batch]) => ({ batchId, ...batch }))
+                .sort(
+                  (a, b) =>
+                    new Date(a.purchaseDate || a.createdAt) -
+                    new Date(b.purchaseDate || b.createdAt)
+                );
 
               for (const batch of sortedBatches) {
                 if (remainingQuantity <= 0) break;
 
                 // Acquire lock for this batch
-                const lockAcquired = await acquireBatchLock(batch.id);
+                const lockAcquired = await acquireBatchLock(batch.batchId);
                 if (!lockAcquired) {
                   throw new Error(
-                    `Could not acquire lock for batch ${batch.id}. Please try again.`
+                    `Could not acquire lock for batch ${batch.batchId}. Please try again.`
                   );
                 }
-                lockedBatches.add(batch.id);
+                lockedBatches.add(batch.batchId);
 
                 if (!batch.items || !Array.isArray(batch.items)) {
                   console.warn(
-                    `[DataContext] Batch ${batch.id} has no items array`
+                    `[DataContext] Batch ${batch.batchId} has no items array`
                   );
                   continue;
                 }
@@ -1183,7 +1232,7 @@ export function DataProvider({ children }) {
 
                     console.log(
                       `[DataContext] Reduced ${quantityToReduce} from batch ${
-                        batch.id
+                        batch.batchId
                       }, item: ${item.colorName || "no color"}`
                     );
                   }
@@ -1192,7 +1241,13 @@ export function DataProvider({ children }) {
                 // If we modified any items in this batch, add to update promises
                 if (remainingQuantity < product.quantity) {
                   updatePromises.push(
-                    updateFabricBatch(batch.id, { items: batch.items })
+                    fabricOperations.updateFabricBatch(
+                      product.fabricId,
+                      batch.batchId,
+                      {
+                        items: batch.items,
+                      }
+                    )
                   );
                 }
               }
@@ -1223,7 +1278,7 @@ export function DataProvider({ children }) {
         });
       },
     }),
-    [state.fabricBatches]
+    []
   );
 
   const contextValue = useMemo(

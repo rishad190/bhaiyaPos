@@ -1,5 +1,5 @@
-import LoadingFallback from "@/components/LoadingFallback";
+import { CashbookLoading } from "@/components/LoadingSystem";
 
-export default function CashbookLoading() {
-  return <LoadingFallback />;
+export default function CashbookLoadingPage() {
+  return <CashbookLoading />;
 }

@@ -1,5 +1,5 @@
-import LoadingFallback from "@/components/LoadingFallback";
+import { DashboardLoading } from "@/components/LoadingSystem";
 
-export default function DashboardLoading() {
-  return <LoadingFallback />;
+export default function DashboardLoadingPage() {
+  return <DashboardLoading />;
 }
