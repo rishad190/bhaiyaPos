@@ -76,20 +76,25 @@ export default function CustomerDetail() {
     TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL
   );
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({
+    key: "date",
+    direction: "asc",
+  });
 
   const customer = customers?.find((c) => c.id === params.id);
 
   const sortedTransactions = useMemo(() => {
     if (!transactions) return [];
-    let sortableItems = [...transactions.filter(t => t.customerId === params.id)];
+    let sortableItems = [
+      ...transactions.filter((t) => t.customerId === params.id),
+    ];
     if (sortConfig.key) {
       sortableItems.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
+          return sortConfig.direction === "asc" ? -1 : 1;
         }
         if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
+          return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
       });
@@ -176,7 +181,10 @@ export default function CustomerDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
-      await updateTransaction(transactionId, { ...updatedData, customerId: params.id });
+      await updateTransaction(transactionId, {
+        ...updatedData,
+        customerId: params.id,
+      });
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -208,9 +216,9 @@ export default function CustomerDetail() {
   };
 
   const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
@@ -330,7 +338,9 @@ export default function CustomerDetail() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-blue-50 border-none shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-blue-600">Total Bill</CardTitle>
+                    <CardTitle className="text-sm font-medium text-blue-600">
+                      Total Bill
+                    </CardTitle>
                     <DollarSign className="h-4 w-4 text-blue-600" />
                   </CardHeader>
                   <CardContent>
@@ -345,7 +355,9 @@ export default function CustomerDetail() {
 
                 <Card className="bg-green-50 border-none shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-green-600">Total Deposit</CardTitle>
+                    <CardTitle className="text-sm font-medium text-green-600">
+                      Total Deposit
+                    </CardTitle>
                     <CreditCard className="h-4 w-4 text-green-600" />
                   </CardHeader>
                   <CardContent>
@@ -359,13 +371,32 @@ export default function CustomerDetail() {
                 </Card>
 
                 <Card
-                  className={`border-none shadow-sm ${totalDue > 0 ? "bg-red-50" : "bg-green-50"}`}>
-                  <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2`}>
-                    <CardTitle className={`text-sm font-medium ${totalDue > 0 ? "text-red-600" : "text-green-600"}`}>Total Due</CardTitle>
-                    <FileText className={`h-4 w-4 ${totalDue > 0 ? "text-red-600" : "text-green-600"}`} />
+                  className={`border-none shadow-sm ${
+                    totalDue > 0 ? "bg-red-50" : "bg-green-50"
+                  }`}
+                >
+                  <CardHeader
+                    className={`flex flex-row items-center justify-between space-y-0 pb-2`}
+                  >
+                    <CardTitle
+                      className={`text-sm font-medium ${
+                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    >
+                      Total Due
+                    </CardTitle>
+                    <FileText
+                      className={`h-4 w-4 ${
+                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                      }`}
+                    />
                   </CardHeader>
                   <CardContent>
-                    <div className={`text-2xl font-bold ${totalDue > 0 ? "text-red-700" : "text-green-700"}`}>
+                    <div
+                      className={`text-2xl font-bold ${
+                        totalDue > 0 ? "text-red-700" : "text-green-700"
+                      }`}
+                    >
                       ৳{totalDue.toLocaleString()}
                     </div>
                   </CardContent>
@@ -378,9 +409,19 @@ export default function CustomerDetail() {
                     <SelectValue placeholder="Filter by store..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL}>All Stores</SelectItem>
-                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE1}>Store 1</SelectItem>
-                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE2}>Store 2</SelectItem>
+                    <SelectItem value={TRANSACTION_CONSTANTS.STORE_OPTIONS.ALL}>
+                      All Stores
+                    </SelectItem>
+                    <SelectItem
+                      value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE1}
+                    >
+                      Store 1
+                    </SelectItem>
+                    <SelectItem
+                      value={TRANSACTION_CONSTANTS.STORE_OPTIONS.STORE2}
+                    >
+                      Store 2
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -406,10 +447,13 @@ export default function CustomerDetail() {
                     <FileText className="mr-2 h-4 w-4" />
                     Export PDF
                   </Button>
-                  <Button onClick={() => setIsAddingTransaction(true)} disabled={loadingState.action}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Transaction
-                  </Button>
+                  <AddTransactionDialog
+                    open={isAddingTransaction}
+                    onOpenChange={setIsAddingTransaction}
+                    customerId={params.id}
+                    onAddTransaction={handleAddTransaction}
+                    isLoading={loadingState.action}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -421,23 +465,44 @@ export default function CustomerDetail() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="whitespace-nowrap cursor-pointer" onClick={() => requestSort('date')}>
+                <TableHead
+                  className="whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("date")}
+                >
                   Date <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="whitespace-nowrap cursor-pointer" onClick={() => requestSort('memoNumber')}>
-                  Memo Number <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                <TableHead
+                  className="whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("memoNumber")}
+                >
+                  Memo Number{" "}
+                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
                 <TableHead className="whitespace-nowrap">Details</TableHead>
-                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('total')}>
-                  Total Bill <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                <TableHead
+                  className="text-right whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("total")}
+                >
+                  Total Bill{" "}
+                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('deposit')}>
+                <TableHead
+                  className="text-right whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("deposit")}
+                >
                   Deposit <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('due')}>
-                  Due Amount <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                <TableHead
+                  className="text-right whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("due")}
+                >
+                  Due Amount{" "}
+                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort('cumulativeBalance')}>
+                <TableHead
+                  className="text-right whitespace-nowrap cursor-pointer"
+                  onClick={() => requestSort("cumulativeBalance")}
+                >
                   Balance <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
                 </TableHead>
                 <TableHead className="whitespace-nowrap">Store</TableHead>
@@ -523,16 +588,6 @@ export default function CustomerDetail() {
             </TableBody>
           </Table>
         </div>
-
-        {isAddingTransaction && (
-          <AddTransactionDialog
-            open={isAddingTransaction}
-            onOpenChange={setIsAddingTransaction}
-            customerId={params.id}
-            onAddTransaction={handleAddTransaction}
-            isLoading={loadingState.action}
-          />
-        )}
 
         {/* Footer Section */}
         <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

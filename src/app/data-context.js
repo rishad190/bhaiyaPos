@@ -256,8 +256,9 @@ const validateBatchData = (batchData) => {
 const validateTransactionData = (transactionData) => {
   const errors = [];
   if (!transactionData.customerId) errors.push("Customer ID is required");
-  if (!transactionData.total || transactionData.total <= 0)
-    errors.push("Valid total amount is required");
+  if ((transactionData.total || 0) <= 0 && (transactionData.deposit || 0) <= 0) {
+    errors.push("Either total or deposit must be a positive amount");
+  }
   return errors;
 };
 
