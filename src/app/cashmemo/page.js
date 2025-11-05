@@ -49,7 +49,7 @@ import {
 
 import { calculateFifoSale } from "@/lib/inventory-utils";
 import { formatColorDisplay, formatProductWithColor } from "@/lib/color-utils";
-import { cn } from "@/lib/utils";
+import * as utils from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CashMemoPage() {
@@ -316,117 +316,7 @@ export default function CashMemoPage() {
   );
 
   const handlePrint = () => {
-    const printContent = document.getElementById("print-section");
-    if (!printContent) return;
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Print Memo</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 1cm;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-              font-family: 'Arial', sans-serif;
-            }
-            body {
-              padding: 1.5rem;
-              color: #333;
-              line-height: 1.6;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 3rem;
-              padding-bottom: 1rem;
-              border-bottom: 2px solid #eaeaea;
-            }
-            .logo {
-              max-width: 120px;
-              margin-bottom: 1rem;
-            }
-            .company-name {
-              font-size: 24px;
-              font-weight: bold;
-              color: #1a1a1a;
-              margin-bottom: 0.5rem;
-            }
-            .memo-info {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 2rem;
-            }
-            .customer-details, .memo-details {
-              flex: 1;
-              max-width: 300px;
-            }
-            .memo-details {
-              text-align: right;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 2rem 0;
-            }
-            th, td {
-              padding: 12px;
-              text-align: left;
-              border-bottom: 1px solid #eaeaea;
-            }
-            th {
-              background-color: #f8f8f8;
-              font-weight: bold;
-            }
-            .text-right {
-              text-align: right;
-            }
-            .grand-total {
-              margin-top: 2rem;
-              text-align: right;
-              font-size: 18px;
-              font-weight: bold;
-            }
-            .footer {
-              margin-top: 4rem;
-              text-align: center;
-              color: #666;
-              font-size: 14px;
-            }
-            .footer-line {
-              margin-top: 2rem;
-              padding-top: 1rem;
-              border-top: 1px solid #eaeaea;
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-          <div class="footer">
-            <p>Thank you for your business!</p>
-            <div class="footer-line">
-              <p>Sky Fabric's - Quality Fabrics, Trusted Service</p>
-              <p>Mobile: 01713-458086, 01738-732971</p>
-            </div>
-          </div>
-          <script>
-            window.onload = () => {
-              window.print();
-              window.onafterprint = () => window.close();
-            }
-          </script>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
+    utils.printElement("print-section", "Print Memo");
   };
 
   const handleSelectCustomer = (customer) => {
@@ -901,7 +791,7 @@ export default function CashMemoPage() {
                                   }
                                 >
                                   <Check
-                                    className={cn(
+                                    className={utils.cn(
                                       "mr-2 h-4 w-4",
                                       customerId === customer.id // Check against customerId
                                         ? "opacity-100"
@@ -1060,7 +950,7 @@ export default function CashMemoPage() {
                                   }}
                                 >
                                   <Check
-                                    className={cn(
+                                    className={utils.cn(
                                       "mr-2 h-4 w-4",
                                       newProduct.name.toLowerCase() ===
                                         fabric.name.toLowerCase()
