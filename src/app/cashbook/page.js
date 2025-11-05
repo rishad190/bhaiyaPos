@@ -941,6 +941,10 @@ export default function CashBookPage() {
                         </div>
                       </div>
                     </div>
+                    <div className="bg-muted/50 px-4 py-3 border-t font-bold flex justify-between">
+                        <span>Daily Balance</span>
+                        <span>৳{(dailyIncome - dailyExpense).toFixed(2)}</span>
+                    </div>
                   </div>
                 );
               })
