@@ -23,7 +23,8 @@ import {
   ERROR_MESSAGES,
   PAGE_TITLES,
 } from "@/lib/constants";
-import { Plus } from "lucide-react";
+
+import { Plus, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function CustomerPage() {
   const router = useRouter();
@@ -53,7 +54,11 @@ export default function CustomerPage() {
 
   useEffect(() => {
     if (customers) {
-      setLoadingState((prev) => ({ ...prev, initial: false, customers: false }));
+      setLoadingState((prev) => ({
+        ...prev,
+        initial: false,
+        customers: false,
+      }));
     }
   }, [customers]);
 
@@ -125,6 +130,41 @@ export default function CustomerPage() {
     }
   };
 
+  const stats = useMemo(() => {
+    if (!Array.isArray(customers) || !transactions) {
+      return {
+        totalBill: 0,
+        totalDeposit: 0,
+        totalDue: 0,
+      };
+    }
+
+    const totals = customers.reduce(
+      (acc, customer) => {
+        const customerTransactions =
+          transactions?.filter((t) => t.customerId === customer.id) || [];
+        const customerTotal = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.total) || 0),
+          0
+        );
+        const customerDeposit = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.deposit) || 0),
+          0
+        );
+        const customerDue = getCustomerDue(customer.id);
+
+        return {
+          totalBill: acc.totalBill + customerTotal,
+          totalDeposit: acc.totalDeposit + customerDeposit,
+          totalDue: acc.totalDue + customerDue,
+        };
+      },
+      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
+    );
+
+    return totals;
+  }, [customers, transactions, getCustomerDue]);
+
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
     return customers.filter((customer) => {
@@ -178,6 +218,68 @@ export default function CustomerPage() {
               Add Customer
             </Button>
           </AddCustomerDialog>
+        </div>
+
+        {/* Financial Summary */}
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight mb-4">
+            Financial Summary
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-blue-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Total Bill Amount
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-blue-800" />
+                </div>
+                <div className="text-2xl font-bold text-blue-900">
+                  ৳ {stats.totalBill}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-blue-800">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span>12% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-green-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-green-800">
+                    Total Deposit
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-green-800" />
+                </div>
+                <div className="text-2xl font-bold text-green-900">
+                  ৳ {stats.totalDeposit}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-green-800">
+                  <ArrowUpRight className="h-4 w-4 mr-1" />
+                  <span>8% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-red-100 border-none shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Total Due Amount
+                  </h3>
+                  <DollarSign className="h-4 w-4 text-red-800" />
+                </div>
+                <div className="text-2xl font-bold text-red-900">
+                  ৳ {stats.totalDue}
+                </div>
+                <div className="flex items-center mt-2 text-sm text-red-800">
+                  <ArrowDownRight className="h-4 w-4 mr-1" />
+                  <span>3% from last month</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
