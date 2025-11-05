@@ -2,16 +2,6 @@ import { formatDate } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export const formatLargeNumber = (num) => {
-  if (num >= 10000000) {
-    return (num / 10000000).toFixed(2) + " Crore";
-  } else if (num >= 100000) {
-    return (num / 100000).toFixed(2) + " Lakh";
-  } else {
-    return num.toLocaleString("en-IN");
-  }
-};
-
 export const formatCurrencyForPDF = (amount) => {
   try {
     if (amount === undefined || amount === null) return "৳0";
@@ -19,7 +9,7 @@ export const formatCurrencyForPDF = (amount) => {
     if (isNaN(numAmount)) {
       throw new Error("Invalid amount");
     }
-    return `${formatLargeNumber(numAmount)}`;
+    return `${numAmount}`;
   } catch (error) {
     console.error("Error formatting currency:", error);
     return "৳0";
