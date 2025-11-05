@@ -40,6 +40,16 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     if (!formData.memoNumber?.trim())
       newErrors.memoNumber = "Memo number is required";
 
+    const totalAmount = parseFloat(formData.total) || 0;
+    const depositAmount = parseFloat(formData.deposit) || 0;
+
+    if (totalAmount <= 0 && depositAmount <= 0) {
+      newErrors.total =
+        "Either Total Bill or Deposit must be a positive number.";
+      newErrors.deposit =
+        "Either Total Bill or Deposit must be a positive number.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
