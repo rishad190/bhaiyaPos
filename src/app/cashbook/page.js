@@ -76,6 +76,7 @@ export default function CashBookPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [openingBalance, setOpeningBalance] = useState(0);
 
   // Add useEffect to handle initial loading state
   useEffect(() => {
@@ -98,6 +99,40 @@ export default function CashBookPage() {
 
     initializeData();
   }, [dailyCashTransactions, toast]);
+
+  // Add useEffect to handle initial loading state
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Wait for dailyCashTransactions to be available
+        if (dailyCashTransactions !== undefined) {
+          setLoadingState((prev) => ({ ...prev, initial: false }));
+        }
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load data. Please refresh the page.",
+          variant: "destructive",
+        });
+        setLoadingState((prev) => ({ ...prev, initial: false }));
+      }
+    };
+
+    initializeData();
+  }, [dailyCashTransactions, toast]);
+  useEffect(() => {
+    if (date && dailyCashTransactions) {
+      const previousDay = new Date(date);
+      previousDay.setDate(previousDay.getDate() - 1);
+      const previousDayISO = previousDay.toISOString().split("T")[0];
+
+      const balance = dailyCashTransactions
+        .filter((t) => t.date <= previousDayISO)
+        .reduce((acc, t) => acc + (t.cashIn || 0) - (t.cashOut || 0), 0);
+      setOpeningBalance(balance);
+    }
+  }, [date, dailyCashTransactions]);
 
   // Remove debug logging in production
   useEffect(() => {
@@ -227,8 +262,19 @@ export default function CashBookPage() {
       (a, b) => new Date(b) - new Date(a)
     );
 
+    let runningBalance = openingBalance;
+    sorted.forEach((date) => {
+      const { income, expense } = grouped[date];
+      [...income, ...expense]
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .forEach((entry) => {
+          runningBalance += (entry.cashIn || 0) - (entry.cashOut || 0);
+          entry.balance = runningBalance;
+        });
+    });
+
     return { groupedEntries: grouped, sortedDates: sorted };
-  }, [dailyCashTransactions, date, searchTerm]);
+  }, [dailyCashTransactions, date, searchTerm, openingBalance]);
 
   const handleEditClick = (entry) => {
     setEditingTransaction(entry);
@@ -801,7 +847,8 @@ export default function CashBookPage() {
                                   <span className="font-medium">
                                     ৳{entry.amount.toFixed(2)}
                                   </span>
-                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -858,6 +905,7 @@ export default function CashBookPage() {
                                   <span className="font-medium">
                                     ৳{entry.amount.toFixed(2)}
                                   </span>
+
                                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button
                                       variant="ghost"
