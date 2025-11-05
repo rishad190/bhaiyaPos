@@ -36,6 +36,7 @@ import {
 import { backupService } from "@/services/backupService";
 import { restoreService } from "@/services/restoreService";
 import { backupScheduler } from "@/services/backupScheduler";
+import { ImageUpload } from "@/components/ImageUpload";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -52,6 +53,7 @@ export default function SettingsPage() {
     phone: "",
     email: "",
     currency: "৳",
+    logo: "",
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -486,6 +488,23 @@ export default function SettingsPage() {
                       })
                     }
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="logo">Logo</Label>
+                  <ImageUpload
+                    onUploadComplete={(url) =>
+                      setStoreSettings({ ...storeSettings, logo: url })
+                    }
+                  />
+                  {storeSettings.logo && (
+                    <div className="pt-2">
+                      <img
+                        src={storeSettings.logo}
+                        alt="logo"
+                        className="h-16 w-16 rounded-md object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">

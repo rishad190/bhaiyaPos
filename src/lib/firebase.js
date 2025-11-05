@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { get, getDatabase, ref, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -17,11 +18,13 @@ const firebaseConfig = {
 let app;
 let db;
 let auth;
+let storage;
 
 try {
   app = initializeApp(firebaseConfig);
   db = getDatabase(app);
   auth = getAuth(app);
+  storage = getStorage(app);
 
   // Monitor database connection
   const connectedRef = ref(db, ".info/connected");
@@ -48,7 +51,7 @@ try {
 }
 
 // Export database instance and auth
-export { db, auth };
+export { db, auth, storage };
 
 // Helper function to safely get database reference
 export const getDbRef = (path) => {

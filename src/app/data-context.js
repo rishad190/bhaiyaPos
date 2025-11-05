@@ -24,7 +24,7 @@ import {
   goOffline,
   goOnline,
 } from "firebase/database";
-import { doc, updateDoc } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
 
 // Create context
@@ -97,6 +97,7 @@ const initialState = {
       phone: "",
       email: "",
       currency: "৳",
+      logo: "/download.png",
     },
     notifications: {
       lowStockAlert: true,
@@ -1076,7 +1077,7 @@ export function DataProvider({ children }) {
 
     return executeAtomicOperation("updateSettings", async () => {
       // Update settings in Firebase
-      await updateDoc(doc(db, "settings", "app"), newSettings);
+      await update(ref(db, "settings"), newSettings);
 
       // Update local state
       dispatch({
