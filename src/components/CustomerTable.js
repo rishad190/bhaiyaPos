@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { ArrowUpDown } from "lucide-react";
+
 export function CustomerTable({
   customers,
   getCustomerDue,
@@ -23,28 +25,39 @@ export function CustomerTable({
   onDelete,
   currentPage,
   customersPerPage,
+  requestSort,
+  sortConfig,
 }) {
   const paginatedCustomers = customers.slice(
     (currentPage - 1) * customersPerPage,
     currentPage * customersPerPage
   );
 
+  const getSortIndicator = (key) => {
+    if (sortConfig?.key === key) {
+      return sortConfig.direction === "asc" ? " 🔼" : " 🔽";
+    }
+    return null;
+  };
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="whitespace-nowrap">Name</TableHead>
-          <TableHead className="whitespace-nowrap hidden md:table-cell">
-            Phone
+          <TableHead className="whitespace-nowrap cursor-pointer" onClick={() => requestSort("name")}>
+            Name {getSortIndicator("name")}
           </TableHead>
-          <TableHead className="whitespace-nowrap hidden md:table-cell">
-            Address
+          <TableHead className="whitespace-nowrap hidden md:table-cell cursor-pointer" onClick={() => requestSort("phone")}>
+            Phone {getSortIndicator("phone")}
           </TableHead>
-          <TableHead className="whitespace-nowrap hidden md:table-cell">
-            Store ID
+          <TableHead className="whitespace-nowrap hidden md:table-cell cursor-pointer" onClick={() => requestSort("address")}>
+            Address {getSortIndicator("address")}
           </TableHead>
-          <TableHead className="text-right whitespace-nowrap">
-            Due Amount
+          <TableHead className="whitespace-nowrap hidden md:table-cell cursor-pointer" onClick={() => requestSort("storeId")}>
+            Store ID {getSortIndicator("storeId")}
+          </TableHead>
+          <TableHead className="text-right whitespace-nowrap cursor-pointer" onClick={() => requestSort("dueAmount")}>
+            Due Amount {getSortIndicator("dueAmount")}
           </TableHead>
           <TableHead className="whitespace-nowrap">Actions</TableHead>
         </TableRow>

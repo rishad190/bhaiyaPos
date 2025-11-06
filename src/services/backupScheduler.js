@@ -27,7 +27,7 @@ class BackupScheduler {
         await this.startScheduler(settings);
       }
 
-      console.log("Backup scheduler initialized");
+
     } catch (error) {
       console.error("Error initializing backup scheduler:", error);
     }
@@ -41,12 +41,12 @@ class BackupScheduler {
       const config = settings || this.loadSettings();
 
       if (this.isRunning) {
-        console.log("Backup scheduler is already running");
+
         return;
       }
 
       this.isRunning = true;
-      console.log("Starting backup scheduler with config:", config);
+
 
       // Schedule the backup
       await this.scheduleBackup(config);
@@ -68,7 +68,7 @@ class BackupScheduler {
       this.scheduledBackups.clear();
 
       this.isRunning = false;
-      console.log("Backup scheduler stopped");
+
     } catch (error) {
       console.error("Error stopping backup scheduler:", error);
     }
@@ -82,7 +82,7 @@ class BackupScheduler {
       const nextRunTime = this.calculateNextRunTime(config);
       const delay = nextRunTime.getTime() - Date.now();
 
-      console.log(`Next backup scheduled for: ${nextRunTime.toLocaleString()}`);
+
 
       const timeoutId = setTimeout(async () => {
         try {
@@ -153,7 +153,7 @@ class BackupScheduler {
    */
   async executeScheduledBackup(config) {
     try {
-      console.log("Executing scheduled backup...");
+
 
       let result;
       switch (config.format) {
@@ -186,7 +186,7 @@ class BackupScheduler {
         await this.cleanupOldBackups(config.retention);
       }
 
-      console.log("Scheduled backup completed successfully");
+
       return result;
     } catch (error) {
       console.error("Error executing scheduled backup:", error);
@@ -250,7 +250,7 @@ class BackupScheduler {
       );
 
       localStorage.setItem("backupLogs", JSON.stringify(recentLogs));
-      console.log(`Cleaned up backup logs older than ${retentionDays} days`);
+
     } catch (error) {
       console.error("Error cleaning up old backups:", error);
     }
@@ -263,7 +263,7 @@ class BackupScheduler {
     try {
       const config = { ...this.defaultSettings, ...settings };
       localStorage.setItem("backupSettings", JSON.stringify(config));
-      console.log("Backup settings saved:", config);
+
     } catch (error) {
       console.error("Error saving backup settings:", error);
     }
@@ -320,7 +320,7 @@ class BackupScheduler {
    */
   async executeImmediateBackup(format = "json") {
     try {
-      console.log("Executing immediate backup...");
+
 
       let result;
       switch (format) {

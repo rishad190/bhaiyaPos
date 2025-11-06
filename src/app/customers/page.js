@@ -26,108 +26,254 @@ import {
 
 import { Plus, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
+import { backupService } from "@/services/backupService";
+
+import { formatDate } from "@/lib/utils";
+
+
+
 export default function CustomerPage() {
+
   const router = useRouter();
+
   const {
+
     customers,
+
     transactions,
+
     error,
+
     addCustomer,
+
     updateCustomer,
+
     deleteCustomer,
+
     getCustomerDue,
+
   } = useData();
+
   const { toast } = useToast();
 
+
+
   const [loadingState, setLoadingState] = useState({
+
     initial: true,
+
     customers: true,
+
     actions: false,
+
   });
+
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
+
   const [selectedFilter, setSelectedFilter] = useState(
+
     CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL
+
   );
+
   const [editingCustomer, setEditingCustomer] = useState(null);
+
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
+
+
+
   useEffect(() => {
+
     if (customers) {
+
       setLoadingState((prev) => ({
+
         ...prev,
+
         initial: false,
+
         customers: false,
+
       }));
+
     }
+
   }, [customers]);
 
+
+
   const handleAddCustomer = async (customerData) => {
+
     setLoadingState((prev) => ({ ...prev, actions: true }));
+
     try {
+
       await addCustomer(customerData);
+
       setIsAddingCustomer(false);
+
       toast({
+
         title: "Success",
+
         description: "Customer added successfully",
+
       });
+
     } catch (error) {
+
       console.error(ERROR_MESSAGES.ADD_ERROR, error);
+
       toast({
+
         title: "Error",
+
         description: ERROR_MESSAGES.ADD_ERROR,
+
         variant: "destructive",
+
       });
+
     } finally {
+
       setLoadingState((prev) => ({ ...prev, actions: false }));
+
     }
+
   };
+
+
 
   const handleEditCustomer = async (customerId, updatedData) => {
+
     setLoadingState((prev) => ({ ...prev, actions: true }));
+
     try {
+
       await updateCustomer(customerId, updatedData);
+
       setEditingCustomer(null);
+
       toast({
+
         title: "Success",
+
         description: "Customer updated successfully",
+
       });
+
     } catch (error) {
+
       console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
+
       toast({
+
         title: "Error",
+
         description: ERROR_MESSAGES.UPDATE_ERROR,
+
         variant: "destructive",
+
       });
+
     } finally {
+
       setLoadingState((prev) => ({ ...prev, actions: false }));
+
     }
+
   };
+
+
 
   const handleRowClick = (customerId) => {
+
     router.push(`/customers/${customerId}`);
+
   };
 
+
+
   const handleDeleteCustomer = async (customerId) => {
+
     if (window.confirm(ERROR_MESSAGES.DELETE_CONFIRMATION)) {
+
       setLoadingState((prev) => ({ ...prev, actions: true }));
+
       try {
+
         await deleteCustomer(customerId);
+
         toast({
+
           title: "Success",
+
           description: "Customer deleted successfully",
+
         });
+
       } catch (error) {
+
         console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+
         toast({
+
           title: "Error",
+
           description: ERROR_MESSAGES.DELETE_ERROR,
+
           variant: "destructive",
+
         });
+
       } finally {
+
         setLoadingState((prev) => ({ ...prev, actions: false }));
+
       }
+
     }
+
+  };
+
+
+
+  const handleExportCSV = () => {
+
+    const dataToExport = filteredCustomers.reduce((acc, customer) => {
+
+      acc[customer.id] = customer;
+
+      return acc;
+
+    }, {});
+
+
+
+    const csvContent = backupService.convertToCSV(dataToExport);
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = `customers-${formatDate(new Date(), "YYYY-MM-DD")}.csv`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
   };
 
   const stats = useMemo(() => {
@@ -167,7 +313,7 @@ export default function CustomerPage() {
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    return customers.filter((customer) => {
+    let sortableCustomers = customers.filter((customer) => {
       if (!customer) return false;
 
       const matchesSearch =
@@ -182,7 +328,33 @@ export default function CustomerPage() {
           currentDue === 0);
       return matchesSearch && matchesFilter;
     });
-  }, [customers, searchTerm, selectedFilter, getCustomerDue]);
+
+    sortableCustomers.forEach(customer => {
+      customer.dueAmount = getCustomerDue(customer.id);
+    });
+
+    if (sortConfig.key) {
+      sortableCustomers.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return sortableCustomers;
+  }, [customers, searchTerm, selectedFilter, getCustomerDue, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
 
   if (error) {
     return (
@@ -204,20 +376,26 @@ export default function CustomerPage() {
               Manage your customers and their transactions.
             </p>
           </div>
-          <AddCustomerDialog
-            isOpen={isAddingCustomer}
-            onClose={() => setIsAddingCustomer(false)}
-            onAddCustomer={handleAddCustomer}
-          >
-            <Button
-              className="w-full md:w-auto"
-              disabled={loadingState.actions}
-              onClick={() => setIsAddingCustomer(true)}
-            >
+          <div className="flex justify-end space-x-2">
+            <Button onClick={handleExportCSV} variant="outline">
               <Plus className="mr-2 h-4 w-4" />
-              Add Customer
+              Export to CSV
             </Button>
-          </AddCustomerDialog>
+            <AddCustomerDialog
+              isOpen={isAddingCustomer}
+              onClose={() => setIsAddingCustomer(false)}
+              onAddCustomer={handleAddCustomer}
+            >
+              <Button
+                className="w-full md:w-auto"
+                disabled={loadingState.actions}
+                onClick={() => setIsAddingCustomer(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Customer
+              </Button>
+            </AddCustomerDialog>
+          </div>
         </div>
 
         {/* Financial Summary */}
@@ -237,10 +415,7 @@ export default function CustomerPage() {
                 <div className="text-2xl font-bold text-blue-900">
                   ৳ {stats.totalBill}
                 </div>
-                <div className="flex items-center mt-2 text-sm text-blue-800">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span>12% from last month</span>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -255,10 +430,7 @@ export default function CustomerPage() {
                 <div className="text-2xl font-bold text-green-900">
                   ৳ {stats.totalDeposit}
                 </div>
-                <div className="flex items-center mt-2 text-sm text-green-800">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span>8% from last month</span>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -273,10 +445,7 @@ export default function CustomerPage() {
                 <div className="text-2xl font-bold text-red-900">
                   ৳ {stats.totalDue}
                 </div>
-                <div className="flex items-center mt-2 text-sm text-red-800">
-                  <ArrowDownRight className="h-4 w-4 mr-1" />
-                  <span>3% from last month</span>
-                </div>
+
               </CardContent>
             </Card>
           </div>
@@ -306,6 +475,8 @@ export default function CustomerPage() {
                   onDelete={handleDeleteCustomer}
                   currentPage={currentPage}
                   customersPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
+                  sortConfig={sortConfig}
+                  requestSort={requestSort}
                 />
               )}
             </div>

@@ -21,7 +21,7 @@ class BackupService {
    */
   async exportAllData() {
     try {
-      console.log("Starting data export...");
+      
 
       const backupData = {
         metadata: {
@@ -38,7 +38,7 @@ class BackupService {
         COLLECTION_REFS
       )) {
         try {
-          console.log(`Exporting ${collectionName}...`);
+          
           const collectionRef = ref(db, collectionPath);
           const snapshot = await get(collectionRef);
 
@@ -76,7 +76,7 @@ class BackupService {
       backupData.metadata.totalRecords = totalRecords;
       backupData.metadata.exportCompleted = new Date().toISOString();
 
-      console.log(`Data export completed. Total records: ${totalRecords}`);
+      
       return backupData;
     } catch (error) {
       console.error("Error during data export:", error);
