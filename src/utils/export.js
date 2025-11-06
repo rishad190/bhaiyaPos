@@ -293,10 +293,10 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.setFont("helvetica", "bold");
     doc.text(
       "Total Outstanding:",
-      doc.internal.pageSize.width - 80,
+      doc.internal.pageSize.width - 120,
       summaryY + 10
     );
-
+    doc.setFontSize(12);
     doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
     doc.setFont("helvetica", "bold");
     doc.text(
