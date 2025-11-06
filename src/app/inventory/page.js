@@ -5,6 +5,7 @@ import { useData } from "@/app/data-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
+import { logger } from "@/utils/logger";
 import {
   Table,
   TableBody,
@@ -90,7 +91,10 @@ export default function InventoryPage() {
           description: "Fabric deleted successfully",
         });
       } catch (error) {
-        console.error("Error deleting fabric:", error);
+        logger.error("Error deleting fabric", {
+          fabricId,
+          error: error.message,
+        });
         toast({
           title: "Error",
           description: "Failed to delete fabric. Please try again.",
@@ -165,7 +169,10 @@ export default function InventoryPage() {
       setIsDialogOpen(false);
       setEditingFabric(null);
     } catch (error) {
-      console.error("Error saving fabric:", error);
+      logger.error("Error saving fabric", {
+        fabricId: fabric?.id,
+        error: error.message,
+      });
       toast({
         title: "Error",
         description: "Failed to save fabric. Please try again.",
@@ -227,10 +234,10 @@ export default function InventoryPage() {
                     key={fabric.id}
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => {
-                      console.log(
-                        "Row clicked - Navigating to fabric:",
-                        fabric.id
-                      );
+                      logger.debug("Row clicked - Navigating to fabric", {
+                        fabricId: fabric.id,
+                        fabricName: fabric.name,
+                      });
                       router.push(`/inventory/${fabric.id}`);
                     }}
                   >
@@ -255,9 +262,12 @@ export default function InventoryPage() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent row click from firing
-                            console.log(
-                              "View button clicked - Navigating to fabric:",
-                              fabric.id
+                            logger.debug(
+                              "View button clicked - Navigating to fabric",
+                              {
+                                fabricId: fabric.id,
+                                fabricName: fabric.name,
+                              }
                             );
                             router.push(`/inventory/${fabric.id}`);
                           }}
@@ -269,7 +279,10 @@ export default function InventoryPage() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent row click from firing
-                            console.log("Edit button clicked");
+                            logger.debug("Edit button clicked", {
+                              fabricId: fabric.id,
+                              fabricName: fabric.name,
+                            });
                             handleEditClick(fabric);
                           }}
                         >
@@ -280,7 +293,10 @@ export default function InventoryPage() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent row click from firing
-                            console.log("Delete button clicked");
+                            logger.debug("Delete button clicked", {
+                              fabricId: fabric.id,
+                              fabricName: fabric.name,
+                            });
                             handleDeleteClick(fabric.id);
                           }}
                         >

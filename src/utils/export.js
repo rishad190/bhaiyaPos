@@ -4,15 +4,15 @@ import autoTable from "jspdf-autotable";
 
 export const formatCurrencyForPDF = (amount) => {
   try {
-    if (amount === undefined || amount === null) return "৳0";
+    if (amount === undefined || amount === null) return "৳0.00";
     const numAmount = Number(amount);
     if (isNaN(numAmount)) {
       throw new Error("Invalid amount");
     }
-    return `${numAmount}`;
+    return `${numAmount.toFixed(2)}`;
   } catch (error) {
     console.error("Error formatting currency:", error);
-    return "৳0";
+    return "৳0.00";
   }
 };
 
@@ -37,12 +37,7 @@ export const exportToCSV = (data, filename) => {
 
     // Format currency values
     if (typeof value === "number") {
-      return value.toLocaleString("en-IN", {
-        style: "currency",
-        currency: "INR",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      });
+      return value.toFixed(2);
     }
 
     // Escape special characters and wrap in quotes if contains comma
@@ -300,7 +295,7 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
     doc.setFont("helvetica", "bold");
     doc.text(
-      formatCurrencyForPDF(totalDue.toFixed(2)),
+      formatCurrencyForPDF(totalDue),
       doc.internal.pageSize.width - 10,
       summaryY + 10,
       { align: "right" }

@@ -26,6 +26,7 @@ import {
 } from "firebase/database";
 
 import { db } from "@/lib/firebase";
+import logger from "@/utils/logger";
 
 // Create context
 const DataContext = createContext(null);
@@ -256,7 +257,10 @@ const validateBatchData = (batchData) => {
 const validateTransactionData = (transactionData) => {
   const errors = [];
   if (!transactionData.customerId) errors.push("Customer ID is required");
-  if ((transactionData.total || 0) <= 0 && (transactionData.deposit || 0) <= 0) {
+  if (
+    (transactionData.total || 0) <= 0 &&
+    (transactionData.deposit || 0) <= 0
+  ) {
     errors.push("Either total or deposit must be a positive amount");
   }
   return errors;
@@ -285,13 +289,17 @@ const trackPerformance = (operationName, startTime, dispatch) => {
   });
 
   if (isVerySlow) {
-    console.warn(
-      `[Performance] Very slow operation: ${operationName} took ${duration}ms`
-    );
+    logger.warn(`Very slow operation: ${operationName} took ${duration}ms`, {
+      operationName,
+      duration,
+      threshold: PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION,
+    });
   } else if (isSlow) {
-    console.info(
-      `[Performance] Slow operation: ${operationName} took ${duration}ms`
-    );
+    logger.info(`Slow operation: ${operationName} took ${duration}ms`, {
+      operationName,
+      duration,
+      threshold: PERFORMANCE_THRESHOLDS.SLOW_OPERATION,
+    });
   }
 
   return duration;
@@ -314,9 +322,9 @@ export function DataProvider({ children }) {
       });
 
       if (connected) {
-        console.log("[DataContext] Firebase connection established");
+        logger.info("Firebase connection established");
       } else {
-        console.warn("[DataContext] Firebase connection lost");
+        logger.warn("Firebase connection lost");
       }
     });
 
@@ -327,9 +335,9 @@ export function DataProvider({ children }) {
   const processOfflineQueue = useCallback(async () => {
     if (state.offlineQueue.length === 0) return;
 
-    console.log(
-      `[DataContext] Processing ${state.offlineQueue.length} offline operations`
-    );
+    logger.info(`Processing offline operations`, {
+      queueLength: state.offlineQueue.length,
+    });
 
     const successfulOperations = [];
     const failedOperations = [];
@@ -339,12 +347,17 @@ export function DataProvider({ children }) {
       try {
         await operation.fn();
         successfulOperations.push(i);
-        console.log(
-          `[DataContext] Offline operation ${i} completed successfully`
-        );
+        logger.info("Offline operation completed successfully", {
+          operationIndex: i,
+          operationName: operation.name,
+        });
       } catch (error) {
         failedOperations.push({ index: i, error });
-        console.error(`[DataContext] Offline operation ${i} failed:`, error);
+        logger.error("Offline operation failed", {
+          operationIndex: i,
+          operationName: operation.name,
+          error: error.message,
+        });
       }
     }
 
@@ -354,9 +367,10 @@ export function DataProvider({ children }) {
     });
 
     if (failedOperations.length > 0) {
-      console.warn(
-        `[DataContext] ${failedOperations.length} offline operations failed`
-      );
+      logger.warn("Some offline operations failed", {
+        failedCount: failedOperations.length,
+        successfulCount: successfulOperations.length,
+      });
     }
   }, [state.offlineQueue]);
 
@@ -408,31 +422,40 @@ export function DataProvider({ children }) {
         });
 
         if (isVerySlow) {
-          console.warn(
-            `[Performance] Very slow operation: ${operationName} took ${duration}ms`
+          logger.warn(
+            `Very slow operation: ${operationName} took ${duration}ms`,
+            {
+              operationName,
+              duration,
+              threshold: PERFORMANCE_THRESHOLDS.VERY_SLOW_OPERATION,
+            }
           );
         } else if (isSlow) {
-          console.info(
-            `[Performance] Slow operation: ${operationName} took ${duration}ms`
-          );
+          logger.info(`Slow operation: ${operationName} took ${duration}ms`, {
+            operationName,
+            duration,
+            threshold: PERFORMANCE_THRESHOLDS.SLOW_OPERATION,
+          });
         }
 
         return result;
       } catch (error) {
-        console.error(
-          `[DataContext] Atomic operation failed: ${operationName}`,
-          error
-        );
+        logger.error(`Atomic operation failed: ${operationName}`, {
+          operationName,
+          error: error.message,
+          operationId,
+        });
 
         // Execute fallback if provided
         if (fallbackFn && typeof fallbackFn === "function") {
           try {
             await fallbackFn();
           } catch (fallbackError) {
-            console.error(
-              `[DataContext] Fallback operation failed: ${operationName}`,
-              fallbackError
-            );
+            logger.error(`Fallback operation failed: ${operationName}`, {
+              operationName,
+              error: fallbackError.message,
+              operationId,
+            });
           }
         }
 
@@ -533,10 +556,10 @@ export function DataProvider({ children }) {
 
                 // Only include fabrics that have a valid Firebase ID
                 if (!id || id === "" || id === "0") {
-                  console.warn(
-                    `[DataContext] Skipping fabric with invalid ID:`,
-                    { id, fabricData }
-                  );
+                  logger.warn("Skipping fabric with invalid ID", {
+                    fabricId: id,
+                    fabricData,
+                  });
                   return null;
                 }
 
@@ -558,7 +581,7 @@ export function DataProvider({ children }) {
 
             dispatch({ type: "SET_FABRICS", payload: fabricsArray });
           } else {
-            console.log("[DataContext] No fabric data found");
+            logger.info("No fabric data found");
             dispatch({ type: "SET_FABRICS", payload: [] });
           }
         },
@@ -581,7 +604,7 @@ export function DataProvider({ children }) {
               // Removed raw data logging for cleaner console
               setter(rawData);
             } else {
-              console.log(`[DataContext] No data found for ${path}`);
+              logger.info(`No data found for collection`, { collection: path });
               setter([]);
             }
           }, PERFORMANCE_THRESHOLDS.DEBOUNCE_DELAY);
@@ -589,7 +612,9 @@ export function DataProvider({ children }) {
         unsubscribers.push(unsubscribe);
       });
     } catch (err) {
-      console.error("Error setting up Firebase listeners:", err);
+      logger.error("Error setting up Firebase listeners", {
+        error: err.message,
+      });
       dispatch({ type: "SET_ERROR", payload: err.message });
     }
 
@@ -660,10 +685,10 @@ export function DataProvider({ children }) {
       });
       return true;
     } catch (error) {
-      console.warn(
-        `[DataContext] Could not acquire lock for batch ${batchId}:`,
-        error
-      );
+      logger.warn("Could not acquire batch lock", {
+        batchId,
+        error: error.message,
+      });
       return false;
     }
   }, []);
@@ -673,10 +698,10 @@ export function DataProvider({ children }) {
     try {
       await remove(lockRef);
     } catch (error) {
-      console.warn(
-        `[DataContext] Could not release lock for batch ${batchId}:`,
-        error
-      );
+      logger.warn("Could not release batch lock", {
+        batchId,
+        error: error.message,
+      });
     }
   }, []);
 
@@ -1220,10 +1245,14 @@ export function DataProvider({ children }) {
 
       reduceInventory: async (saleProducts) => {
         return executeAtomicOperation("reduceInventory", async () => {
-          console.log(
-            "[DataContext] Reducing inventory for products:",
-            saleProducts
-          );
+          logger.info("Reducing inventory for products", {
+            products: saleProducts.map((p) => ({
+              name: p.name,
+              fabricId: p.fabricId,
+              quantity: p.quantity,
+              color: p.color,
+            })),
+          });
 
           // Validate input products
           if (!Array.isArray(saleProducts) || saleProducts.length === 0) {
@@ -1235,9 +1264,12 @@ export function DataProvider({ children }) {
 
           try {
             for (const product of saleProducts) {
-              console.log(
-                `[DataContext] Processing product: ${product.name}, quantity: ${product.quantity}, color: ${product.color}`
-              );
+              logger.debug("Processing product for inventory reduction", {
+                productName: product.name,
+                fabricId: product.fabricId,
+                quantity: product.quantity,
+                color: product.color,
+              });
 
               // Validate product data
               if (!product.fabricId) {
@@ -1298,9 +1330,10 @@ export function DataProvider({ children }) {
                 lockedBatches.add(batch.batchId);
 
                 if (!batch.items || !Array.isArray(batch.items)) {
-                  console.warn(
-                    `[DataContext] Batch ${batch.batchId} has no items array`
-                  );
+                  logger.warn("Batch has no items array", {
+                    batchId: batch.batchId,
+                    fabricId: product.fabricId,
+                  });
                   continue;
                 }
 
@@ -1329,11 +1362,13 @@ export function DataProvider({ children }) {
                     item.quantity = availableQuantity - quantityToReduce;
                     remainingQuantity -= quantityToReduce;
 
-                    console.log(
-                      `[DataContext] Reduced ${quantityToReduce} from batch ${
-                        batch.batchId
-                      }, item: ${item.colorName || "no color"}`
-                    );
+                    logger.debug("Reduced inventory from batch", {
+                      batchId: batch.batchId,
+                      fabricId: product.fabricId,
+                      color: item.colorName || "no color",
+                      quantityReduced: quantityToReduce,
+                      remainingQuantity: item.quantity,
+                    });
                   }
                 }
 
@@ -1353,9 +1388,13 @@ export function DataProvider({ children }) {
               }
 
               if (remainingQuantity > 0) {
-                console.warn(
-                  `[DataContext] Could not reduce full quantity for ${product.name}. Remaining: ${remainingQuantity}`
-                );
+                logger.warn("Could not reduce full quantity for product", {
+                  productName: product.name,
+                  fabricId: product.fabricId,
+                  requestedQuantity: product.quantity,
+                  remainingQuantity,
+                  availableQuantity: product.quantity - remainingQuantity,
+                });
                 throw new Error(
                   `Insufficient stock for ${product.name}. Only ${
                     product.quantity - remainingQuantity
@@ -1366,9 +1405,10 @@ export function DataProvider({ children }) {
 
             // Wait for all batch updates to complete
             await Promise.all(updatePromises);
-            console.log(
-              "[DataContext] Inventory reduction completed successfully"
-            );
+            logger.info("Inventory reduction completed successfully", {
+              productsProcessed: saleProducts.length,
+              batchesUpdated: updatePromises.length,
+            });
           } finally {
             // Release all acquired locks
             for (const batchId of lockedBatches) {
