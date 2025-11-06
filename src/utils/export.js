@@ -300,7 +300,7 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.setTextColor(totalDue > 0 ? "#e74c3c" : "#27ae60");
     doc.setFont("helvetica", "bold");
     doc.text(
-      formatCurrencyForPDF(totalDue),
+      formatCurrencyForPDF(totalDue.toFixed(2)),
       doc.internal.pageSize.width - 10,
       summaryY + 10,
       { align: "right" }
