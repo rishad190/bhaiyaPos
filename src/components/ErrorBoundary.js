@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Error caught by boundary:", error, errorInfo);
+
     this.setState({ errorInfo });
 
     // Log to external service in production
@@ -32,12 +32,12 @@ export class ErrorBoundary extends Component {
 
   logErrorToService = (error, errorInfo) => {
     // In a real app, this would send to Sentry, LogRocket, etc.
-    console.log("Error logged to service:", {
-      error: error.toString(),
-      errorInfo: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      url: window.location.href,
-    });
+    // console.log("Error logged to service:", {
+    //   error: error.toString(),
+    //   errorInfo: errorInfo.componentStack,
+    //   timestamp: new Date().toISOString(),
+    //   url: window.location.href,
+    // });
   };
 
   handleRetry = () => {
@@ -213,7 +213,7 @@ export const useErrorHandler = () => {
       // In production, send to error reporting service
       if (process.env.NODE_ENV === "production") {
         // Send to error reporting service
-        console.log("Error reported to service:", { error, context });
+        // console.log("Error reported to service:", { error, context });
       }
 
       return {

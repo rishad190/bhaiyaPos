@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,7 @@ export default function LoginPage() {
         setError(`Invalid password. ${5 - loginAttempts} attempts remaining.`);
       }
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error("Login error:", error);
       setError("An error occurred during login");
       setIsLoading(false);
     }

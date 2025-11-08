@@ -1,9 +1,10 @@
 "use client";
 
+import React from "react";
 import { formatDate } from "@/lib/utils";
 import Image from "next/image";
 
-export function CashMemoPrint({ memoData, products, grandTotal }) {
+export const CashMemoPrint = React.memo(function CashMemoPrint({ memoData, products, grandTotal }) {
   return (
     <div className="print-container">
       <div className="header">
@@ -74,4 +75,4 @@ export function CashMemoPrint({ memoData, products, grandTotal }) {
       </div>
     </div>
   );
-}
+  });

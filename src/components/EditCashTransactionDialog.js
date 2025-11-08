@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export function EditCashTransactionDialog({
@@ -59,6 +60,7 @@ export function EditCashTransactionDialog({
             Update the transaction details below.
           </p>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Transaction Type Selection */}
           <div className="grid grid-cols-2 gap-4">
@@ -177,6 +179,7 @@ export function EditCashTransactionDialog({
             </Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 
 export function AddExpenseDialog({ onAddExpense }) {
@@ -60,6 +61,7 @@ export function AddExpenseDialog({ onAddExpense }) {
         <DialogHeader>
           <DialogTitle>Add New Expense</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date *</label>
@@ -120,6 +122,7 @@ export function AddExpenseDialog({ onAddExpense }) {
             <Button type="submit">Add Expense</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

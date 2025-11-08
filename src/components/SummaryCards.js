@@ -1,6 +1,7 @@
+import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 
-export function SummaryCards({ totals }) {
+export const SummaryCards = React.memo(function SummaryCards({ totals }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <Card>

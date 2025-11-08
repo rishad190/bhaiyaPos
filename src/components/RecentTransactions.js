@@ -1,11 +1,22 @@
 'use client';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 
-export function RecentTransactions({ transactions, customers }) {
+import { useMemo } from 'react';
+
+export const RecentTransactions = React.memo(function RecentTransactions({ transactions, customers }) {
+  console.log("Rebuilding RecentTransactions");
   const router = useRouter();
+
+  const customerMap = useMemo(() => {
+    return customers.reduce((acc, customer) => {
+      acc[customer.id] = customer.name;
+      return acc;
+    }, {});
+  }, [customers]);
 
   return (
     <Card className="border-none shadow-md hover:shadow-lg transition-shadow">
@@ -32,7 +43,7 @@ export function RecentTransactions({ transactions, customers }) {
               >
                 <div>
                   <p className="font-medium">
-                    {customers.find((c) => c.id === transaction.customerId)?.name ||
+                    {customerMap[transaction.customerId] ||
                       "Unknown Customer"}
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -64,4 +75,4 @@ export function RecentTransactions({ transactions, customers }) {
       </CardContent>
     </Card>
   );
-}
+});

@@ -27,7 +27,7 @@ try {
   const connectedRef = ref(db, ".info/connected");
   onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
-      console.log("Connected to Firebase");
+      // console.log("Connected to Firebase");
     } else {
       console.warn("Not connected to Firebase");
     }
@@ -37,7 +37,7 @@ try {
   const dbRef = ref(db);
   get(dbRef)
     .then(() => {
-      console.log("Firebase data access successful");
+      // console.log("Firebase data access successful");
     })
     .catch((error) => {
       console.error("Firebase data access error:", error);

@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 
 export function AddSupplierDialog({ onAddSupplier }) {
@@ -50,6 +51,7 @@ export function AddSupplierDialog({ onAddSupplier }) {
         <DialogHeader>
           <DialogTitle>Add New Supplier</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Name *</label>
@@ -123,6 +125,7 @@ export function AddSupplierDialog({ onAddSupplier }) {
             <Button type="submit">Add Supplier</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

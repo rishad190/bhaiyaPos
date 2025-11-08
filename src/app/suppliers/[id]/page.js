@@ -1,5 +1,6 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
+import logger from "@/utils/logger";
 import { useState, useEffect } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
@@ -44,6 +45,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierDetail() {
@@ -164,7 +166,7 @@ export default function SupplierDetail() {
         description: "Transaction added successfully",
       });
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      logger.error("Error adding transaction:", error);
       toast({
         title: "Error",
         description: "Failed to add transaction",
@@ -197,7 +199,7 @@ export default function SupplierDetail() {
         });
       }
     } catch (error) {
-      console.error("Error deleting transaction:", error);
+      logger.error("Error deleting transaction:", error);
       toast({
         title: "Error",
         description: "Failed to delete transaction",
@@ -313,6 +315,7 @@ export default function SupplierDetail() {
   };
 
   return (
+    <DataErrorBoundary>
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex items-center justify-between mb-6">
@@ -642,5 +645,6 @@ export default function SupplierDetail() {
         </div>
       </div>
     </div>
+    </DataErrorBoundary>
   );
 }

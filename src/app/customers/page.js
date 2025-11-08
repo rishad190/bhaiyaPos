@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,7 @@ import { CustomerTable } from "@/components/CustomerTable";
 import { CustomerSearch } from "@/components/CustomerSearch";
 import { Pagination } from "@/components/Pagination";
 import { TableSkeleton } from "@/components/LoadingState";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useData } from "@/app/data-context";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -126,7 +127,7 @@ export default function CustomerPage() {
 
     } catch (error) {
 
-      console.error(ERROR_MESSAGES.ADD_ERROR, error);
+      logger.error(ERROR_MESSAGES.ADD_ERROR, error);
 
       toast({
 
@@ -168,7 +169,7 @@ export default function CustomerPage() {
 
     } catch (error) {
 
-      console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
+      logger.error(ERROR_MESSAGES.UPDATE_ERROR, error);
 
       toast({
 
@@ -218,7 +219,7 @@ export default function CustomerPage() {
 
       } catch (error) {
 
-        console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+        logger.error(ERROR_MESSAGES.DELETE_ERROR, error);
 
         toast({
 
@@ -365,7 +366,7 @@ export default function CustomerPage() {
   }
 
   return (
-    <ErrorBoundary>
+    <DataErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -499,6 +500,6 @@ export default function CustomerPage() {
           />
         )}
       </div>
-    </ErrorBoundary>
+    </DataErrorBoundary>
   );
 }

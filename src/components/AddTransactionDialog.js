@@ -8,6 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 
 export function AddTransactionDialog({ customerId, onAddTransaction }) {
@@ -103,19 +104,20 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add Transaction</Button>
+        <Button aria-label="Add new transaction">Add Transaction</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>New Transaction</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date *</label>
             <Input
               type="date"
               value={formData.date}
-              onChange={handleDateChange}
+              aria-label="Transaction date"
               max={new Date().toISOString().split("T")[0]}
               className={errors.date ? "border-red-500" : ""}
             />
@@ -127,7 +129,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Memo Number *</label>
             <Input
-              placeholder="Enter memo number"
+              aria-label="Memo number"
               value={formData.memoNumber}
               onChange={(e) =>
                 setFormData({ ...formData, memoNumber: e.target.value })
@@ -142,7 +144,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Details</label>
             <Input
-              placeholder="Enter transaction details"
+              aria-label="Transaction details"
               value={formData.details}
               onChange={(e) =>
                 setFormData({ ...formData, details: e.target.value })
@@ -156,7 +158,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Enter total amount"
+              aria-label="Total bill amount"
               value={formData.total}
               onChange={(e) =>
                 setFormData({ ...formData, total: e.target.value })
@@ -174,7 +176,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Enter deposit amount"
+              aria-label="Deposit amount"
               value={formData.deposit}
               onChange={(e) =>
                 setFormData({ ...formData, deposit: e.target.value })
@@ -189,10 +191,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Store</label>
             <select
-              className={`w-full border rounded-md px-3 py-2 ${
-                errors.storeId ? "border-red-500" : ""
-              }`}
-              value={formData.storeId}
+              aria-label="Select store"
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
               }
@@ -209,13 +208,14 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              aria-label="Cancel adding new transaction"
             >
               Cancel
             </Button>
-            <Button type="submit">Save Transaction</Button>
+            <Button type="submit" aria-label="Save new transaction">Save Transaction</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

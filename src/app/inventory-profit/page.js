@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DollarSign, ArrowUpDown } from "lucide-react";
 
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useRouter } from "next/navigation";
 
 export default function InventoryProfitPage() {
@@ -106,6 +107,7 @@ export default function InventoryProfitPage() {
   };
 
   return (
+    <DataErrorBoundary>
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight mb-8">
         Inventory Profit
@@ -192,5 +194,6 @@ export default function InventoryProfitPage() {
         </CardContent>
       </Card>
     </div>
+    </DataErrorBoundary>
   );
 }

@@ -29,10 +29,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={geist.className}>
       <body>
-        <ErrorBoundary
-          fallback={GlobalErrorFallback}
-          showDetails={process.env.NODE_ENV !== "production"}
-        >
+        <ErrorBoundary fallback={<GlobalErrorFallback />}>
           <Suspense fallback={<div>Loading...</div>}>
             <ClientRoot>{children}</ClientRoot>
           </Suspense>

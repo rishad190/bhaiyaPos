@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -110,7 +111,7 @@ export default function SettingsPage() {
         setSchedulerStatus(status);
         setSchedulerSettings(status.settings);
       } catch (error) {
-        console.error("Error loading backup data:", error);
+        logger.error("Error loading backup data:", error);
       }
     };
     loadBackupData();

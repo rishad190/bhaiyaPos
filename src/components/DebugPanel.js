@@ -1,5 +1,6 @@
 "use client";
-export function DebugPanel({ data }) {
+import React from "react";
+export const DebugPanel = React.memo(function DebugPanel({ data }) {
   if (process.env.NODE_ENV !== "development") return null;
 
   return (
@@ -12,4 +13,4 @@ export function DebugPanel({ data }) {
       </details>
     </div>
   );
-}
+  });

@@ -1,3 +1,4 @@
+import React from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
@@ -8,7 +9,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-export function CustomerSearch({
+export const CustomerSearch = React.memo(function CustomerSearch({
   searchTerm,
   onSearchChange,
   selectedFilter,
@@ -45,4 +46,4 @@ export function CustomerSearch({
       </CardContent>
     </Card>
   );
-}
+  });

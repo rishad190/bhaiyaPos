@@ -1,8 +1,9 @@
 "use client";
 
+import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function LoadingFallback() {
+export default React.memo(function LoadingFallback() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navbar Skeleton */}
@@ -42,5 +43,4 @@ export default function LoadingFallback() {
         </div>
       </div>
     </div>
-  );
-}
+  });

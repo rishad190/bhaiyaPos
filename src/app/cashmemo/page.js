@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useMemo } from "react";
+import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
@@ -252,7 +253,7 @@ export default function CashMemoPage() {
       }
 
       // Debug log for stock validation
-      console.debug("[CashMemo] Stock validation passed:", {
+      logger.debug("[CashMemo] Stock validation passed:", {
         fabricName: fabric.name,
         productQuantity: quantityNum,
         availableStock,
@@ -295,7 +296,7 @@ export default function CashMemoPage() {
       // Reset product search value as well if needed
       setProductSearchValue("");
     } catch (error) {
-      console.error("Error calculating cost or adding product:", error);
+      logger.error("Error calculating cost or adding product:", error);
       toast({
         title: "Error Adding Product",
         // Display specific error like insufficient stock if available
@@ -333,7 +334,7 @@ export default function CashMemoPage() {
   const handleSelectProduct = (fabric) => {
     // Validate fabric ID before proceeding
     if (!fabric.id || fabric.id === "0" || fabric.id === "") {
-      console.error("[CashMemo] Invalid fabric ID selected:", fabric);
+      logger.error("[CashMemo] Invalid fabric ID selected:", fabric);
       toast({
         title: "Invalid Product",
         description:
@@ -363,7 +364,7 @@ export default function CashMemoPage() {
       .filter((c) => c.quantity > 0);
 
     // Debug log for fabric selection
-    console.debug("[CashMemo] Selected fabric:", {
+    logger.debug("[CashMemo] Selected fabric:", {
       name: fabric.name,
       id: fabric.id,
       availableColorsCount: availableColors.length,
@@ -512,7 +513,7 @@ export default function CashMemoPage() {
         }
 
         // Debug log for save-time validation
-        console.debug("[CashMemo] Save-time stock validation:", {
+        logger.debug("[CashMemo] Save-time stock validation:", {
           fabricName: fabric.name,
           productQuantity: product.quantity,
           availableStock,
@@ -554,14 +555,14 @@ export default function CashMemoPage() {
       // Enhanced debugging for fabric validation
       if (process.env.NODE_ENV !== "production") {
         try {
-          console.debug("[CashMemo] transaction payload:", transaction);
-          console.debug("[CashMemo] Current fabrics data:", fabrics);
-          console.debug("[CashMemo] Products to save:", products);
+          logger.debug("[CashMemo] transaction payload:", transaction);
+          logger.debug("[CashMemo] Current fabrics data:", fabrics);
+          logger.debug("[CashMemo] Products to save:", products);
 
           // Validate fabric IDs before proceeding
           const invalidProducts = products.filter((p) => !p.fabricId);
           if (invalidProducts.length > 0) {
-            console.error(
+            logger.error(
               "[CashMemo] Products missing fabricId:",
               invalidProducts
             );
@@ -571,12 +572,12 @@ export default function CashMemoPage() {
           for (const product of products) {
             const fabric = fabrics.find((f) => f && f.id === product.fabricId);
             if (!fabric) {
-              console.error(
+              logger.error(
                 `[CashMemo] Fabric not found for product:`,
                 product
               );
             } else {
-              console.debug(
+              logger.debug(
                 `[CashMemo] Found fabric for ${product.name}:`,
                 fabric.name,
                 fabric.id
@@ -600,7 +601,7 @@ export default function CashMemoPage() {
             product.fabricId === "0" ||
             product.fabricId === ""
           ) {
-            console.warn("[CashMemo] Product with invalid fabricId:", product);
+            logger.warn("[CashMemo] Product with invalid fabricId:", product);
             const fabric = fabrics.find(
               (f) =>
                 f &&
@@ -610,12 +611,12 @@ export default function CashMemoPage() {
                 f.name.toLowerCase() === product.name.toLowerCase()
             );
             if (fabric) {
-              console.log(
+              logger.info(
                 `[CashMemo] Fixed fabricId for ${product.name}: ${fabric.id}`
               );
               return { ...product, fabricId: fabric.id };
             } else {
-              console.error(
+              logger.error(
                 `[CashMemo] No valid fabric found for ${product.name}`
               );
               return null;
@@ -640,7 +641,7 @@ export default function CashMemoPage() {
       }
 
       // Debug log before reducing inventory
-      console.debug(
+      logger.debug(
         "[CashMemo] Products with valid fabric IDs:",
         productsWithValidFabricIds
       );
@@ -684,7 +685,7 @@ export default function CashMemoPage() {
         router.push("/cashbook"); // Navigate to cashbook after save
       }, 2000);
     } catch (error) {
-      console.error("Error saving memo:", error);
+      logger.error("Error saving memo:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to save memo. Please try again.",

@@ -29,6 +29,7 @@ import {
   ArrowDownRight,
   RefreshCw,
 } from "lucide-react";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -271,7 +272,8 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+    <DataErrorBoundary>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
@@ -532,5 +534,6 @@ export default function SuppliersPage() {
         />
       )}
     </div>
+    </DataErrorBoundary>
   );
 }

@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Plus } from "lucide-react";
 
 export function AddFabricDialog({ onAddFabric, children }) {
@@ -102,6 +103,7 @@ export function AddFabricDialog({ onAddFabric, children }) {
           <DialogTitle>Add New Fabric</DialogTitle>
         </DialogHeader>
 
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Fabric Name */}
           <div className="space-y-2">
@@ -193,6 +195,7 @@ export function AddFabricDialog({ onAddFabric, children }) {
             </Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );
