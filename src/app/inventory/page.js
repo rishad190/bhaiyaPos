@@ -6,7 +6,7 @@ import { useData } from "@/app/data-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
-import { logger } from "@/utils/logger";
+import logger from "@/utils/logger";
 import {
   Table,
   TableBody,

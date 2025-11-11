@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
-import { logger } from "@/utils/logger";
+import logger from "@/utils/logger";
 
 import {
   Table,
