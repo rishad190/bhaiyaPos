@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import logger from "@/utils/logger";
 import { useData } from "@/app/data-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +48,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { Pagination } from "@/components/Pagination";
 
 export default function CashBookPage() {
@@ -87,7 +89,7 @@ export default function CashBookPage() {
           setLoadingState((prev) => ({ ...prev, initial: false }));
         }
       } catch (error) {
-        console.error("Error loading initial data:", error);
+        logger.error("Error loading initial data:", error);
         toast({
           title: "Error",
           description: "Failed to load data. Please refresh the page.",
@@ -109,7 +111,7 @@ export default function CashBookPage() {
           setLoadingState((prev) => ({ ...prev, initial: false }));
         }
       } catch (error) {
-        console.error("Error loading initial data:", error);
+        logger.error("Error loading initial data:", error);
         toast({
           title: "Error",
           description: "Failed to load data. Please refresh the page.",
@@ -137,8 +139,8 @@ export default function CashBookPage() {
   // Remove debug logging in production
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      console.log("Loading state:", loadingState);
-      console.log(
+      logger.info("Loading state:", loadingState);
+      logger.info(
         "Daily cash transactions count:",
         dailyCashTransactions?.length || 0
       );
@@ -293,7 +295,7 @@ export default function CashBookPage() {
         description: "Transaction added successfully",
       });
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      logger.error("Error adding transaction:", error);
       toast({
         title: "Error",
         description: "Failed to add transaction. Please try again.",
@@ -313,7 +315,7 @@ export default function CashBookPage() {
         description: "Transaction updated successfully",
       });
     } catch (error) {
-      console.error("Error updating transaction:", error);
+      logger.error("Error updating transaction:", error);
       toast({
         title: "Error",
         description: "Failed to update transaction. Please try again.",
@@ -337,7 +339,7 @@ export default function CashBookPage() {
         description: "Transaction deleted successfully",
       });
     } catch (error) {
-      console.error("Error deleting transaction:", error);
+      logger.error("Error deleting transaction:", error);
       toast({
         title: "Error",
         description: "Failed to delete transaction. Please try again.",
@@ -529,6 +531,7 @@ export default function CashBookPage() {
   }
 
   return (
+    <DataErrorBoundary>
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -972,5 +975,6 @@ export default function CashBookPage() {
         />
       )}
     </div>
+    </DataErrorBoundary>
   );
 }

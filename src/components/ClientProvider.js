@@ -1,6 +1,7 @@
 "use client";
+import React from "react";
 import { DataProvider } from "@/app/data-context";
 
-export function ClientProvider({ children }) {
+export const ClientProvider = React.memo(function ClientProvider({ children }) {
   return <DataProvider>{children}</DataProvider>;
-}
+});

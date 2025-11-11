@@ -39,7 +39,7 @@ export const addSampleData = async () => {
     await set(ref(db, "customers"), customers);
     await set(ref(db, "transactions"), transactions);
 
-    console.log("Sample data added successfully");
+    // console.log("Sample data added successfully");
   } catch (error) {
     console.error("Error adding sample data:", error);
   }

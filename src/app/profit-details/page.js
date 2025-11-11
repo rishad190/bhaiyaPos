@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { Badge } from "@/components/ui/badge";
 
 export default function ProfitDetailsPage() {
@@ -24,6 +25,7 @@ export default function ProfitDetailsPage() {
     }));
 
   return (
+    <DataErrorBoundary>
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <Card>
         <CardHeader>
@@ -61,5 +63,6 @@ export default function ProfitDetailsPage() {
         </CardContent>
       </Card>
     </div>
+    </DataErrorBoundary>
   );
 }

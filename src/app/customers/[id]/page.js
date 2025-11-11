@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import logger from "@/utils/logger";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 
@@ -30,7 +31,7 @@ import {
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { EditTransactionDialog } from "@/components/EditTransactionDialog";
 import { LoadingState, TableSkeleton } from "@/components/LoadingState";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import {
   ArrowLeft,
   Phone,
@@ -145,7 +146,7 @@ export default function CustomerDetail() {
       });
       setIsAddingTransaction(false);
     } catch (error) {
-      console.error(ERROR_MESSAGES.ADD_ERROR, error);
+      logger.error(ERROR_MESSAGES.ADD_ERROR, error);
       toast({
         title: "Error",
         description: ERROR_MESSAGES.ADD_ERROR,
@@ -166,7 +167,7 @@ export default function CustomerDetail() {
           description: "Transaction deleted successfully",
         });
       } catch (error) {
-        console.error(ERROR_MESSAGES.DELETE_ERROR, error);
+        logger.error(ERROR_MESSAGES.DELETE_ERROR, error);
         toast({
           title: "Error",
           description: ERROR_MESSAGES.DELETE_ERROR,
@@ -190,7 +191,7 @@ export default function CustomerDetail() {
         description: "Transaction updated successfully",
       });
     } catch (error) {
-      console.error(ERROR_MESSAGES.UPDATE_ERROR, error);
+      logger.error(ERROR_MESSAGES.UPDATE_ERROR, error);
       toast({
         title: "Error",
         description: error.message || ERROR_MESSAGES.UPDATE_ERROR,
@@ -255,7 +256,7 @@ export default function CustomerDetail() {
       : 0;
 
   return (
-    <ErrorBoundary>
+    <DataErrorBoundary>
       <div className="p-6 max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-6">
@@ -606,6 +607,6 @@ export default function CustomerDetail() {
           </div>
         </div>
       </div>
-    </ErrorBoundary>
+    </DataErrorBoundary>
   );
 }

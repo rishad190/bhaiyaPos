@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { Loader2 } from "lucide-react";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 
 export function EditTransactionDialog({
@@ -156,6 +157,7 @@ export function EditTransactionDialog({
         <DialogHeader>
           <DialogTitle>Edit Transaction for {customerName}</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date *</label>
@@ -269,6 +271,7 @@ export function EditTransactionDialog({
             </Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

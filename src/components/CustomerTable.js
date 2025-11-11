@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Table,
   TableBody,
@@ -147,3 +148,4 @@ export function CustomerTable({
     </Table>
   );
 }
+

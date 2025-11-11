@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 
 export default function FabricProfitDetailPage() {
@@ -55,6 +56,7 @@ export default function FabricProfitDetailPage() {
   }
 
   return (
+    <DataErrorBoundary>
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight mb-2">{fabric.name}</h1>
       <p className="text-muted-foreground mb-8">{fabric.code}</p>
@@ -123,5 +125,6 @@ export default function FabricProfitDetailPage() {
         </CardContent>
       </Card>
     </div>
+    </DataErrorBoundary>
   );
 }

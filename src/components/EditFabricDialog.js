@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Edit, Trash2 } from "lucide-react";
 
 export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
@@ -116,6 +117,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
           <DialogTitle>Edit Fabric</DialogTitle>
         </DialogHeader>
 
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Fabric Name */}
           <div className="space-y-2">
@@ -219,6 +221,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
             </div>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

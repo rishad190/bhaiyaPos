@@ -103,7 +103,6 @@ class Logger {
     // This is a stub - implement based on your error reporting service
     try {
       // Example: Sentry.captureException(new Error(errorData.message), { extra: errorData });
-      console.log("Error sent to monitoring service:", errorData);
     } catch (error) {
       console.error("Failed to send error to monitoring service:", error);
     }

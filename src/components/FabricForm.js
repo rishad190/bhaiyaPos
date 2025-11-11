@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { X } from "lucide-react";
 
 const emptyFabric = {
@@ -94,6 +95,7 @@ const FabricForm = ({ fabric, onSave, onCancel }) => {
   };
 
   return (
+    <FormErrorBoundary>
     <form
       onSubmit={handleSubmit}
       className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
@@ -281,6 +283,7 @@ const FabricForm = ({ fabric, onSave, onCancel }) => {
         <Button type="submit">{fabric ? "Update" : "Save"} Fabric</Button>
       </div>
     </form>
+    </FormErrorBoundary>
   );
 };
 

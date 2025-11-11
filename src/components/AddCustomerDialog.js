@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { useData } from "@/app/data-context";
 
 export function AddCustomerDialog({ onClose }) {
@@ -54,12 +55,13 @@ export function AddCustomerDialog({ onClose }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add New Customer</Button>
+        <Button aria-label="Add new customer">Add New Customer</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Customer</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="name" className="text-sm font-medium">
@@ -68,7 +70,7 @@ export function AddCustomerDialog({ onClose }) {
             <Input
               id="name"
               required
-              placeholder="Enter customer name"
+              aria-label="Customer name"
               value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
@@ -83,7 +85,7 @@ export function AddCustomerDialog({ onClose }) {
             <Input
               id="phone"
               required
-              placeholder="Enter phone number"
+              aria-label="Customer phone number"
               value={formData.phone}
               onChange={(e) =>
                 setFormData({ ...formData, phone: e.target.value })
@@ -98,7 +100,7 @@ export function AddCustomerDialog({ onClose }) {
             <Input
               id="email"
               type="email"
-              placeholder="Enter email address"
+              aria-label="Customer email address"
               value={formData.email}
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
@@ -112,7 +114,7 @@ export function AddCustomerDialog({ onClose }) {
             </label>
             <Input
               id="address"
-              placeholder="Enter customer address"
+              aria-label="Customer address"
               value={formData.address}
               onChange={(e) =>
                 setFormData({ ...formData, address: e.target.value })
@@ -126,7 +128,7 @@ export function AddCustomerDialog({ onClose }) {
             </label>
             <select
               id="storeId"
-              className="w-full border rounded-md px-3 py-2"
+              aria-label="Select store"
               value={formData.storeId}
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
@@ -141,13 +143,14 @@ export function AddCustomerDialog({ onClose }) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              aria-label="Cancel adding new customer"
             >
               Cancel
             </Button>
-            <Button type="submit">Save Customer</Button>
+            <Button type="submit" aria-label="Save new customer">Save Customer</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

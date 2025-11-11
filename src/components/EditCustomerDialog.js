@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 
 export function EditCustomerDialog({
@@ -51,12 +52,13 @@ export function EditCustomerDialog({
         <DialogHeader>
           <DialogTitle>Edit Customer</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Name *</label>
             <Input
               required
-              value={formData.name}
+              aria-label="Customer name"
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
@@ -67,7 +69,7 @@ export function EditCustomerDialog({
             <label className="text-sm font-medium">Phone *</label>
             <Input
               required
-              value={formData.phone}
+              aria-label="Customer phone number"
               onChange={(e) =>
                 setFormData({ ...formData, phone: e.target.value })
               }
@@ -77,7 +79,7 @@ export function EditCustomerDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">Address</label>
             <Input
-              value={formData.address}
+              aria-label="Customer address"
               onChange={(e) =>
                 setFormData({ ...formData, address: e.target.value })
               }
@@ -88,7 +90,7 @@ export function EditCustomerDialog({
             <label className="text-sm font-medium">Email</label>
             <Input
               type="email"
-              value={formData.email}
+              aria-label="Customer email address"
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
@@ -98,7 +100,7 @@ export function EditCustomerDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">Store</label>
             <select
-              className="w-full border rounded-md px-3 py-2"
+              aria-label="Select store"
               value={formData.storeId}
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
@@ -110,12 +112,13 @@ export function EditCustomerDialog({
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel editing customer">
               Cancel
             </Button>
-            <Button type="submit">Update Customer</Button>
+            <Button type="submit" aria-label="Update customer details">Update Customer</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

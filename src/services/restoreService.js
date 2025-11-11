@@ -21,7 +21,7 @@ class RestoreService {
    */
   async restoreFromBackup(backupData, options = {}) {
     try {
-      console.log("Starting data restore...");
+      // console.log("Starting data restore...");
 
       const {
         dryRun = false,
@@ -51,7 +51,7 @@ class RestoreService {
 
       for (const collectionName of collectionsToRestore) {
         try {
-          console.log(`Restoring ${collectionName}...`);
+          // console.log(`Restoring ${collectionName}...`);
 
           const collectionData = backupData.collections[collectionName];
           if (!collectionData || !collectionData.data) {
@@ -122,7 +122,7 @@ class RestoreService {
       }
 
       results.summary.completedAt = new Date().toISOString();
-      console.log("Data restore completed:", results.summary);
+      // console.log("Data restore completed:", results.summary);
 
       return results;
     } catch (error) {

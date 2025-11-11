@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useMemo } from "react";
+import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
@@ -253,7 +254,7 @@ export default function CashMemoPage() {
       }
 
       // Debug log for stock validation
-      logger.debug("Stock validation passed", {
+      logger.debug("[CashMemo] Stock validation passed:", {
         fabricName: fabric.name,
         productQuantity: quantityNum,
         availableStock,
@@ -296,12 +297,7 @@ export default function CashMemoPage() {
       // Reset product search value as well if needed
       setProductSearchValue("");
     } catch (error) {
-      logger.error("Error calculating cost or adding product", {
-        error: error.message,
-        productName: newProduct.name,
-        quantity: newProduct.quantity,
-        price: newProduct.price,
-      });
+      logger.error("Error calculating cost or adding product:", error);
       toast({
         title: "Error Adding Product",
         // Display specific error like insufficient stock if available
@@ -339,10 +335,7 @@ export default function CashMemoPage() {
   const handleSelectProduct = (fabric) => {
     // Validate fabric ID before proceeding
     if (!fabric.id || fabric.id === "0" || fabric.id === "") {
-      logger.error("Invalid fabric ID selected", {
-        fabricName: fabric.name,
-        fabricId: fabric.id,
-      });
+      logger.error("[CashMemo] Invalid fabric ID selected:", fabric);
       toast({
         title: "Invalid Product",
         description:
@@ -372,9 +365,9 @@ export default function CashMemoPage() {
       .filter((c) => c.quantity > 0);
 
     // Debug log for fabric selection
-    logger.debug("Selected fabric", {
-      fabricName: fabric.name,
-      fabricId: fabric.id,
+    logger.debug("[CashMemo] Selected fabric:", {
+      name: fabric.name,
+      id: fabric.id,
       availableColorsCount: availableColors.length,
     });
 
@@ -521,7 +514,7 @@ export default function CashMemoPage() {
         }
 
         // Debug log for save-time validation
-        logger.debug("Save-time stock validation", {
+        logger.debug("[CashMemo] Save-time stock validation:", {
           fabricName: fabric.name,
           productQuantity: product.quantity,
           availableStock,
@@ -561,30 +554,36 @@ export default function CashMemoPage() {
       };
 
       // Enhanced debugging for fabric validation
-      logger.debug("Transaction payload", { transaction });
-      logger.debug("Current fabrics data", {
-        fabricsCount: fabrics?.length,
-        fabricIds: fabrics?.map((f) => ({ id: f.id, name: f.name })),
-      });
-      logger.debug("Products to save", { products });
+      if (process.env.NODE_ENV !== "production") {
+        try {
+          logger.debug("[CashMemo] transaction payload:", transaction);
+          logger.debug("[CashMemo] Current fabrics data:", fabrics);
+          logger.debug("[CashMemo] Products to save:", products);
 
-      // Validate fabric IDs before proceeding
-      const invalidProducts = products.filter((p) => !p.fabricId);
-      if (invalidProducts.length > 0) {
-        logger.error("Products missing fabricId", { invalidProducts });
-      }
+          // Validate fabric IDs before proceeding
+          const invalidProducts = products.filter((p) => !p.fabricId);
+          if (invalidProducts.length > 0) {
+            logger.error(
+              "[CashMemo] Products missing fabricId:",
+              invalidProducts
+            );
+          }
 
-      // Verify fabrics exist
-      for (const product of products) {
-        const fabric = fabrics.find((f) => f && f.id === product.fabricId);
-        if (!fabric) {
-          logger.error("Fabric not found for product", { product });
-        } else {
-          logger.debug("Found fabric for product", {
-            productName: product.name,
-            fabricName: fabric.name,
-            fabricId: fabric.id,
-          });
+          // Verify fabrics exist
+          for (const product of products) {
+            const fabric = fabrics.find((f) => f && f.id === product.fabricId);
+            if (!fabric) {
+              logger.error(`[CashMemo] Fabric not found for product:`, product);
+            } else {
+              logger.debug(
+                `[CashMemo] Found fabric for ${product.name}:`,
+                fabric.name,
+                fabric.id
+              );
+            }
+          }
+        } catch (e) {
+          /* ignore logging errors */
         }
       }
 
@@ -600,7 +599,7 @@ export default function CashMemoPage() {
             product.fabricId === "0" ||
             product.fabricId === ""
           ) {
-            logger.warn("Product with invalid fabricId", { product });
+            logger.warn("[CashMemo] Product with invalid fabricId:", product);
             const fabric = fabrics.find(
               (f) =>
                 f &&
@@ -610,17 +609,14 @@ export default function CashMemoPage() {
                 f.name.toLowerCase() === product.name.toLowerCase()
             );
             if (fabric) {
-              logger.info("Fixed fabricId for product", {
-                productName: product.name,
-                oldFabricId: product.fabricId,
-                newFabricId: fabric.id,
-              });
+              logger.info(
+                `[CashMemo] Fixed fabricId for ${product.name}: ${fabric.id}`
+              );
               return { ...product, fabricId: fabric.id };
             } else {
-              logger.error("No valid fabric found for product", {
-                productName: product.name,
-                productFabricId: product.fabricId,
-              });
+              logger.error(
+                `[CashMemo] No valid fabric found for ${product.name}`
+              );
               return null;
             }
           }
@@ -643,11 +639,10 @@ export default function CashMemoPage() {
       }
 
       // Debug log before reducing inventory
-      logger.debug("Products with valid fabric IDs", {
-        productsWithValidFabricIds,
-        originalProductsCount: products.length,
-        validProductsCount: productsWithValidFabricIds.length,
-      });
+      logger.debug(
+        "[CashMemo] Products with valid fabric IDs:",
+        productsWithValidFabricIds
+      );
 
       // Reduce inventory after successful transaction
       await reduceInventory(productsWithValidFabricIds);
@@ -688,12 +683,7 @@ export default function CashMemoPage() {
         router.push("/cashbook"); // Navigate to cashbook after save
       }, 2000);
     } catch (error) {
-      logger.error("Error saving memo", {
-        error: error.message,
-        customerId,
-        productsCount: products.length,
-        grandTotal,
-      });
+      logger.error("Error saving memo:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to save memo. Please try again.",

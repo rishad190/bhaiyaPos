@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Label } from "@/components/ui/label";
 
 export function EditSupplierDialog({
@@ -59,6 +60,7 @@ export function EditSupplierDialog({
         <DialogHeader>
           <DialogTitle>Edit Supplier</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
             <div className="space-y-2">
@@ -134,6 +136,7 @@ export function EditSupplierDialog({
             <Button type="submit">Save Changes</Button>
           </DialogFooter>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

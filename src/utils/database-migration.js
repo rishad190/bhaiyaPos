@@ -24,7 +24,7 @@ export class DatabaseMigration {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${message}`;
     this.migrationLog.push(logEntry);
-    console.log(logEntry);
+    // console.log(logEntry);
   }
 
   async migrateToFlattenedStructure() {

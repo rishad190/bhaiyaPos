@@ -8,6 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 
 export function EditSupplierTransactionDialog({ transaction, onSave }) {
@@ -78,6 +79,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
         <DialogHeader>
           <DialogTitle>Edit Transaction</DialogTitle>
         </DialogHeader>
+        <FormErrorBoundary>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Date *</label>
@@ -163,6 +165,7 @@ export function EditSupplierTransactionDialog({ transaction, onSave }) {
             <Button type="submit">Save Changes</Button>
           </div>
         </form>
+        </FormErrorBoundary>
       </DialogContent>
     </Dialog>
   );

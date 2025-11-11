@@ -63,9 +63,7 @@ const COLLECTION_REFS = {
  * Migrates all existing data to the new flattened structure
  */
 export const migrateToFlattenedStructure = async () => {
-  console.log(
-    "[Migration] Starting database migration to flattened structure..."
-  );
+
 
   try {
     // Get current fabrics and batches
@@ -78,7 +76,7 @@ export const migrateToFlattenedStructure = async () => {
     ]);
 
     if (!fabricsSnapshot.exists()) {
-      console.log("[Migration] No fabrics found to migrate");
+
       return { success: true, migrated: 0 };
     }
 
@@ -87,11 +85,7 @@ export const migrateToFlattenedStructure = async () => {
       ? batchesSnapshot.val()
       : {};
 
-    console.log(
-      `[Migration] Found ${Object.keys(currentFabrics).length} fabrics and ${
-        Object.keys(currentBatches).length
-      } batches`
-    );
+
 
     // Create new flattened structure
     const flattenedFabrics = {};
@@ -133,21 +127,15 @@ export const migrateToFlattenedStructure = async () => {
       }
 
       migratedCount++;
-      console.log(
-        `[Migration] Processed fabric: ${fabricData.name} with ${fabricBatches.length} batches`
-      );
+
     }
 
     // Save flattened structure to a new path temporarily
     const flattenedRef = ref(db, "fabrics_flattened");
     await set(flattenedRef, flattenedFabrics);
 
-    console.log(
-      `[Migration] Successfully migrated ${migratedCount} fabrics to flattened structure`
-    );
-    console.log(
-      "[Migration] New structure saved to 'fabrics_flattened' for verification"
-    );
+
+
 
     return {
       success: true,
@@ -199,7 +187,7 @@ export const verifyMigration = async () => {
  */
 export const finalizeMigration = async () => {
   try {
-    console.log("[Migration] Finalizing migration...");
+
 
     // Get the flattened data
     const flattenedRef = ref(db, "fabrics_flattened");
@@ -222,7 +210,7 @@ export const finalizeMigration = async () => {
     // Remove temporary flattened data
     await remove(flattenedRef);
 
-    console.log("[Migration] Migration finalized successfully");
+
     return { success: true };
   } catch (error) {
     console.error("[Migration] Finalization error:", error);
@@ -235,13 +223,13 @@ export const finalizeMigration = async () => {
  */
 export const rollbackMigration = async () => {
   try {
-    console.log("[Migration] Rolling back migration...");
+
 
     // Remove temporary flattened data
     const flattenedRef = ref(db, "fabrics_flattened");
     await remove(flattenedRef);
 
-    console.log("[Migration] Rollback completed");
+
     return { success: true };
   } catch (error) {
     console.error("[Migration] Rollback error:", error);
