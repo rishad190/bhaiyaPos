@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useMemo } from "react";
-import logger from "@/utils/logger";
+
 import { useRouter } from "next/navigation";
 import { useData } from "@/app/data-context";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
