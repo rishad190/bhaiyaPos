@@ -61,7 +61,12 @@ export function EditTransactionDialog({
     // Validate date is not in the future
     const selectedDate = new Date(formData.date);
     const today = new Date();
-    if (selectedDate > today) {
+    today.setHours(0, 0, 0, 0); // Set time to midnight for today
+
+    // Adjust for timezone offset when creating selectedDate
+    const adjustedSelectedDate = new Date(selectedDate.getTime() + selectedDate.getTimezoneOffset() * 60000);
+
+    if (adjustedSelectedDate > today) {
       newErrors.date = "Date cannot be in the future";
     }
 
@@ -158,119 +163,118 @@ export function EditTransactionDialog({
           <DialogTitle>Edit Transaction for {customerName}</DialogTitle>
         </DialogHeader>
         <FormErrorBoundary>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Date *</label>
-            <Input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleInputChange}
-              className={errors.date ? "border-red-500" : ""}
-              max={new Date().toISOString().split("T")[0]}
-            />
-            {errors.date && (
-              <p className="text-red-500 text-sm">{errors.date}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Memo Number *</label>
-            <Input
-              name="memoNumber"
-              placeholder="Enter memo number"
-              value={formData.memoNumber}
-              onChange={handleInputChange}
-              className={errors.memoNumber ? "border-red-500" : ""}
-            />
-            {errors.memoNumber && (
-              <p className="text-red-500 text-sm">{errors.memoNumber}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Details</label>
-            <Input
-              name="details"
-              placeholder="Enter transaction details"
-              value={formData.details}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Total Bill</label>
-            <Input
-              name="total"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Enter total amount"
-              value={formData.total}
-              onChange={handleInputChange}
-              className={errors.total ? "border-red-500" : ""}
-            />
-            {errors.total && (
-              <p className="text-red-500 text-sm">{errors.total}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Deposit</label>
-            <Input
-              name="deposit"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Enter deposit amount"
-              value={formData.deposit}
-              onChange={handleInputChange}
-              className={errors.deposit ? "border-red-500" : ""}
-            />
-            {errors.deposit && (
-              <p className="text-red-500 text-sm">{errors.deposit}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Store</label>
-            <select
-              name="storeId"
-              className={`w-full border rounded-md px-3 py-2 ${
-                errors.storeId ? "border-red-500" : ""
-              }`}
-              value={formData.storeId}
-              onChange={handleInputChange}
-            >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
-            </select>
-            {errors.storeId && (
-              <p className="text-red-500 text-sm">{errors.storeId}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Transaction"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date *</label>
+              <Input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleInputChange}
+                className={errors.date ? "border-red-500" : ""}
+              />
+              {errors.date && (
+                <p className="text-red-500 text-sm">{errors.date}</p>
               )}
-            </Button>
-          </div>
-        </form>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Memo Number *</label>
+              <Input
+                name="memoNumber"
+                placeholder="Enter memo number"
+                value={formData.memoNumber}
+                onChange={handleInputChange}
+                className={errors.memoNumber ? "border-red-500" : ""}
+              />
+              {errors.memoNumber && (
+                <p className="text-red-500 text-sm">{errors.memoNumber}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Details</label>
+              <Input
+                name="details"
+                placeholder="Enter transaction details"
+                value={formData.details}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Total Bill</label>
+              <Input
+                name="total"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Enter total amount"
+                value={formData.total}
+                onChange={handleInputChange}
+                className={errors.total ? "border-red-500" : ""}
+              />
+              {errors.total && (
+                <p className="text-red-500 text-sm">{errors.total}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Deposit</label>
+              <Input
+                name="deposit"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Enter deposit amount"
+                value={formData.deposit}
+                onChange={handleInputChange}
+                className={errors.deposit ? "border-red-500" : ""}
+              />
+              {errors.deposit && (
+                <p className="text-red-500 text-sm">{errors.deposit}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Store</label>
+              <select
+                name="storeId"
+                className={`w-full border rounded-md px-3 py-2 ${
+                  errors.storeId ? "border-red-500" : ""
+                }`}
+                value={formData.storeId}
+                onChange={handleInputChange}
+              >
+                <option value="STORE1">Store 1</option>
+                <option value="STORE2">Store 2</option>
+              </select>
+              {errors.storeId && (
+                <p className="text-red-500 text-sm">{errors.storeId}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Transaction"
+                )}
+              </Button>
+            </div>
+          </form>
         </FormErrorBoundary>
       </DialogContent>
     </Dialog>
