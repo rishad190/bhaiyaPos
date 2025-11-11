@@ -1,7 +1,6 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import logger from "@/utils/logger";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { useData } from "@/app/data-context";
@@ -45,14 +44,13 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { suppliers, updateSupplier, deleteSupplierTransaction } = useData();
+  const { suppliers, deleteSupplierTransaction, updateSupplierDue } = useData();
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -124,6 +122,21 @@ export default function SupplierDetail() {
     };
   }, [params.id, router, storeFilter, toast]);
 
+  // Calculate totals based on the *filtered* transactions list
+  const filteredTotals = useMemo(() => {
+    return transactions.reduce(
+      (acc, t) => {
+        const total = Number(t.totalAmount) || 0;
+        const paid = Number(t.paidAmount) || 0;
+        acc.totalAmount += total;
+        acc.paidAmount += paid;
+        acc.totalDue += total - paid;
+        return acc;
+      },
+      { totalAmount: 0, paidAmount: 0, totalDue: 0 }
+    );
+  }, [transactions]);
+
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
       Date: formatDate(t.date),
@@ -156,17 +169,14 @@ export default function SupplierDetail() {
         (supplier.totalDue || 0) +
         (transaction.totalAmount - (transaction.paidAmount || 0));
 
-      await updateSupplier(params.id, {
-        totalDue: newTotalDue,
-        updatedAt: new Date().toISOString(),
-      });
+      await updateSupplierDue(params.id, newTotalDue);
 
       toast({
         title: "Success",
         description: "Transaction added successfully",
       });
     } catch (error) {
-      logger.error("Error adding transaction:", error);
+      console.error("Error adding transaction:", error);
       toast({
         title: "Error",
         description: "Failed to add transaction",
@@ -199,7 +209,7 @@ export default function SupplierDetail() {
         });
       }
     } catch (error) {
-      logger.error("Error deleting transaction:", error);
+      console.error("Error deleting transaction:", error);
       toast({
         title: "Error",
         description: "Failed to delete transaction",
@@ -222,10 +232,10 @@ export default function SupplierDetail() {
       const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
       await update(transactionRef, updatedData);
 
-      await updateSupplier(params.id, {
-        totalDue: Math.max(0, (supplier.totalDue || 0) + dueDifference),
-        updatedAt: new Date().toISOString(),
-      });
+      await updateSupplierDue(
+        params.id,
+        Math.max(0, (supplier.totalDue || 0) + dueDifference)
+      );
 
       toast({
         title: "Success",
@@ -294,10 +304,7 @@ export default function SupplierDetail() {
     if (!window.confirm("Update stored Total Due to computed value?")) return;
     try {
       setLoading((prev) => ({ ...prev, action: true }));
-      await updateSupplier(params.id, {
-        totalDue: derivedTotalDue,
-        updatedAt: new Date().toISOString(),
-      });
+      await updateSupplierDue(params.id, derivedTotalDue);
       toast({
         title: "Success",
         description: "Supplier totalDue updated to computed value",
@@ -315,7 +322,6 @@ export default function SupplierDetail() {
   };
 
   return (
-    <DataErrorBoundary>
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex items-center justify-between mb-6">
@@ -405,10 +411,7 @@ export default function SupplierDetail() {
                     <DollarSign className="h-4 w-4 text-blue-600" />
                   </div>
                   <div className="text-2xl font-bold text-blue-700">
-                    ৳
-                    {transactions
-                      .reduce((sum, t) => sum + (t.totalAmount || 0), 0)
-                      .toLocaleString()}
+                    ৳{filteredTotals.totalAmount.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -422,24 +425,21 @@ export default function SupplierDetail() {
                     <CreditCard className="h-4 w-4 text-green-600" />
                   </div>
                   <div className="text-2xl font-bold text-green-700">
-                    ৳
-                    {transactions
-                      .reduce((sum, t) => sum + (t.paidAmount || 0), 0)
-                      .toLocaleString()}
+                    ৳{filteredTotals.paidAmount.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
 
               <Card
                 className={`${
-                  supplier.totalDue > 0 ? "bg-red-50" : "bg-green-50"
+                  filteredTotals.totalDue > 0 ? "bg-red-50" : "bg-green-50"
                 } border-none shadow-sm`}
               >
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <span
                       className={`text-sm font-medium ${
-                        supplier.totalDue > 0
+                        filteredTotals.totalDue > 0
                           ? "text-red-600"
                           : "text-green-600"
                       }`}
@@ -448,7 +448,7 @@ export default function SupplierDetail() {
                     </span>
                     <FileText
                       className={`h-4 w-4 ${
-                        supplier.totalDue > 0
+                        filteredTotals.totalDue > 0
                           ? "text-red-600"
                           : "text-green-600"
                       }`}
@@ -456,10 +456,12 @@ export default function SupplierDetail() {
                   </div>
                   <div
                     className={`text-2xl font-bold ${
-                      supplier.totalDue > 0 ? "text-red-700" : "text-green-700"
+                      filteredTotals.totalDue > 0
+                        ? "text-red-700"
+                        : "text-green-700"
                     }`}
                   >
-                    ৳{supplier.totalDue.toLocaleString()}
+                    ৳{filteredTotals.totalDue.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -645,6 +647,5 @@ export default function SupplierDetail() {
         </div>
       </div>
     </div>
-    </DataErrorBoundary>
   );
 }

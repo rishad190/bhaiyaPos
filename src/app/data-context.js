@@ -861,6 +861,19 @@ export function DataProvider({ children }) {
         });
       },
 
+      updateSupplierDue: async (supplierId, newTotalDue) => {
+        return executeAtomicOperation("updateSupplierDue", async () => {
+          const supplierRef = ref(
+            db,
+            `${COLLECTION_REFS.SUPPLIERS}/${supplierId}`
+          );
+          await update(supplierRef, {
+            totalDue: newTotalDue,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      },
+
       deleteSupplier: async (supplierId) => {
         return executeAtomicOperation("deleteSupplier", async () => {
           // First delete associated transactions
@@ -887,8 +900,6 @@ export function DataProvider({ children }) {
         const validationErrors = [];
         if (!transaction.supplierId)
           validationErrors.push("Supplier ID is required");
-        if (!transaction.totalAmount || transaction.totalAmount <= 0)
-          validationErrors.push("Valid total amount is required");
 
         if (validationErrors.length > 0) {
           throw new Error(`Validation failed: ${validationErrors.join(", ")}`);
