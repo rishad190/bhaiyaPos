@@ -19,7 +19,7 @@ import {
 import { ArrowUpDown } from "lucide-react";
 
 export function CustomerTable({
-  customers,
+  customers = [],
   getCustomerDue,
   onRowClick,
   onEdit,
@@ -29,11 +29,7 @@ export function CustomerTable({
   requestSort,
   sortConfig,
 }) {
-  const paginatedCustomers = customers.slice(
-    (currentPage - 1) * customersPerPage,
-    currentPage * customersPerPage
-  );
-
+  // No need to paginate here - customers are already paginated from the backend
   const getSortIndicator = (key) => {
     if (sortConfig?.key === key) {
       return sortConfig.direction === "asc" ? " 🔼" : " 🔽";
@@ -64,7 +60,7 @@ export function CustomerTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {paginatedCustomers.map((customer) => {
+        {Array.isArray(customers) && customers.map((customer) => {
           const dueAmount = getCustomerDue(customer.id);
           return (
             <TableRow

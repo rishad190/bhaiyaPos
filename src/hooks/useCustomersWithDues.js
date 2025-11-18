@@ -15,9 +15,9 @@ export function useCustomersWithDues({ page = 1, limit = 20, searchTerm = '', fi
 
   // Fetch customers with dues already calculated by backend
   const { data: customersData, isLoading: customersLoading, error } = useQuery({
-    queryKey: ['customers', 'list', { page, limit, searchTerm, filter }],
+    queryKey: ['customers', 'list', page, limit, searchTerm, filter],
     queryFn: () => customerService.getCustomers({ page, limit, searchTerm, filter }),
-    keepPreviousData: true,
+    staleTime: 30000, // 30 seconds
   });
 
   // Calculate financial summary from ALL transactions (not just current page)
