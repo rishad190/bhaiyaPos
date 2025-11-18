@@ -52,6 +52,33 @@ const snapshotToObject = (snapshot) => {
 // ============ CUSTOMERS ============
 export const customerService = {
   // Fetch paginated customers
+  // Cache for transactions (improves performance)
+  _transactionsCache: null,
+  _transactionsCacheTime: 0,
+  _CACHE_DURATION: 30000, // 30 seconds
+
+  async _getCachedTransactions() {
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (this._transactionsCache && (now - this._transactionsCacheTime) < this._CACHE_DURATION) {
+      return this._transactionsCache;
+    }
+    
+    // Fetch fresh data
+    const transactionsRef = ref(db, COLLECTIONS.TRANSACTIONS);
+    const snapshot = await get(transactionsRef);
+    this._transactionsCache = snapshotToArray(snapshot);
+    this._transactionsCacheTime = now;
+    
+    return this._transactionsCache;
+  },
+
+  invalidateTransactionsCache() {
+    this._transactionsCache = null;
+    this._transactionsCacheTime = 0;
+  },
+
   async getCustomers({ page = 1, limit = 20, searchTerm = "", filter = "all" } = {}) {
     try {
       const customersRef = ref(db, COLLECTIONS.CUSTOMERS);
@@ -59,10 +86,8 @@ export const customerService = {
       
       let customers = snapshotToArray(snapshot);
       
-      // Get all transactions to calculate dues (needed for filtering)
-      const transactionsRef = ref(db, COLLECTIONS.TRANSACTIONS);
-      const transactionsSnapshot = await get(transactionsRef);
-      const allTransactions = snapshotToArray(transactionsSnapshot);
+      // Get all transactions to calculate dues (with caching for performance)
+      const allTransactions = await this._getCachedTransactions();
       
       // Calculate dues for each customer
       customers = customers.map((customer) => {

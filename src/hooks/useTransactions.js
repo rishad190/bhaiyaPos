@@ -109,9 +109,15 @@ export function useAddTransaction() {
     },
 
     onSettled: (data, error, variables) => {
+      // Invalidate React Query caches
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
+      
+      // Invalidate Firebase service cache
+      const { customerService } = require('@/services/firebaseService');
+      customerService.invalidateTransactionsCache();
+      
       if (variables.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.customerId),
@@ -137,10 +143,15 @@ export function useUpdateTransaction() {
     mutationFn: ({ transactionId, updatedData }) =>
       transactionService.updateTransaction(transactionId, updatedData),
     onSuccess: (_, variables) => {
-      // Invalidate transactions list
+      // Invalidate React Query caches
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
+      
+      // Invalidate Firebase service cache
+      const { customerService } = require('@/services/firebaseService');
+      customerService.invalidateTransactionsCache();
+      
       if (variables.updatedData.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.updatedData.customerId),
@@ -170,11 +181,16 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (transactionId) => transactionService.deleteTransaction(transactionId),
     onSuccess: () => {
-      // Invalidate transactions list
+      // Invalidate React Query caches
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
+      
+      // Invalidate Firebase service cache
+      const { customerService } = require('@/services/firebaseService');
+      customerService.invalidateTransactionsCache();
+      
       toast({
         title: 'Success',
         description: 'Transaction deleted successfully',
