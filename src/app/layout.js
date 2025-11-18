@@ -5,6 +5,8 @@ import { Suspense } from "react";
 
 const geist = Geist({
   subsets: ["latin"],
+  display: "swap", // Improves font loading performance
+  preload: true,
 });
 
 // Add metadata configuration
@@ -18,7 +20,6 @@ export const metadata = {
   keywords: ["POS", "point of sale", "customer management", "transactions"],
   authors: [{ name: "Md Rishad Khan" }],
   manifest: "/manifest.json",
-  themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -28,12 +29,15 @@ export const metadata = {
     icon: "/favicon.ico",
     apple: "/icon-192x192.png",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+// Viewport configuration (separate from metadata in Next.js 14+)
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }) {
