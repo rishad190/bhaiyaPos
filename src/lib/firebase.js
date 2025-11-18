@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { get, getDatabase, ref, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
+import logger from "@/utils/logger";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -27,9 +28,9 @@ try {
   const connectedRef = ref(db, ".info/connected");
   onValue(connectedRef, (snap) => {
     if (snap.val() === true) {
-      // console.log("Connected to Firebase");
+      logger.debug("Connected to Firebase", "Firebase");
     } else {
-      console.warn("Not connected to Firebase");
+      logger.warn("Not connected to Firebase", "Firebase");
     }
   });
 
@@ -37,13 +38,13 @@ try {
   const dbRef = ref(db);
   get(dbRef)
     .then(() => {
-      // console.log("Firebase data access successful");
+      logger.debug("Firebase data access successful", "Firebase");
     })
     .catch((error) => {
-      console.error("Firebase data access error:", error);
+      logger.error(`Firebase data access error: ${error.message}`, "Firebase");
     });
 } catch (error) {
-  console.error("Firebase initialization error:", error);
+  logger.error(`Firebase initialization error: ${error.message}`, "Firebase");
   throw new Error("Failed to initialize Firebase");
 }
 
@@ -62,7 +63,7 @@ export const getData = async (path) => {
     const snapshot = await get(getDbRef(path));
     return snapshot.exists() ? snapshot.val() : null;
   } catch (error) {
-    console.error(`Error getting data from ${path}:`, error);
+    logger.error(`Error getting data from ${path}: ${error.message}`, "Firebase");
     throw error;
   }
 };
@@ -74,7 +75,7 @@ export const setData = async (path, data) => {
     await set(dbRef, data);
     return true;
   } catch (error) {
-    console.error(`Error setting data at ${path}:`, error);
+    logger.error(`Error setting data at ${path}: ${error.message}`, "Firebase");
     throw error;
   }
 };

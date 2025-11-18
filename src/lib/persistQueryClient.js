@@ -1,6 +1,7 @@
 "use client";
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { get, set, del } from 'idb-keyval';
+import logger from '@/utils/logger';
 
 // Create IndexedDB persister for better offline support
 export function createIDBPersister() {
@@ -24,7 +25,7 @@ export function createLocalStoragePersister() {
       try {
         localStorage.setItem('react-query-cache', JSON.stringify(client));
       } catch (error) {
-        console.error('Failed to persist to localStorage', error);
+        logger.error('Failed to persist to localStorage', 'QueryCache');
       }
     },
     restoreClient: async () => {
@@ -32,7 +33,7 @@ export function createLocalStoragePersister() {
         const cached = localStorage.getItem('react-query-cache');
         return cached ? JSON.parse(cached) : undefined;
       } catch (error) {
-        console.error('Failed to restore from localStorage', error);
+        logger.error('Failed to restore from localStorage', 'QueryCache');
         return undefined;
       }
     },
@@ -40,7 +41,7 @@ export function createLocalStoragePersister() {
       try {
         localStorage.removeItem('react-query-cache');
       } catch (error) {
-        console.error('Failed to remove from localStorage', error);
+        logger.error('Failed to remove from localStorage', 'QueryCache');
       }
     },
   };
@@ -67,7 +68,7 @@ export function setupPersistence(queryClient) {
       },
     });
   } catch (error) {
-    console.warn('IndexedDB not available, falling back to localStorage', error);
+    logger.warn('IndexedDB not available, falling back to localStorage', 'QueryCache');
     
     // Fallback to localStorage
     try {
@@ -80,7 +81,7 @@ export function setupPersistence(queryClient) {
         buster: '',
       });
     } catch (fallbackError) {
-      console.error('Failed to setup query persistence', fallbackError);
+      logger.error('Failed to setup query persistence', 'QueryCache');
     }
   }
 }

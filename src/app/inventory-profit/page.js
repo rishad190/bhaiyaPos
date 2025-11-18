@@ -1,7 +1,8 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { useData } from "@/app/data-context";
+import { useFabrics } from "@/hooks/useFabrics";
+import { useTransactions } from "@/hooks/useTransactions";
 import {
   Table,
   TableBody,
@@ -19,7 +20,8 @@ import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useRouter } from "next/navigation";
 
 export default function InventoryProfitPage() {
-  const { fabrics, transactions } = useData();
+  const { data: fabrics } = useFabrics();
+  const { data: transactions } = useTransactions();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });

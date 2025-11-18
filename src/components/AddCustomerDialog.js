@@ -11,10 +11,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
-import { useData } from "@/app/data-context";
+import { useAddCustomer } from "@/hooks/useCustomers";
+import { useToast } from "@/hooks/use-toast";
 
 export function AddCustomerDialog({ onClose }) {
-  const { addCustomer } = useData();
+  const addCustomerMutation = useAddCustomer();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -37,17 +39,24 @@ export function AddCustomerDialog({ onClose }) {
     if (!validate()) return;
 
     try {
-      await addCustomer({
+      await addCustomerMutation.mutateAsync({
         name: formData.name,
         phone: formData.phone,
         address: formData.address,
         storeId: formData.storeId,
-        createdAt: new Date().toISOString(),
       });
       setOpen(false);
       onClose?.();
+      toast({
+        title: "Success",
+        description: "Customer added successfully",
+      });
     } catch (error) {
-      console.error("Error adding customer:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add customer",
+        variant: "destructive",
+      });
       alert("Failed to add customer. Please try again.");
     }
   };

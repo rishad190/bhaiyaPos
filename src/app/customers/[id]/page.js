@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo } from "react";
 import logger from "@/utils/logger";
 import { useParams, useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useCustomers } from "@/hooks/useCustomers";
+import { useTransactions, useAddTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useTransactions";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,13 +61,12 @@ export default function CustomerDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    customers,
-    transactions,
-    addTransaction,
-    deleteTransaction,
-    updateTransaction,
-  } = useData();
+  
+  const { data: customers } = useCustomers();
+  const { data: transactions } = useTransactions();
+  const addTransactionMutation = useAddTransaction();
+  const updateTransactionMutation = useUpdateTransaction();
+  const deleteTransactionMutation = useDeleteTransaction();
 
   const [loadingState, setLoadingState] = useState({
     initial: true,

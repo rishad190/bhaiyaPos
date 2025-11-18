@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useData } from "@/app/data-context";
+import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Settings,
@@ -42,8 +42,8 @@ import { backupScheduler } from "@/services/backupScheduler";
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { settings, updateSettings } = useData();
-  const [loading, setLoading] = useState(true);
+  const { data: settings, isLoading: loading } = useSettings();
+  const updateSettingsMutation = useUpdateSettings();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
 
@@ -120,7 +120,7 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      await updateSettings({
+      await updateSettingsMutation.mutateAsync({
         store: storeSettings,
         notifications: notificationSettings,
         appearance: appearanceSettings,

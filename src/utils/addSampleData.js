@@ -1,5 +1,6 @@
 import { ref, set } from "firebase/database";
 import { db } from "@/lib/firebase";
+import logger from "@/utils/logger";
 
 export const addSampleData = async () => {
   try {
@@ -39,8 +40,8 @@ export const addSampleData = async () => {
     await set(ref(db, "customers"), customers);
     await set(ref(db, "transactions"), transactions);
 
-    // console.log("Sample data added successfully");
+    logger.info("Sample data added successfully", "SampleData");
   } catch (error) {
-    console.error("Error adding sample data:", error);
+    logger.error(`Error adding sample data: ${error.message}`, "SampleData");
   }
 };

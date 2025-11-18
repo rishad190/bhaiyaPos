@@ -1,5 +1,6 @@
 'use client';
-import { useData } from "@/app/data-context";
+import { useTransactions } from "@/hooks/useTransactions";
+import { useCustomers } from "@/hooks/useCustomers";
 import {
   Table,
   TableBody,
@@ -13,7 +14,8 @@ import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { Badge } from "@/components/ui/badge";
 
 export default function ProfitDetailsPage() {
-  const { transactions, customers } = useData();
+  const { data: transactions = [] } = useTransactions();
+  const { data: customers = [] } = useCustomers();
 
   const profitableTransactions = transactions
     .filter((t) => t.totalCost && t.total > t.totalCost)

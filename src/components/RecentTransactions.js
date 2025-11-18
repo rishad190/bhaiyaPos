@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useMemo } from 'react';
 
 export const RecentTransactions = React.memo(function RecentTransactions({ transactions, customers }) {
-  console.log("Rebuilding RecentTransactions");
+  // Removed console.log - use React DevTools Profiler for render tracking
   const router = useRouter();
 
   const customerMap = useMemo(() => {

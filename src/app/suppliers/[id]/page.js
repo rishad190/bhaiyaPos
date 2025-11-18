@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { useData } from "@/app/data-context";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -50,7 +50,8 @@ export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { suppliers, deleteSupplierTransaction, updateSupplierDue } = useData();
+  const { data: suppliers } = useSuppliers();
+  // Note: deleteSupplierTransaction and updateSupplierDue are handled via Firebase directly in this component
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
   const [transactions, setTransactions] = useState([]);

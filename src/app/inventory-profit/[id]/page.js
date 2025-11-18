@@ -1,7 +1,8 @@
 "use client";
 import React, { useMemo } from "react";
 import { useParams } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useFabrics } from "@/hooks/useFabrics";
+import { useTransactions } from "@/hooks/useTransactions";
 import {
   Table,
   TableBody,
@@ -16,7 +17,8 @@ import { DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 
 export default function FabricProfitDetailPage() {
   const { id } = useParams();
-  const { fabrics, transactions } = useData();
+  const { data: fabrics } = useFabrics();
+  const { data: transactions } = useTransactions();
 
   const fabric = useMemo(() => {
     if (!fabrics) return null;

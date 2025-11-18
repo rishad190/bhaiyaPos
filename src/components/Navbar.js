@@ -63,7 +63,7 @@ const navItems = [
   },
 ];
 
-import { useData } from "@/app/data-context";
+import { useSettings } from "@/hooks/useSettings";
 
 export function Navbar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,7 +71,7 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const { settings } = useData();
+  const { data: settings } = useSettings();
 
   useEffect(() => {
     const checkAuth = () => {
