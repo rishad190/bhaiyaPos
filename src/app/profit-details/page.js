@@ -14,8 +14,11 @@ import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { Badge } from "@/components/ui/badge";
 
 export default function ProfitDetailsPage() {
-  const { data: transactions = [] } = useTransactions();
-  const { data: customers = [] } = useCustomers();
+  const { data: transactionsData } = useTransactions({ page: 1, limit: 10000 });
+  const { data: customersData } = useCustomers({ page: 1, limit: 10000 });
+  
+  const transactions = transactionsData?.data || [];
+  const customers = customersData?.data || [];
 
   const profitableTransactions = transactions
     .filter((t) => t.totalCost && t.total > t.totalCost)

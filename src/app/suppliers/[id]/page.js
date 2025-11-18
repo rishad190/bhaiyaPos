@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ref, onValue, push, update, remove } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import {
@@ -50,7 +51,9 @@ export default function SupplierDetail() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { data: suppliers } = useSuppliers();
+  const queryClient = useQueryClient();
+  const { data: suppliersData } = useSuppliers({ page: 1, limit: 10000 });
+  const suppliers = suppliersData?.data || [];
   // Note: deleteSupplierTransaction and updateSupplierDue are handled via Firebase directly in this component
   const [storeFilter, setStoreFilter] = useState("all");
   const [supplier, setSupplier] = useState(null);
@@ -123,9 +126,9 @@ export default function SupplierDetail() {
     };
   }, [params.id, router, storeFilter, toast]);
 
-  // Calculate totals based on the *filtered* transactions list
-  const filteredTotals = useMemo(() => {
-    return transactions.reduce(
+  // Calculate totals from ALL transactions (for financial summary)
+  const allTransactionsTotals = useMemo(() => {
+    return allTransactions.reduce(
       (acc, t) => {
         const total = Number(t.totalAmount) || 0;
         const paid = Number(t.paidAmount) || 0;
@@ -136,7 +139,45 @@ export default function SupplierDetail() {
       },
       { totalAmount: 0, paidAmount: 0, totalDue: 0 }
     );
-  }, [transactions]);
+  }, [allTransactions]);
+
+  // Compute cumulative balances using the complete chronological set of supplier transactions
+  const cumulativeMap = useMemo(() => {
+    return allTransactions.reduce((map, txn) => {
+      const prevBalance = map.lastBalance || 0;
+      const due = (txn.totalAmount || 0) - (txn.paidAmount || 0);
+      const newBalance = prevBalance + due;
+      map.byId = map.byId || {};
+      map.byId[txn.id] = newBalance;
+      map.lastBalance = newBalance;
+      return map;
+    }, {});
+  }, [allTransactions]);
+
+  // Attach computed cumulative balance to the visible (possibly filtered) transactions
+  const transactionsWithBalance = useMemo(() => {
+    return transactions.map((transaction) => ({
+      ...transaction,
+      due: (transaction.totalAmount || 0) - (transaction.paidAmount || 0),
+      cumulativeBalance: cumulativeMap.byId?.[transaction.id] ?? 0,
+    }));
+  }, [transactions, cumulativeMap]);
+
+  // Helper function to delete supplier transaction
+  const deleteSupplierTransaction = async (transactionId) => {
+    try {
+      const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
+      await remove(transactionRef);
+      // Note: totalDue is calculated from transactions, no need to update supplier record
+      
+      // Invalidate queries to refresh the suppliers list
+      queryClient.invalidateQueries({ queryKey: ['supplierTransactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    } catch (error) {
+      console.error("Error deleting supplier transaction:", error);
+      throw error;
+    }
+  };
 
   const handleExportCSV = () => {
     const data = transactionsWithBalance.map((t) => ({
@@ -165,12 +206,11 @@ export default function SupplierDetail() {
       };
 
       await update(newTransactionRef, newTransaction);
+      // Note: totalDue is calculated from transactions, no need to update supplier record
 
-      const newTotalDue =
-        (supplier.totalDue || 0) +
-        (transaction.totalAmount - (transaction.paidAmount || 0));
-
-      await updateSupplierDue(params.id, newTotalDue);
+      // Invalidate queries to refresh the suppliers list
+      queryClient.invalidateQueries({ queryKey: ['supplierTransactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
 
       toast({
         title: "Success",
@@ -198,12 +238,7 @@ export default function SupplierDetail() {
           `Are you sure you want to delete this transaction?\nThis will reduce the total due by ৳${dueAmount.toLocaleString()}`
         )
       ) {
-        await deleteSupplierTransaction(
-          transactionId,
-          params.id,
-          amount,
-          paidAmount
-        );
+        await deleteSupplierTransaction(transactionId);
         toast({
           title: "Success",
           description: "Transaction deleted successfully",
@@ -224,19 +259,14 @@ export default function SupplierDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoading((prev) => ({ ...prev, action: true }));
-      const oldTransaction = transactions.find((t) => t.id === transactionId);
-      const oldDue =
-        oldTransaction.totalAmount - (oldTransaction.paidAmount || 0);
-      const newDue = updatedData.totalAmount - (updatedData.paidAmount || 0);
-      const dueDifference = newDue - oldDue;
 
       const transactionRef = ref(db, `supplierTransactions/${transactionId}`);
       await update(transactionRef, updatedData);
+      // Note: totalDue is calculated from transactions, no need to update supplier record
 
-      await updateSupplierDue(
-        params.id,
-        Math.max(0, (supplier.totalDue || 0) + dueDifference)
-      );
+      // Invalidate queries to refresh the suppliers list
+      queryClient.invalidateQueries({ queryKey: ['supplierTransactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
 
       toast({
         title: "Success",
@@ -262,65 +292,6 @@ export default function SupplierDetail() {
       </div>
     );
   }
-
-  // Update the transactionsWithBalance calculation
-  // Compute cumulative balances using the complete chronological set of supplier transactions
-  const cumulativeMap = allTransactions.reduce((map, txn) => {
-    const prevBalance = map.lastBalance || 0;
-    const due = (txn.totalAmount || 0) - (txn.paidAmount || 0);
-    const newBalance = prevBalance + due;
-    map.byId = map.byId || {};
-    map.byId[txn.id] = newBalance;
-    map.lastBalance = newBalance;
-    return map;
-  }, {});
-
-  // Attach computed cumulative balance to the visible (possibly filtered) transactions
-  const transactionsWithBalance = transactions.map((transaction) => ({
-    ...transaction,
-    due: (transaction.totalAmount || 0) - (transaction.paidAmount || 0),
-    cumulativeBalance: cumulativeMap.byId?.[transaction.id] ?? 0,
-  }));
-
-  // Diagnostic: compute derived total due from allTransactions and compare with supplier.totalDue
-  const derivedTotalDue = allTransactions.reduce((sum, t) => {
-    const total = Number(t.totalAmount) || 0;
-    const paid = Number(t.paidAmount) || 0;
-    return sum + (total - paid);
-  }, 0);
-
-  if (typeof supplier?.totalDue !== "undefined") {
-    if (Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001) {
-      console.warn(
-        "Supplier totalDue mismatch:",
-        { supplierId: params.id },
-        { supplierTotalDue: supplier.totalDue },
-        { computedTotalDue: derivedTotalDue },
-        { lastCumulative: cumulativeMap.lastBalance ?? 0 }
-      );
-    }
-  }
-
-  const handleFixTotalDue = async () => {
-    if (!window.confirm("Update stored Total Due to computed value?")) return;
-    try {
-      setLoading((prev) => ({ ...prev, action: true }));
-      await updateSupplierDue(params.id, derivedTotalDue);
-      toast({
-        title: "Success",
-        description: "Supplier totalDue updated to computed value",
-      });
-    } catch (error) {
-      console.error("Failed to update supplier totalDue:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update supplier totalDue",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading((prev) => ({ ...prev, action: false }));
-    }
-  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -412,7 +383,7 @@ export default function SupplierDetail() {
                     <DollarSign className="h-4 w-4 text-blue-600" />
                   </div>
                   <div className="text-2xl font-bold text-blue-700">
-                    ৳{filteredTotals.totalAmount.toLocaleString()}
+                    ৳{allTransactionsTotals.totalAmount.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -426,21 +397,21 @@ export default function SupplierDetail() {
                     <CreditCard className="h-4 w-4 text-green-600" />
                   </div>
                   <div className="text-2xl font-bold text-green-700">
-                    ৳{filteredTotals.paidAmount.toLocaleString()}
+                    ৳{allTransactionsTotals.paidAmount.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
 
               <Card
                 className={`${
-                  filteredTotals.totalDue > 0 ? "bg-red-50" : "bg-green-50"
+                  allTransactionsTotals.totalDue > 0 ? "bg-red-50" : "bg-green-50"
                 } border-none shadow-sm`}
               >
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <span
                       className={`text-sm font-medium ${
-                        filteredTotals.totalDue > 0
+                        allTransactionsTotals.totalDue > 0
                           ? "text-red-600"
                           : "text-green-600"
                       }`}
@@ -449,7 +420,7 @@ export default function SupplierDetail() {
                     </span>
                     <FileText
                       className={`h-4 w-4 ${
-                        filteredTotals.totalDue > 0
+                        allTransactionsTotals.totalDue > 0
                           ? "text-red-600"
                           : "text-green-600"
                       }`}
@@ -457,12 +428,12 @@ export default function SupplierDetail() {
                   </div>
                   <div
                     className={`text-2xl font-bold ${
-                      filteredTotals.totalDue > 0
+                      allTransactionsTotals.totalDue > 0
                         ? "text-red-700"
                         : "text-green-700"
                     }`}
                   >
-                    ৳{filteredTotals.totalDue.toLocaleString()}
+                    ৳{allTransactionsTotals.totalDue.toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -500,26 +471,6 @@ export default function SupplierDetail() {
       </div>
 
       {/* Transactions Table */}
-      {typeof supplier?.totalDue !== "undefined" &&
-        Math.abs((derivedTotalDue || 0) - (supplier.totalDue || 0)) > 0.001 && (
-          <div className="mb-4 p-4 rounded-md bg-yellow-50 border border-yellow-200 text-sm flex items-start justify-between gap-4">
-            <div>
-              <strong>Warning:</strong> Computed total from transactions ( ৳
-              {derivedTotalDue.toLocaleString()}) does not match stored Total
-              Due ( ৳{(supplier.totalDue || 0).toLocaleString()}). Difference: ৳
-              {(derivedTotalDue - (supplier.totalDue || 0)).toLocaleString()}
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                className="inline-flex items-center px-3 py-1.5 bg-primary text-white rounded-md"
-                onClick={handleFixTotalDue}
-                disabled={loading.action}
-              >
-                Fix Total Due
-              </button>
-            </div>
-          </div>
-        )}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -640,10 +591,10 @@ export default function SupplierDetail() {
           <span className="font-semibold">Current Balance: </span>
           <span
             className={`font-bold ${
-              supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
+              allTransactionsTotals.totalDue > 0 ? "text-red-500" : "text-green-500"
             }`}
           >
-            ৳{supplier.totalDue.toLocaleString()}
+            ৳{allTransactionsTotals.totalDue.toLocaleString()}
           </span>
         </div>
       </div>

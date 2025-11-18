@@ -62,15 +62,17 @@ export default function CustomerDetail() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const { data: customers } = useCustomers();
-  const { data: transactions } = useTransactions();
+  const { data: customersData, isLoading: customersLoading } = useCustomers({ page: 1, limit: 10000 });
+  const { data: transactionsData, isLoading: transactionsLoading } = useTransactions({ page: 1, limit: 10000 });
+  
+  // Extract the actual arrays from the paginated response
+  const customers = customersData?.data || [];
+  const transactions = transactionsData?.data || [];
   const addTransactionMutation = useAddTransaction();
   const updateTransactionMutation = useUpdateTransaction();
   const deleteTransactionMutation = useDeleteTransaction();
 
   const [loadingState, setLoadingState] = useState({
-    initial: true,
-    transactions: true,
     action: false,
   });
   const [storeFilter, setStoreFilter] = useState(
@@ -82,10 +84,10 @@ export default function CustomerDetail() {
     direction: "asc",
   });
 
-  const customer = customers?.find((c) => c.id === params.id);
+  const customer = Array.isArray(customers) ? customers.find((c) => c.id === params.id) : null;
 
   const sortedTransactions = useMemo(() => {
-    if (!transactions) return [];
+    if (!Array.isArray(transactions)) return [];
     let sortableItems = [
       ...transactions.filter((t) => t.customerId === params.id),
     ];
@@ -123,6 +125,22 @@ export default function CustomerDetail() {
       }, []);
   }, [sortedTransactions, storeFilter]);
 
+  // Calculate financial summary for THIS customer only
+  const customerFinancialSummary = useMemo(() => {
+    if (!Array.isArray(transactions)) {
+      return { totalBill: 0, totalDeposit: 0, totalDue: 0 };
+    }
+
+    // Filter transactions for this customer only
+    const customerTransactions = transactions.filter(t => t.customerId === params.id);
+
+    const totalBill = customerTransactions.reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+    const totalDeposit = customerTransactions.reduce((sum, t) => sum + (Number(t.deposit) || 0), 0);
+    const totalDue = totalBill - totalDeposit;
+
+    return { totalBill, totalDeposit, totalDue };
+  }, [transactions, params.id]);
+
   useEffect(() => {
     if (customer && transactions) {
       setLoadingState((prev) => ({
@@ -136,7 +154,7 @@ export default function CustomerDetail() {
   const handleAddTransaction = async (transactionData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
-      await addTransaction({
+      await addTransactionMutation.mutateAsync({
         ...transactionData,
         customerId: params.id,
       });
@@ -161,7 +179,7 @@ export default function CustomerDetail() {
     if (window.confirm(ERROR_MESSAGES.DELETE_CONFIRMATION)) {
       try {
         setLoadingState((prev) => ({ ...prev, action: true }));
-        await deleteTransaction(transactionId);
+        await deleteTransactionMutation.mutateAsync(transactionId);
         toast({
           title: "Success",
           description: "Transaction deleted successfully",
@@ -182,9 +200,12 @@ export default function CustomerDetail() {
   const handleEditTransaction = async (transactionId, updatedData) => {
     try {
       setLoadingState((prev) => ({ ...prev, action: true }));
-      await updateTransaction(transactionId, {
-        ...updatedData,
-        customerId: params.id,
+      await updateTransactionMutation.mutateAsync({
+        transactionId,
+        updatedData: {
+          ...updatedData,
+          customerId: params.id,
+        },
       });
       toast({
         title: "Success",
@@ -224,7 +245,7 @@ export default function CustomerDetail() {
     setSortConfig({ key, direction });
   };
 
-  if (loadingState.initial) {
+  if (customersLoading || transactionsLoading) {
     return (
       <LoadingState
         title="Customer Details"
@@ -346,10 +367,7 @@ export default function CustomerDetail() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-700">
-                      ৳
-                      {customerTransactionsWithBalance
-                        .reduce((sum, t) => sum + (t.total || 0), 0)
-                        .toLocaleString()}
+                      ৳{customerFinancialSummary.totalBill.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -363,17 +381,14 @@ export default function CustomerDetail() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-green-700">
-                      ৳
-                      {customerTransactionsWithBalance
-                        .reduce((sum, t) => sum + (t.deposit || 0), 0)
-                        .toLocaleString()}
+                      ৳{customerFinancialSummary.totalDeposit.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card
                   className={`border-none shadow-sm ${
-                    totalDue > 0 ? "bg-red-50" : "bg-green-50"
+                    customerFinancialSummary.totalDue > 0 ? "bg-red-50" : "bg-green-50"
                   }`}
                 >
                   <CardHeader
@@ -381,24 +396,24 @@ export default function CustomerDetail() {
                   >
                     <CardTitle
                       className={`text-sm font-medium ${
-                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                        customerFinancialSummary.totalDue > 0 ? "text-red-600" : "text-green-600"
                       }`}
                     >
                       Total Due
                     </CardTitle>
                     <FileText
                       className={`h-4 w-4 ${
-                        totalDue > 0 ? "text-red-600" : "text-green-600"
+                        customerFinancialSummary.totalDue > 0 ? "text-red-600" : "text-green-600"
                       }`}
                     />
                   </CardHeader>
                   <CardContent>
                     <div
                       className={`text-2xl font-bold ${
-                        totalDue > 0 ? "text-red-700" : "text-green-700"
+                        customerFinancialSummary.totalDue > 0 ? "text-red-700" : "text-green-700"
                       }`}
                     >
-                      ৳{totalDue.toLocaleString()}
+                      ৳{customerFinancialSummary.totalDue.toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>

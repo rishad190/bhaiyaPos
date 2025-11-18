@@ -17,16 +17,19 @@ import { DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 
 export default function FabricProfitDetailPage() {
   const { id } = useParams();
-  const { data: fabrics } = useFabrics();
-  const { data: transactions } = useTransactions();
+  const { data: fabricsData } = useFabrics({ page: 1, limit: 10000 });
+  const { data: transactionsData } = useTransactions({ page: 1, limit: 10000 });
+  
+  const fabrics = fabricsData?.data || [];
+  const transactions = transactionsData?.data || [];
 
   const fabric = useMemo(() => {
-    if (!fabrics) return null;
+    if (!Array.isArray(fabrics)) return null;
     return fabrics.find((f) => f.id === id);
   }, [fabrics, id]);
 
   const fabricTransactions = useMemo(() => {
-    if (!transactions || !id) return [];
+    if (!Array.isArray(transactions) || !id) return [];
     return transactions
       .filter((t) => t.products?.some((p) => p.fabricId === id))
       .map((t) => {

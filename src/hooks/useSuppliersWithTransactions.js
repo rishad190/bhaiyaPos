@@ -29,7 +29,8 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
 
   // Calculate totals for each supplier
   const suppliersWithTotals = useMemo(() => {
-    if (!suppliersData?.data || !allSupplierTransactions) return [];
+    if (!suppliersData?.data) return [];
+    if (!Array.isArray(allSupplierTransactions)) return suppliersData.data.map(s => ({ ...s, totalDue: 0 }));
 
     return suppliersData.data.map((supplier) => {
       const supplierTxns = allSupplierTransactions.filter(
@@ -44,16 +45,18 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
         { totalAmount: 0, paidAmount: 0 }
       );
 
+      const totalDue = totals.totalAmount - totals.paidAmount;
+
       return {
         ...supplier,
-        totalDue: totals.totalAmount - totals.paidAmount,
+        totalDue: totalDue >= 0 ? totalDue : 0, // Ensure non-negative
       };
     });
   }, [suppliersData, allSupplierTransactions]);
 
-  // Calculate financial summary
+  // Calculate financial summary from all transactions
   const financialSummary = useMemo(() => {
-    if (!suppliersWithTotals.length) {
+    if (!Array.isArray(allSupplierTransactions) || allSupplierTransactions.length === 0) {
       return {
         totalAmount: 0,
         paidAmount: 0,
@@ -61,29 +64,20 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
       };
     }
 
-    return suppliersWithTotals.reduce(
-      (acc, supplier) => {
-        const supplierTxns = allSupplierTransactions.filter(
-          (t) => t.supplierId === supplier.id
-        );
-
-        const supplierTotal = supplierTxns.reduce(
-          (txnAcc, transaction) => ({
-            totalAmount: txnAcc.totalAmount + (Number(transaction.totalAmount) || 0),
-            paidAmount: txnAcc.paidAmount + (Number(transaction.paidAmount) || 0),
-          }),
-          { totalAmount: 0, paidAmount: 0 }
-        );
-
-        acc.totalAmount += supplierTotal.totalAmount;
-        acc.paidAmount += supplierTotal.paidAmount;
-        acc.dueAmount = acc.totalAmount - acc.paidAmount;
-
-        return acc;
-      },
-      { totalAmount: 0, paidAmount: 0, dueAmount: 0 }
+    const totals = allSupplierTransactions.reduce(
+      (acc, transaction) => ({
+        totalAmount: acc.totalAmount + (Number(transaction.totalAmount) || 0),
+        paidAmount: acc.paidAmount + (Number(transaction.paidAmount) || 0),
+      }),
+      { totalAmount: 0, paidAmount: 0 }
     );
-  }, [suppliersWithTotals, allSupplierTransactions]);
+
+    return {
+      totalAmount: totals.totalAmount,
+      paidAmount: totals.paidAmount,
+      dueAmount: totals.totalAmount - totals.paidAmount,
+    };
+  }, [allSupplierTransactions]);
 
   return {
     suppliers: suppliersWithTotals,

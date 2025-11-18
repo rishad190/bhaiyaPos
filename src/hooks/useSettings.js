@@ -45,21 +45,24 @@ export function useSettings() {
           const data = snapshot.val();
           // Merge with defaults to ensure all fields exist
           return {
-            store: { ...DEFAULT_SETTINGS.store, ...data.store },
-            notifications: { ...DEFAULT_SETTINGS.notifications, ...data.notifications },
-            appearance: { ...DEFAULT_SETTINGS.appearance, ...data.appearance },
-            security: { ...DEFAULT_SETTINGS.security, ...data.security },
+            store: { ...DEFAULT_SETTINGS.store, ...(data.store || {}) },
+            notifications: { ...DEFAULT_SETTINGS.notifications, ...(data.notifications || {}) },
+            appearance: { ...DEFAULT_SETTINGS.appearance, ...(data.appearance || {}) },
+            security: { ...DEFAULT_SETTINGS.security, ...(data.security || {}) },
           };
         }
         
         return DEFAULT_SETTINGS;
       } catch (error) {
         logger.error(`Failed to fetch settings: ${error.message}`, "Settings");
-        throw error;
+        // Return defaults on error instead of throwing
+        return DEFAULT_SETTINGS;
       }
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
+    // Provide initial data to prevent undefined errors
+    placeholderData: DEFAULT_SETTINGS,
   });
 }
 

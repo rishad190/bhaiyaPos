@@ -96,7 +96,6 @@ export default function SettingsPage() {
       setNotificationSettings(settings.notifications || notificationSettings);
       setAppearanceSettings(settings.appearance || appearanceSettings);
       setSecuritySettings(settings.security || securitySettings);
-      setLoading(false);
     }
   }, [settings]);
 

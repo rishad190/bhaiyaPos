@@ -387,10 +387,10 @@ export default function SuppliersPage() {
                   </TableCell>
                   <TableCell
                     className={`text-right ${
-                      supplier.totalDue > 0 ? "text-red-500" : "text-green-500"
+                      (supplier.totalDue || 0) > 0 ? "text-red-500" : "text-green-500"
                     }`}
                   >
-                    ৳{(supplier.totalDue || 0).toLocaleString()}
+                    ৳{(Number(supplier.totalDue) || 0).toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end">

@@ -24,7 +24,8 @@ import { calculateTotalQuantity } from "@/lib/inventory-utils";
 export default function FabricDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { data: fabrics } = useFabrics();
+  const { data: fabricsData } = useFabrics({ page: 1, limit: 10000 });
+  const fabrics = fabricsData?.data || [];
 
   // Find the current fabric with its batches (new flattened structure)
   const fabric = useMemo(() => {

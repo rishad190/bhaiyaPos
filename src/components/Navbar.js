@@ -71,7 +71,15 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const { data: settings } = useSettings();
+  const { data: settings, isLoading: settingsLoading } = useSettings();
+
+  // Provide default settings to prevent undefined errors
+  const safeSettings = settings || {
+    store: {
+      storeName: "Sky Fabric's",
+      logo: "/download.png",
+    },
+  };
 
   useEffect(() => {
     const checkAuth = () => {
@@ -111,14 +119,14 @@ export function Navbar() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <Image
-                src={settings.store.logo || "/download.png"}
-                alt={`${settings.store.storeName} Logo`}
+                src={safeSettings.store.logo || "/download.png"}
+                alt={`${safeSettings.store.storeName} Logo`}
                 width={40}
                 height={40}
                 className="rounded-md"
               />
               <span className="ml-2 text-xl md:text-2xl font-semibold text-gray-800">
-                {settings.store.storeName || "Sky Fabric's"}
+                {safeSettings.store.storeName || "Sky Fabric's"}
               </span>
             </Link>
           </div>

@@ -53,6 +53,19 @@ export default function CustomerPage() {
     filter: selectedFilter,
   });
 
+  // Provide safe defaults
+  const safeCustomers = customers || [];
+  const safeFinancialSummary = financialSummary || {
+    totalBill: 0,
+    totalDeposit: 0,
+    totalDue: 0,
+  };
+  const safePagination = pagination || {
+    total: 0,
+    page: 1,
+    limit: CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE,
+  };
+
   // Mutations
   const addCustomerMutation = useAddCustomer();
   const updateCustomerMutation = useUpdateCustomer();
@@ -79,9 +92,9 @@ export default function CustomerPage() {
   };
 
   const handleExportCSV = () => {
-    if (!customers || customers.length === 0) return;
+    if (!safeCustomers || safeCustomers.length === 0) return;
     
-    const dataToExport = customers.reduce((acc, customer) => {
+    const dataToExport = safeCustomers.reduce((acc, customer) => {
       acc[customer.id] = customer;
       return acc;
     }, {});
@@ -100,15 +113,15 @@ export default function CustomerPage() {
 
   // Helper function to get customer due (already calculated in customers data)
   const getCustomerDue = (customerId) => {
-    const customer = customers?.find(c => c.id === customerId);
+    const customer = safeCustomers?.find(c => c.id === customerId);
     return customer?.due || 0;
   };
 
   // Sort customers
   const sortedCustomers = useMemo(() => {
-    if (!customers) return [];
+    if (!safeCustomers) return [];
     
-    const sortableCustomers = [...customers];
+    const sortableCustomers = [...safeCustomers];
 
     if (sortConfig.key) {
       sortableCustomers.sort((a, b) => {
@@ -132,7 +145,7 @@ export default function CustomerPage() {
     }
 
     return sortableCustomers;
-  }, [customers, sortConfig]);
+  }, [safeCustomers, sortConfig]);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -199,7 +212,7 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-blue-800" />
                 </div>
                 <div className="text-2xl font-bold text-blue-900">
-                  ৳ {financialSummary.totalBill.toFixed(2)}
+                  ৳ {safeFinancialSummary.totalBill.toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -213,7 +226,7 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-green-800" />
                 </div>
                 <div className="text-2xl font-bold text-green-900">
-                  ৳ {financialSummary.totalDeposit.toFixed(2)}
+                  ৳ {safeFinancialSummary.totalDeposit.toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -227,7 +240,7 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-red-800" />
                 </div>
                 <div className="text-2xl font-bold text-red-900">
-                  ৳ {financialSummary.totalDue.toFixed(2)}
+                  ৳ {safeFinancialSummary.totalDue.toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -265,7 +278,7 @@ export default function CustomerPage() {
             </div>
             <Pagination
               currentPage={currentPage}
-              totalItems={pagination.total}
+              totalItems={safePagination.total}
               itemsPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
               onPageChange={setCurrentPage}
               className="mt-4"

@@ -59,6 +59,37 @@ export const customerService = {
       
       let customers = snapshotToArray(snapshot);
       
+      // Get all transactions to calculate dues (needed for filtering)
+      const transactionsRef = ref(db, COLLECTIONS.TRANSACTIONS);
+      const transactionsSnapshot = await get(transactionsRef);
+      const allTransactions = snapshotToArray(transactionsSnapshot);
+      
+      // Calculate dues for each customer
+      customers = customers.map((customer) => {
+        const customerTransactions = allTransactions.filter(
+          (t) => t.customerId === customer.id
+        );
+        
+        const totalBill = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.total) || 0),
+          0
+        );
+        
+        const totalDeposit = customerTransactions.reduce(
+          (sum, t) => sum + (Number(t.deposit) || 0),
+          0
+        );
+        
+        const due = totalBill - totalDeposit;
+
+        return {
+          ...customer,
+          totalBill,
+          totalDeposit,
+          due,
+        };
+      });
+      
       // Apply search filter
       if (searchTerm) {
         customers = customers.filter(
@@ -68,7 +99,15 @@ export const customerService = {
         );
       }
       
-      // Calculate pagination
+      // Apply due filter BEFORE pagination
+      if (filter === 'due') {
+        customers = customers.filter(c => c.due > 0);
+      } else if (filter === 'paid') {
+        customers = customers.filter(c => c.due === 0);
+      }
+      // 'all' filter doesn't need any filtering
+      
+      // Calculate pagination AFTER filtering
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
       const paginatedCustomers = customers.slice(startIndex, endIndex);

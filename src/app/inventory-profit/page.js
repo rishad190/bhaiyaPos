@@ -20,8 +20,11 @@ import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { useRouter } from "next/navigation";
 
 export default function InventoryProfitPage() {
-  const { data: fabrics } = useFabrics();
-  const { data: transactions } = useTransactions();
+  const { data: fabricsData } = useFabrics({ page: 1, limit: 10000 });
+  const { data: transactionsData } = useTransactions({ page: 1, limit: 10000 });
+  
+  const fabrics = fabricsData?.data || [];
+  const transactions = transactionsData?.data || [];
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
@@ -42,7 +45,7 @@ export default function InventoryProfitPage() {
   }, [transactions, dateRange]);
 
   const inventoryProfit = useMemo(() => {
-    if (!fabrics || !filteredTransactions) return [];
+    if (!Array.isArray(fabrics) || !Array.isArray(filteredTransactions)) return [];
 
     let data = fabrics.map((fabric) => {
       const fabricTransactions = filteredTransactions.filter((t) =>

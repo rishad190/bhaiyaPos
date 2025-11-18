@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 // Hook to fetch customers with their due amounts calculated
 export function useCustomersWithDues({ page = 1, limit = 20, searchTerm = '', filter = 'all' } = {}) {
-  // Fetch all transactions (we need this to calculate dues)
+  // Fetch all transactions (we need this for financial summary)
   const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery({
     queryKey: ['transactions', 'all'],
     queryFn: async () => {
@@ -13,46 +13,16 @@ export function useCustomersWithDues({ page = 1, limit = 20, searchTerm = '', fi
     },
   });
 
-  // Fetch customers
+  // Fetch customers with dues already calculated by backend
   const { data: customersData, isLoading: customersLoading, error } = useQuery({
     queryKey: ['customers', 'list', { page, limit, searchTerm, filter }],
     queryFn: () => customerService.getCustomers({ page, limit, searchTerm, filter }),
     keepPreviousData: true,
   });
 
-  // Calculate dues for each customer
-  const customersWithDues = useMemo(() => {
-    if (!customersData?.data || !allTransactions) return [];
-
-    return customersData.data.map((customer) => {
-      const customerTransactions = allTransactions.filter(
-        (t) => t.customerId === customer.id
-      );
-      
-      const totalBill = customerTransactions.reduce(
-        (sum, t) => sum + (Number(t.total) || 0),
-        0
-      );
-      
-      const totalDeposit = customerTransactions.reduce(
-        (sum, t) => sum + (Number(t.deposit) || 0),
-        0
-      );
-      
-      const due = totalBill - totalDeposit;
-
-      return {
-        ...customer,
-        totalBill,
-        totalDeposit,
-        due,
-      };
-    });
-  }, [customersData, allTransactions]);
-
-  // Calculate financial summary
+  // Calculate financial summary from ALL transactions (not just current page)
   const financialSummary = useMemo(() => {
-    if (!customersWithDues.length) {
+    if (!allTransactions || allTransactions.length === 0) {
       return {
         totalBill: 0,
         totalDeposit: 0,
@@ -60,26 +30,23 @@ export function useCustomersWithDues({ page = 1, limit = 20, searchTerm = '', fi
       };
     }
 
-    return customersWithDues.reduce(
-      (acc, customer) => ({
-        totalBill: acc.totalBill + customer.totalBill,
-        totalDeposit: acc.totalDeposit + customer.totalDeposit,
-        totalDue: acc.totalDue + customer.due,
-      }),
-      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
+    const totalBill = allTransactions.reduce(
+      (sum, t) => sum + (Number(t.total) || 0),
+      0
     );
-  }, [customersWithDues]);
+    
+    const totalDeposit = allTransactions.reduce(
+      (sum, t) => sum + (Number(t.deposit) || 0),
+      0
+    );
+    
+    const totalDue = totalBill - totalDeposit;
 
-  // Apply filter based on due amount
-  const filteredCustomers = useMemo(() => {
-    if (filter === 'all') return customersWithDues;
-    if (filter === 'due') return customersWithDues.filter(c => c.due > 0);
-    if (filter === 'paid') return customersWithDues.filter(c => c.due === 0);
-    return customersWithDues;
-  }, [customersWithDues, filter]);
+    return { totalBill, totalDeposit, totalDue };
+  }, [allTransactions]);
 
   return {
-    customers: filteredCustomers,
+    customers: customersData?.data || [],
     financialSummary,
     isLoading: customersLoading || transactionsLoading,
     error,

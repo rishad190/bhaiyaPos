@@ -110,6 +110,8 @@ export function useAddTransaction() {
 
     onSettled: (data, error, variables) => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       if (variables.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.customerId),
@@ -137,6 +139,8 @@ export function useUpdateTransaction() {
     onSuccess: (_, variables) => {
       // Invalidate transactions list
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       if (variables.updatedData.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.updatedData.customerId),
@@ -169,6 +173,8 @@ export function useDeleteTransaction() {
       // Invalidate transactions list
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       toast({
         title: 'Success',
         description: 'Transaction deleted successfully',
