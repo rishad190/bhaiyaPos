@@ -247,7 +247,8 @@ const validateBatchData = (batchData) => {
     batchData.items.forEach((item, index) => {
       if (!item.colorName?.trim())
         errors.push(`Item ${index + 1}: Color name is required`);
-      if (!item.quantity || item.quantity <= 0)
+      // Allow 0 quantity (valid after inventory reduction)
+      if (item.quantity === undefined || item.quantity === null || item.quantity < 0)
         errors.push(`Item ${index + 1}: Valid quantity is required`);
     });
   }
@@ -425,7 +426,11 @@ export function DataProvider({ children }) {
       } catch (error) {
         logger.error(
           `[DataContext] Atomic operation failed: ${operationName}`,
-          error
+          {
+            error: error.message,
+            stack: error.stack,
+            details: error,
+          }
         );
 
         // Execute fallback if provided
