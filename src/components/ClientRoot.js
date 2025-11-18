@@ -22,6 +22,22 @@ const DynamicToaster = dynamic(
   }
 );
 
+const DynamicOfflineIndicator = dynamic(
+  () => import("@/components/OfflineIndicator").then((mod) => mod.OfflineIndicator),
+  {
+    loading: () => null,
+    ssr: false,
+  }
+);
+
+const DynamicDevTools = dynamic(
+  () => import("@/components/DevTools").then((mod) => mod.DevTools),
+  {
+    loading: () => null,
+    ssr: false,
+  }
+);
+
 export default function ClientRoot({ children }) {
   return (
     <ErrorBoundary 
@@ -42,6 +58,8 @@ export default function ClientRoot({ children }) {
         </ProtectedRoute>
       </ClientLayout>
       <DynamicToaster />
+      <DynamicOfflineIndicator />
+      <DynamicDevTools />
     </ErrorBoundary>
   );
 }

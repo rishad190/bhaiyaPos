@@ -41,32 +41,86 @@ export function useCustomerDue(customerId) {
   return { due, isLoading };
 }
 
-// Hook to add transaction
+// Hook to add transaction with optimistic updates
 export function useAddTransaction() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (transactionData) => transactionService.addTransaction(transactionData),
-    onSuccess: (_, variables) => {
-      // Invalidate transactions list and customer transactions
+    
+    onMutate: async (newTransaction) => {
+      await queryClient.cancelQueries({ queryKey: transactionKeys.lists() });
+
+      const previousTransactions = queryClient.getQueryData(transactionKeys.lists());
+
+      // Optimistically add transaction
+      if (previousTransactions) {
+        queryClient.setQueriesData({ queryKey: transactionKeys.lists() }, (old) => {
+          if (!old) return old;
+
+          const optimisticTransaction = {
+            id: `temp-${Date.now()}`,
+            ...newTransaction,
+            createdAt: new Date().toISOString(),
+          };
+
+          return {
+            ...old,
+            data: [optimisticTransaction, ...(old.data || [])],
+            total: (old.total || 0) + 1,
+          };
+        });
+      }
+
+      // Also update customer transactions if customerId exists
+      if (newTransaction.customerId) {
+        await queryClient.cancelQueries({ 
+          queryKey: transactionKeys.customerTransactions(newTransaction.customerId) 
+        });
+        
+        queryClient.setQueryData(
+          transactionKeys.customerTransactions(newTransaction.customerId),
+          (old) => {
+            const optimisticTransaction = {
+              id: `temp-${Date.now()}`,
+              ...newTransaction,
+              createdAt: new Date().toISOString(),
+            };
+            return [optimisticTransaction, ...(old || [])];
+          }
+        );
+      }
+
+      return { previousTransactions };
+    },
+
+    onError: (error, newTransaction, context) => {
+      if (context?.previousTransactions) {
+        queryClient.setQueriesData({ queryKey: transactionKeys.lists() }, context.previousTransactions);
+      }
+      
+      logger.error('[useAddTransaction] Error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add transaction',
+        variant: 'destructive',
+      });
+    },
+
+    onSettled: (data, error, variables) => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       if (variables.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.customerId),
         });
       }
+    },
+
+    onSuccess: () => {
       toast({
         title: 'Success',
         description: 'Transaction added successfully',
-      });
-    },
-    onError: (error) => {
-      logger.error('[useAddTransaction] Error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add transaction',
-        variant: 'destructive',
       });
     },
   });

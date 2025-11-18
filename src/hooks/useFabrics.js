@@ -70,26 +70,54 @@ export function useUpdateFabric() {
   });
 }
 
-// Hook to delete fabric
+// Hook to delete fabric with optimistic updates
 export function useDeleteFabric() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (fabricId) => fabricService.deleteFabric(fabricId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: fabricKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Fabric deleted successfully',
-      });
+    
+    onMutate: async (fabricId) => {
+      await queryClient.cancelQueries({ queryKey: fabricKeys.lists() });
+      const previousFabrics = queryClient.getQueryData(fabricKeys.lists());
+
+      if (previousFabrics) {
+        queryClient.setQueriesData({ queryKey: fabricKeys.lists() }, (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            data: (old.data || []).filter((fabric) => fabric.id !== fabricId),
+            total: (old.total || 0) - 1,
+          };
+        });
+      }
+
+      return { previousFabrics };
     },
-    onError: (error) => {
+
+    onError: (error, fabricId, context) => {
+      if (context?.previousFabrics) {
+        queryClient.setQueriesData({ queryKey: fabricKeys.lists() }, context.previousFabrics);
+      }
+      
       logger.error('[useDeleteFabric] Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete fabric',
         variant: 'destructive',
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: fabricKeys.lists() });
+    },
+
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Fabric deleted successfully',
       });
     },
   });

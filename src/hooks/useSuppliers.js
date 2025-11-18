@@ -19,26 +19,61 @@ export function useSuppliers({ page = 1, limit = 20, searchTerm = '' } = {}) {
   });
 }
 
-// Hook to add supplier
+// Hook to add supplier with optimistic updates
 export function useAddSupplier() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (supplierData) => supplierService.addSupplier(supplierData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Supplier added successfully',
-      });
+    
+    onMutate: async (newSupplier) => {
+      await queryClient.cancelQueries({ queryKey: supplierKeys.lists() });
+      const previousSuppliers = queryClient.getQueryData(supplierKeys.lists());
+
+      if (previousSuppliers) {
+        queryClient.setQueriesData({ queryKey: supplierKeys.lists() }, (old) => {
+          if (!old) return old;
+          
+          const optimisticSupplier = {
+            id: `temp-${Date.now()}`,
+            ...newSupplier,
+            totalDue: 0,
+            createdAt: new Date().toISOString(),
+          };
+
+          return {
+            ...old,
+            data: [optimisticSupplier, ...(old.data || [])],
+            total: (old.total || 0) + 1,
+          };
+        });
+      }
+
+      return { previousSuppliers };
     },
-    onError: (error) => {
+
+    onError: (error, newSupplier, context) => {
+      if (context?.previousSuppliers) {
+        queryClient.setQueriesData({ queryKey: supplierKeys.lists() }, context.previousSuppliers);
+      }
+      
       logger.error('[useAddSupplier] Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to add supplier',
         variant: 'destructive',
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
+    },
+
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Supplier added successfully',
       });
     },
   });
@@ -70,26 +105,54 @@ export function useUpdateSupplier() {
   });
 }
 
-// Hook to delete supplier
+// Hook to delete supplier with optimistic updates
 export function useDeleteSupplier() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (supplierId) => supplierService.deleteSupplier(supplierId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Supplier deleted successfully',
-      });
+    
+    onMutate: async (supplierId) => {
+      await queryClient.cancelQueries({ queryKey: supplierKeys.lists() });
+      const previousSuppliers = queryClient.getQueryData(supplierKeys.lists());
+
+      if (previousSuppliers) {
+        queryClient.setQueriesData({ queryKey: supplierKeys.lists() }, (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            data: (old.data || []).filter((supplier) => supplier.id !== supplierId),
+            total: (old.total || 0) - 1,
+          };
+        });
+      }
+
+      return { previousSuppliers };
     },
-    onError: (error) => {
+
+    onError: (error, supplierId, context) => {
+      if (context?.previousSuppliers) {
+        queryClient.setQueriesData({ queryKey: supplierKeys.lists() }, context.previousSuppliers);
+      }
+      
       logger.error('[useDeleteSupplier] Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete supplier',
         variant: 'destructive',
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
+    },
+
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Supplier deleted successfully',
       });
     },
   });

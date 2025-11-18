@@ -31,22 +31,53 @@ export function useCustomer(customerId) {
   });
 }
 
-// Hook to add customer
+// Hook to add customer with optimistic updates
 export function useAddCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (customerData) => customerService.addCustomer(customerData),
-    onSuccess: () => {
-      // Invalidate and refetch customers list
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Customer added successfully',
-      });
+    
+    // Optimistic update
+    onMutate: async (newCustomer) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
+
+      // Snapshot the previous value
+      const previousCustomers = queryClient.getQueryData(customerKeys.lists());
+
+      // Optimistically update to the new value
+      if (previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, (old) => {
+          if (!old) return old;
+          
+          // Create optimistic customer with temporary ID
+          const optimisticCustomer = {
+            id: `temp-${Date.now()}`,
+            ...newCustomer,
+            createdAt: new Date().toISOString(),
+          };
+
+          return {
+            ...old,
+            data: [optimisticCustomer, ...(old.data || [])],
+            total: (old.total || 0) + 1,
+          };
+        });
+      }
+
+      // Return context with previous value
+      return { previousCustomers };
     },
-    onError: (error) => {
+
+    // If mutation fails, rollback
+    onError: (error, newCustomer, context) => {
+      // Restore previous value
+      if (context?.previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, context.previousCustomers);
+      }
+
       logger.error('[useAddCustomer] Error:', error);
       toast({
         title: 'Error',
@@ -54,10 +85,23 @@ export function useAddCustomer() {
         variant: 'destructive',
       });
     },
+
+    // Always refetch after error or success
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+
+    // On success, show toast
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Customer added successfully',
+      });
+    },
   });
 }
 
-// Hook to update customer
+// Hook to update customer with optimistic updates
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -65,16 +109,49 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: ({ customerId, updatedData }) =>
       customerService.updateCustomer(customerId, updatedData),
-    onSuccess: (_, variables) => {
-      // Invalidate specific customer and lists
-      queryClient.invalidateQueries({ queryKey: customerKeys.detail(variables.customerId) });
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Customer updated successfully',
-      });
+    
+    onMutate: async ({ customerId, updatedData }) => {
+      await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: customerKeys.detail(customerId) });
+
+      const previousCustomers = queryClient.getQueryData(customerKeys.lists());
+      const previousCustomer = queryClient.getQueryData(customerKeys.detail(customerId));
+
+      // Optimistically update list
+      if (previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            data: (old.data || []).map((customer) =>
+              customer.id === customerId
+                ? { ...customer, ...updatedData, updatedAt: new Date().toISOString() }
+                : customer
+            ),
+          };
+        });
+      }
+
+      // Optimistically update single customer
+      if (previousCustomer) {
+        queryClient.setQueryData(customerKeys.detail(customerId), (old) => {
+          if (!old) return old;
+          return { ...old, ...updatedData, updatedAt: new Date().toISOString() };
+        });
+      }
+
+      return { previousCustomers, previousCustomer };
     },
-    onError: (error) => {
+
+    onError: (error, variables, context) => {
+      if (context?.previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, context.previousCustomers);
+      }
+      if (context?.previousCustomer) {
+        queryClient.setQueryData(customerKeys.detail(variables.customerId), context.previousCustomer);
+      }
+      
       logger.error('[useUpdateCustomer] Error:', error);
       toast({
         title: 'Error',
@@ -82,30 +159,71 @@ export function useUpdateCustomer() {
         variant: 'destructive',
       });
     },
+
+    onSettled: (_, __, variables) => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.detail(variables.customerId) });
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Customer updated successfully',
+      });
+    },
   });
 }
 
-// Hook to delete customer
+// Hook to delete customer with optimistic updates
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: (customerId) => customerService.deleteCustomer(customerId),
-    onSuccess: () => {
-      // Invalidate customers list
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
-      toast({
-        title: 'Success',
-        description: 'Customer deleted successfully',
-      });
+    
+    onMutate: async (customerId) => {
+      await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
+
+      const previousCustomers = queryClient.getQueryData(customerKeys.lists());
+
+      // Optimistically remove customer
+      if (previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            data: (old.data || []).filter((customer) => customer.id !== customerId),
+            total: (old.total || 0) - 1,
+          };
+        });
+      }
+
+      return { previousCustomers };
     },
-    onError: (error) => {
+
+    onError: (error, customerId, context) => {
+      if (context?.previousCustomers) {
+        queryClient.setQueriesData({ queryKey: customerKeys.lists() }, context.previousCustomers);
+      }
+      
       logger.error('[useDeleteCustomer] Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete customer',
         variant: 'destructive',
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Customer deleted successfully',
       });
     },
   });

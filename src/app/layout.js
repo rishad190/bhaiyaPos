@@ -17,9 +17,22 @@ export const metadata = {
     "A modern Point of Sale system for managing customers and transactions",
   keywords: ["POS", "point of sale", "customer management", "transactions"],
   authors: [{ name: "Md Rishad Khan" }],
-
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Sky Fabric POS",
+  },
   icons: {
     icon: "/favicon.ico",
+    apple: "/icon-192x192.png",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
   },
 };
 

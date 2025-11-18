@@ -2,7 +2,11 @@
 import { useState, useRef, useMemo } from "react";
 
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useCustomers } from "@/hooks/useCustomers";
+import { useAddTransaction } from "@/hooks/useTransactions";
+import { useAddDailyCashTransaction } from "@/hooks/useDailyCash";
+import { useFabrics } from "@/hooks/useFabrics";
+import { useReduceInventory } from "@/hooks/useInventoryTransaction";
 import { CashMemoPrint } from "@/components/CashMemoPrint";
 import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
 import logger from "@/utils/logger";
@@ -56,14 +60,20 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function CashMemoPage() {
   const router = useRouter();
-  const { toast } = useToast(); // Get toast function
-  const {
-    customers,
-    addTransaction,
-    addDailyCashTransaction,
-    fabrics,
-    reduceInventory,
-  } = useData();
+  const { toast } = useToast();
+  
+  // Fetch data with React Query
+  const { data: customersData } = useCustomers({ page: 1, limit: 10000 });
+  const { data: fabricsData } = useFabrics({ page: 1, limit: 10000 });
+  
+  // Mutations
+  const addTransactionMutation = useAddTransaction();
+  const addDailyCashMutation = useAddDailyCashTransaction();
+  const reduceInventoryMutation = useReduceInventory();
+  
+  // Extract data
+  const customers = customersData?.data || [];
+  const fabrics = fabricsData?.data || [];
   const [customerId, setCustomerId] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -588,7 +598,7 @@ export default function CashMemoPage() {
       }
 
       // Wait for transaction to be added
-      const transactionId = await addTransaction(transaction);
+      const transactionId = await addTransactionMutation.mutateAsync(transaction);
 
       // Double-check fabric IDs before reducing inventory
       const productsWithValidFabricIds = products
@@ -644,8 +654,8 @@ export default function CashMemoPage() {
         productsWithValidFabricIds
       );
 
-      // Reduce inventory after successful transaction
-      await reduceInventory(productsWithValidFabricIds);
+      // Reduce inventory atomically (prevents race conditions)
+      await reduceInventoryMutation.mutateAsync(productsWithValidFabricIds);
 
       // Only proceed with cash transaction if deposit exists and transaction was successful
       if (deposit > 0 && transactionId) {
@@ -658,7 +668,7 @@ export default function CashMemoPage() {
           createdAt: new Date().toISOString(),
         };
 
-        await addDailyCashTransaction(cashTransaction);
+        await addDailyCashMutation.mutateAsync(cashTransaction);
       }
 
       setSaveSuccess(true);
@@ -1209,7 +1219,14 @@ export default function CashMemoPage() {
           <Button
             className="w-full sm:w-auto print:hidden"
             onClick={handleSaveMemo}
-            disabled={isSaving || saveSuccess || products.length === 0}
+            disabled={
+              isSaving || 
+              saveSuccess || 
+              products.length === 0 ||
+              addTransactionMutation.isPending ||
+              reduceInventoryMutation.isPending ||
+              addDailyCashMutation.isPending
+            }
           >
             {saveSuccess ? (
               <>
