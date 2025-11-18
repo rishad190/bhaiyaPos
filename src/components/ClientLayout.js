@@ -1,5 +1,6 @@
 "use client";
 import { DataProvider } from "@/app/data-context";
+import { QueryProvider } from "@/providers/QueryProvider";
 import { useState, useEffect } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 
@@ -18,5 +19,9 @@ export function ClientLayout({ children }) {
     );
   }
 
-  return <DataProvider>{children}</DataProvider>;
+  return (
+    <QueryProvider>
+      <DataProvider>{children}</DataProvider>
+    </QueryProvider>
+  );
 }

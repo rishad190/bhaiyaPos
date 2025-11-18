@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,10 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { ErrorBoundary, DataErrorBoundary } from "@/components/ErrorBoundary";
-import { useData } from "@/app/data-context";
+import { useCustomers } from "@/hooks/useCustomers";
+import { useTransactions } from "@/hooks/useTransactions";
+import { useFabrics } from "@/hooks/useFabrics";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import { useToast } from "@/hooks/use-toast";
 import { formatLargeNumber } from "@/lib/utils";
 import { PAGE_TITLES } from "@/lib/constants";
@@ -74,18 +77,24 @@ const RecentTransactions = dynamic(
 
 export default function Dashboard() {
   const router = useRouter();
-  const { customers, transactions, fabrics, suppliers, error, getCustomerDue } =
-    useData();
   const { toast } = useToast();
-
-  const [loadingState, setLoadingState] = useState({
-    initial: true,
-    transactions: true,
-  });
   const [backupLoading, setBackupLoading] = useState(false);
 
+  // Fetch data with React Query
+  const { data: customersData, isLoading: customersLoading } = useCustomers({ page: 1, limit: 10000 });
+  const { data: transactionsData, isLoading: transactionsLoading } = useTransactions({ page: 1, limit: 10000 });
+  const { data: fabricsData, isLoading: fabricsLoading } = useFabrics({ page: 1, limit: 10000 });
+  const { data: suppliersData, isLoading: suppliersLoading } = useSuppliers({ page: 1, limit: 10000 });
+
+  const isLoading = customersLoading || transactionsLoading || fabricsLoading || suppliersLoading;
+
   const stats = useMemo(() => {
-    if (!Array.isArray(customers) || !transactions || !fabrics || !suppliers) {
+    const customers = customersData?.data || [];
+    const transactions = transactionsData?.data || [];
+    const fabrics = fabricsData?.data || [];
+    const suppliers = suppliersData?.data || [];
+
+    if (!customers.length || !transactions.length) {
       return {
         totalBill: 0,
         totalDeposit: 0,
@@ -99,8 +108,7 @@ export default function Dashboard() {
 
     const totals = customers.reduce(
       (acc, customer) => {
-        const customerTransactions =
-          transactions?.filter((t) => t.customerId === customer.id) || [];
+        const customerTransactions = transactions.filter((t) => t.customerId === customer.id);
         const customerTotal = customerTransactions.reduce(
           (sum, t) => sum + (Number(t.total) || 0),
           0
@@ -109,7 +117,7 @@ export default function Dashboard() {
           (sum, t) => sum + (Number(t.deposit) || 0),
           0
         );
-        const customerDue = getCustomerDue(customer.id);
+        const customerDue = customerTotal - customerDeposit;
 
         return {
           totalBill: acc.totalBill + customerTotal,
@@ -120,7 +128,7 @@ export default function Dashboard() {
       { totalBill: 0, totalDeposit: 0, totalDue: 0 }
     );
 
-    const recentTransactions = [...(transactions || [])]
+    const recentTransactions = [...transactions]
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
       .slice(0, 5);
 
@@ -131,7 +139,7 @@ export default function Dashboard() {
       totalSuppliers: suppliers.length,
       recentTransactions,
     };
-  }, [customers, transactions, fabrics, suppliers, getCustomerDue]);
+  }, [customersData, transactionsData, fabricsData, suppliersData]);
 
   const handleQuickBackup = async () => {
     setBackupLoading(true);
@@ -152,25 +160,7 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    if (customers && transactions) {
-      setLoadingState((prev) => ({
-        ...prev,
-        initial: false,
-        transactions: false,
-      }));
-    }
-  }, [customers, transactions]);
-
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-red-500">Error: {error}</p>
-      </div>
-    );
-  }
-
-  if (loadingState.initial) {
+  if (isLoading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         {/* Header Skeleton */}
@@ -280,7 +270,7 @@ export default function Dashboard() {
           />
           <QuickStatCard
             title="Total Transactions"
-            value={transactions?.length || 0}
+            value={transactionsData?.data?.length || 0}
             icon={History}
             trend="up"
             trendValue="15%"
@@ -353,7 +343,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <RecentTransactions
             transactions={stats.recentTransactions}
-            customers={customers}
+            customers={customersData?.data || []}
           />
         </div>
       </div>

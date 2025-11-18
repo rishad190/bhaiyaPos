@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useSuppliersWithTransactions } from "@/hooks/useSuppliersWithTransactions";
+import { useAddSupplier, useUpdateSupplier, useDeleteSupplier } from "@/hooks/useSuppliers";
 import {
   Table,
   TableBody,
@@ -40,99 +41,41 @@ import {
 export default function SuppliersPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    suppliers,
-    supplierTransactions,
-    addSupplier,
-    updateSupplier,
-    deleteSupplier,
-  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [editingSupplier, setEditingSupplier] = useState(null);
-  const [loadingState, setLoadingState] = useState({
-    initial: true,
-    actions: false,
+
+  // Fetch suppliers with React Query
+  const {
+    suppliers,
+    financialSummary: totals,
+    isLoading,
+    error,
+  } = useSuppliersWithTransactions({
+    page: 1,
+    limit: 1000, // Get all suppliers for now
+    searchTerm,
   });
 
-  // Initialize loading state
-  useEffect(() => {
-    if (suppliers !== undefined) {
-      setLoadingState((prev) => ({ ...prev, initial: false }));
-    }
-  }, [suppliers]);
+  // Mutations
+  const addSupplierMutation = useAddSupplier();
+  const updateSupplierMutation = useUpdateSupplier();
+  const deleteSupplierMutation = useDeleteSupplier();
 
-  // Memoize filtered suppliers and totals
-  const { filteredSuppliers, totals } = useMemo(() => {
-    const filtered =
-      suppliers?.filter(
-        (supplier) =>
-          supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          supplier.phone.includes(searchTerm)
-      ) || [];
-
-    const totals = filtered.reduce(
-      (acc, supplier) => {
-        const supplierTxns =
-          supplierTransactions?.filter((t) => t.supplierId === supplier.id) ||
-          [];
-
-        const supplierTotal = supplierTxns.reduce(
-          (txnAcc, transaction) => ({
-            totalAmount:
-              txnAcc.totalAmount + (Number(transaction.totalAmount) || 0),
-            paidAmount:
-              txnAcc.paidAmount + (Number(transaction.paidAmount) || 0),
-          }),
-          { totalAmount: 0, paidAmount: 0 }
-        );
-
-        acc.totalAmount += supplierTotal.totalAmount;
-        acc.paidAmount += supplierTotal.paidAmount;
-        acc.dueAmount = acc.totalAmount - acc.paidAmount;
-
-        // Avoid mutating original supplier object. Compute per-supplier due and
-        // attach it to a new object when rendering if needed.
-        // Store computed due in a temporary map for potential use elsewhere.
-        acc.supplierDues = acc.supplierDues || {};
-        acc.supplierDues[supplier.id] =
-          supplierTotal.totalAmount - supplierTotal.paidAmount;
-
-        return acc;
-      },
-      { totalAmount: 0, paidAmount: 0, dueAmount: 0 }
+  // Filter suppliers locally
+  const filteredSuppliers = useMemo(() => {
+    if (!suppliers) return [];
+    return suppliers.filter(
+      (supplier) =>
+        supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        supplier.phone.includes(searchTerm)
     );
-
-    // Map filtered suppliers to include computed totalDue without mutating source
-    const filteredWithDue = filtered.map((s) => ({
-      ...s,
-      totalDue: totals.supplierDues?.[s.id] ?? s.totalDue ?? 0,
-    }));
-
-    return { filteredSuppliers: filteredWithDue, totals };
-  }, [suppliers, supplierTransactions, searchTerm]);
+  }, [suppliers, searchTerm]);
 
   const handleAddSupplier = async (supplierData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      const newSupplier = {
-        ...supplierData,
-        totalDue: 0,
-        createdAt: new Date().toISOString(),
-      };
-      await addSupplier(newSupplier);
-      toast({
-        title: "Success",
-        description: "Supplier added successfully",
-      });
+      await addSupplierMutation.mutateAsync(supplierData);
     } catch (error) {
       console.error("Error adding supplier:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add supplier. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
@@ -142,43 +85,19 @@ export default function SuppliersPage() {
       return;
     }
 
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteSupplier(supplierId);
-      toast({
-        title: "Success",
-        description: "Supplier deleted successfully",
-      });
+      await deleteSupplierMutation.mutateAsync(supplierId);
     } catch (error) {
       console.error("Error deleting supplier:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete supplier. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
   const handleEditSupplier = async (supplierId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await updateSupplier(supplierId, updatedData);
+      await updateSupplierMutation.mutateAsync({ supplierId, updatedData });
       setEditingSupplier(null);
-      toast({
-        title: "Success",
-        description: "Supplier updated successfully",
-      });
     } catch (error) {
       console.error("Error updating supplier:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update supplier. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
@@ -242,7 +161,7 @@ export default function SuppliersPage() {
     </Card>
   );
 
-  if (loadingState.initial) {
+  if (isLoading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         {/* Header Skeleton */}
@@ -286,7 +205,7 @@ export default function SuppliersPage() {
           <AddSupplierDialog onAddSupplier={handleAddSupplier}>
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
-              disabled={loadingState.actions}
+              disabled={addSupplierMutation.isPending}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Supplier
@@ -296,7 +215,7 @@ export default function SuppliersPage() {
             onClick={handleExportPDF}
             className="w-full md:w-auto"
             variant="outline"
-            disabled={loadingState.actions}
+            disabled={isLoading}
           >
             <FileText className="mr-2 h-4 w-4" />
             Export PDF
@@ -305,7 +224,7 @@ export default function SuppliersPage() {
             onClick={handleExportCSV}
             className="w-full md:w-auto"
             variant="outline"
-            disabled={loadingState.actions}
+            disabled={isLoading}
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV

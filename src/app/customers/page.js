@@ -1,14 +1,11 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import logger from "@/utils/logger";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { AddCustomerDialog } from "@/components/AddCustomerDialog";
 import { EditCustomerDialog } from "@/components/EditCustomerDialog";
@@ -17,329 +14,117 @@ import { CustomerSearch } from "@/components/CustomerSearch";
 import { Pagination } from "@/components/Pagination";
 import { TableSkeleton } from "@/components/LoadingState";
 import { DataErrorBoundary } from "@/components/ErrorBoundary";
-import { useData } from "@/app/data-context";
-import { useToast } from "@/hooks/use-toast";
+import { useCustomersWithDues } from "@/hooks/useCustomersWithDues";
+import {
+  useAddCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
+} from "@/hooks/useCustomers";
 import {
   CUSTOMER_CONSTANTS,
-  ERROR_MESSAGES,
   PAGE_TITLES,
 } from "@/lib/constants";
-
-import { Plus, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
-
+import { Plus, DollarSign } from "lucide-react";
 import { backupService } from "@/services/backupService";
-
 import { formatDate } from "@/lib/utils";
 
-
-
 export default function CustomerPage() {
-
   const router = useRouter();
-
-  const {
-
-    customers,
-
-    transactions,
-
-    error,
-
-    addCustomer,
-
-    updateCustomer,
-
-    deleteCustomer,
-
-    getCustomerDue,
-
-  } = useData();
-
-  const { toast } = useToast();
-
-
-
-  const [loadingState, setLoadingState] = useState({
-
-    initial: true,
-
-    customers: true,
-
-    actions: false,
-
-  });
-
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState("");
-
   const [selectedFilter, setSelectedFilter] = useState(
-
     CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL
-
   );
-
   const [editingCustomer, setEditingCustomer] = useState(null);
-
   const [currentPage, setCurrentPage] = useState(1);
-
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
 
+  // Fetch customers with dues using React Query
+  const {
+    customers,
+    financialSummary,
+    isLoading,
+    error,
+    pagination,
+  } = useCustomersWithDues({
+    page: currentPage,
+    limit: CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE,
+    searchTerm,
+    filter: selectedFilter,
+  });
 
-
-  useEffect(() => {
-
-    if (customers) {
-
-      setLoadingState((prev) => ({
-
-        ...prev,
-
-        initial: false,
-
-        customers: false,
-
-      }));
-
-    }
-
-  }, [customers]);
-
-
+  // Mutations
+  const addCustomerMutation = useAddCustomer();
+  const updateCustomerMutation = useUpdateCustomer();
+  const deleteCustomerMutation = useDeleteCustomer();
 
   const handleAddCustomer = async (customerData) => {
-
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-
-    try {
-
-      await addCustomer(customerData);
-
-      setIsAddingCustomer(false);
-
-      toast({
-
-        title: "Success",
-
-        description: "Customer added successfully",
-
-      });
-
-    } catch (error) {
-
-      logger.error(ERROR_MESSAGES.ADD_ERROR, error);
-
-      toast({
-
-        title: "Error",
-
-        description: ERROR_MESSAGES.ADD_ERROR,
-
-        variant: "destructive",
-
-      });
-
-    } finally {
-
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-
-    }
-
+    await addCustomerMutation.mutateAsync(customerData);
+    setIsAddingCustomer(false);
   };
-
-
 
   const handleEditCustomer = async (customerId, updatedData) => {
-
-    setLoadingState((prev) => ({ ...prev, actions: true }));
-
-    try {
-
-      await updateCustomer(customerId, updatedData);
-
-      setEditingCustomer(null);
-
-      toast({
-
-        title: "Success",
-
-        description: "Customer updated successfully",
-
-      });
-
-    } catch (error) {
-
-      logger.error(ERROR_MESSAGES.UPDATE_ERROR, error);
-
-      toast({
-
-        title: "Error",
-
-        description: ERROR_MESSAGES.UPDATE_ERROR,
-
-        variant: "destructive",
-
-      });
-
-    } finally {
-
-      setLoadingState((prev) => ({ ...prev, actions: false }));
-
-    }
-
+    await updateCustomerMutation.mutateAsync({ customerId, updatedData });
+    setEditingCustomer(null);
   };
-
-
 
   const handleRowClick = (customerId) => {
-
     router.push(`/customers/${customerId}`);
-
   };
-
-
 
   const handleDeleteCustomer = async (customerId) => {
-
-    if (window.confirm(ERROR_MESSAGES.DELETE_CONFIRMATION)) {
-
-      setLoadingState((prev) => ({ ...prev, actions: true }));
-
-      try {
-
-        await deleteCustomer(customerId);
-
-        toast({
-
-          title: "Success",
-
-          description: "Customer deleted successfully",
-
-        });
-
-      } catch (error) {
-
-        logger.error(ERROR_MESSAGES.DELETE_ERROR, error);
-
-        toast({
-
-          title: "Error",
-
-          description: ERROR_MESSAGES.DELETE_ERROR,
-
-          variant: "destructive",
-
-        });
-
-      } finally {
-
-        setLoadingState((prev) => ({ ...prev, actions: false }));
-
-      }
-
+    if (window.confirm("Are you sure you want to delete this customer?")) {
+      await deleteCustomerMutation.mutateAsync(customerId);
     }
-
   };
-
-
 
   const handleExportCSV = () => {
-
-    const dataToExport = filteredCustomers.reduce((acc, customer) => {
-
+    if (!customers || customers.length === 0) return;
+    
+    const dataToExport = customers.reduce((acc, customer) => {
       acc[customer.id] = customer;
-
       return acc;
-
     }, {});
 
-
-
     const csvContent = backupService.convertToCSV(dataToExport);
-
     const blob = new Blob([csvContent], { type: "text/csv" });
-
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
-
     link.href = url;
-
     link.download = `customers-${formatDate(new Date(), "YYYY-MM-DD")}.csv`;
-
     document.body.appendChild(link);
-
     link.click();
-
     document.body.removeChild(link);
-
     URL.revokeObjectURL(url);
-
   };
 
-  const stats = useMemo(() => {
-    if (!Array.isArray(customers) || !transactions) {
-      return {
-        totalBill: 0,
-        totalDeposit: 0,
-        totalDue: 0,
-      };
-    }
+  // Helper function to get customer due (already calculated in customers data)
+  const getCustomerDue = (customerId) => {
+    const customer = customers?.find(c => c.id === customerId);
+    return customer?.due || 0;
+  };
 
-    const totals = customers.reduce(
-      (acc, customer) => {
-        const customerTransactions =
-          transactions?.filter((t) => t.customerId === customer.id) || [];
-        const customerTotal = customerTransactions.reduce(
-          (sum, t) => sum + (Number(t.total) || 0),
-          0
-        );
-        const customerDeposit = customerTransactions.reduce(
-          (sum, t) => sum + (Number(t.deposit) || 0),
-          0
-        );
-        const customerDue = getCustomerDue(customer.id);
-
-        return {
-          totalBill: acc.totalBill + customerTotal,
-          totalDeposit: acc.totalDeposit + customerDeposit,
-          totalDue: acc.totalDue + customerDue,
-        };
-      },
-      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
-    );
-
-    return totals;
-  }, [customers, transactions, getCustomerDue]);
-
-  const filteredCustomers = useMemo(() => {
+  // Sort customers
+  const sortedCustomers = useMemo(() => {
     if (!customers) return [];
-    let sortableCustomers = customers.filter((customer) => {
-      if (!customer) return false;
-
-      const matchesSearch =
-        customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.phone?.includes(searchTerm);
-      const currentDue = getCustomerDue(customer.id);
-      const matchesFilter =
-        selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.ALL ||
-        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.DUE &&
-          currentDue > 0) ||
-        (selectedFilter === CUSTOMER_CONSTANTS.FILTER_OPTIONS.PAID &&
-          currentDue === 0);
-      return matchesSearch && matchesFilter;
-    });
-
-    sortableCustomers.forEach(customer => {
-      customer.dueAmount = getCustomerDue(customer.id);
-    });
+    
+    const sortableCustomers = [...customers];
 
     if (sortConfig.key) {
       sortableCustomers.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        // Handle due amount sorting
+        if (sortConfig.key === "dueAmount") {
+          aVal = a.due;
+          bVal = b.due;
+        }
+        
+        if (aVal < bVal) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aVal > bVal) {
           return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
@@ -347,7 +132,7 @@ export default function CustomerPage() {
     }
 
     return sortableCustomers;
-  }, [customers, searchTerm, selectedFilter, getCustomerDue, sortConfig]);
+  }, [customers, sortConfig]);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -360,7 +145,7 @@ export default function CustomerPage() {
   if (error) {
     return (
       <div className="p-8 text-center">
-        <p className="text-red-500">Error: {error}</p>
+        <p className="text-red-500">Error: {error.message}</p>
       </div>
     );
   }
@@ -389,7 +174,7 @@ export default function CustomerPage() {
             >
               <Button
                 className="w-full md:w-auto"
-                disabled={loadingState.actions}
+                disabled={addCustomerMutation.isPending}
                 onClick={() => setIsAddingCustomer(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -414,9 +199,8 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-blue-800" />
                 </div>
                 <div className="text-2xl font-bold text-blue-900">
-                  ৳ {stats.totalBill}
+                  ৳ {financialSummary.totalBill.toFixed(2)}
                 </div>
-
               </CardContent>
             </Card>
 
@@ -429,9 +213,8 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-green-800" />
                 </div>
                 <div className="text-2xl font-bold text-green-900">
-                  ৳ {stats.totalDeposit}
+                  ৳ {financialSummary.totalDeposit.toFixed(2)}
                 </div>
-
               </CardContent>
             </Card>
 
@@ -444,9 +227,8 @@ export default function CustomerPage() {
                   <DollarSign className="h-4 w-4 text-red-800" />
                 </div>
                 <div className="text-2xl font-bold text-red-900">
-                  ৳ {stats.totalDue}
+                  ৳ {financialSummary.totalDue.toFixed(2)}
                 </div>
-
               </CardContent>
             </Card>
           </div>
@@ -465,11 +247,11 @@ export default function CustomerPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              {loadingState.customers ? (
+              {isLoading ? (
                 <TableSkeleton />
               ) : (
                 <CustomerTable
-                  customers={filteredCustomers}
+                  customers={sortedCustomers}
                   getCustomerDue={getCustomerDue}
                   onRowClick={handleRowClick}
                   onEdit={setEditingCustomer}
@@ -483,7 +265,7 @@ export default function CustomerPage() {
             </div>
             <Pagination
               currentPage={currentPage}
-              totalItems={filteredCustomers.length}
+              totalItems={pagination.total}
               itemsPerPage={CUSTOMER_CONSTANTS.CUSTOMERS_PER_PAGE}
               onPageChange={setCurrentPage}
               className="mt-4"

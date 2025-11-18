@@ -2,7 +2,7 @@
 import React, { useState, useMemo, Suspense } from "react";
 
 import { useRouter } from "next/navigation";
-import { useData } from "@/app/data-context";
+import { useFabrics, useAddFabric, useUpdateFabric, useDeleteFabric } from "@/hooks/useFabrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
@@ -47,31 +47,64 @@ const FabricForm = dynamic(() => import("@/components/FabricForm"), {
 export default function InventoryPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    fabrics,
-    addFabric,
-    updateFabric,
-    deleteFabric,
-    addFabricBatch,
-    updateFabricBatch,
-  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFabric, setEditingFabric] = useState(null);
 
-  const filteredFabrics = useMemo(() => {
-    if (!Array.isArray(fabrics)) return [];
+  // Fetch fabrics with React Query
+  const { data: fabricsData, isLoading } = useFabrics({
+    page: 1,
+    limit: 1000,
+    searchTerm,
+  });
 
-    return fabrics.filter((fabric) => {
-      if (!fabric) return false;
-      const searchString = searchTerm.toLowerCase();
-      return (
-        fabric.name?.toLowerCase().includes(searchString) ||
-        fabric.code?.toLowerCase().includes(searchString) ||
-        fabric.category?.toLowerCase().includes(searchString)
-      );
+  // Mutations
+  const addFabricMutation = useAddFabric();
+  const updateFabricMutation = useUpdateFabric();
+  const deleteFabricMutation = useDeleteFabric();
+
+  const filteredFabrics = useMemo(() => {
+    if (!fabricsData?.data) {
+      logger.info('[Inventory] No fabricsData or data is empty');
+      return [];
+    }
+    
+    logger.info('[Inventory] Raw fabrics data:', fabricsData.data);
+    logger.info('[Inventory] Total raw fabrics:', fabricsData.data.length);
+    
+    // Filter out fabrics with invalid IDs
+    const validFabrics = fabricsData.data.filter((fabric) => {
+      if (!fabric) {
+        logger.warn('[Inventory] Skipping null/undefined fabric');
+        return false;
+      }
+      if (!fabric.id) {
+        logger.warn('[Inventory] Skipping fabric with no ID:', fabric);
+        return false;
+      }
+      return true;
     });
-  }, [fabrics, searchTerm]);
+    
+    logger.info('[Inventory] Valid fabrics after filtering:', validFabrics.length);
+    
+    // Remove duplicates by ID
+    const uniqueFabrics = validFabrics.reduce((acc, fabric) => {
+      if (!acc.find(f => f.id === fabric.id)) {
+        acc.push(fabric);
+      } else {
+        logger.warn('[Inventory] Duplicate fabric ID found:', fabric.id);
+      }
+      return acc;
+    }, []);
+    
+    logger.info('[Inventory] Unique fabrics:', uniqueFabrics.length);
+    
+    if (uniqueFabrics.length > 0) {
+      logger.info('[Inventory] Sample fabric:', uniqueFabrics[0]);
+    }
+    
+    return uniqueFabrics;
+  }, [fabricsData]);
 
   const handleAddClick = () => {
     setEditingFabric(null);
@@ -86,93 +119,42 @@ export default function InventoryPage() {
   const handleDeleteClick = async (fabricId) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       try {
-        await deleteFabric(fabricId);
-        toast({
-          title: "Success",
-          description: "Fabric deleted successfully",
-        });
+        await deleteFabricMutation.mutateAsync(fabricId);
       } catch (error) {
         logger.error("Error deleting fabric:", error);
-        toast({
-          title: "Error",
-          description: "Failed to delete fabric. Please try again.",
-          variant: "destructive",
-        });
       }
     }
   };
 
   const handleSaveFabric = async (fabric) => {
     try {
-      // Separate fabric data from batches
-      const { batches, ...fabricData } = fabric;
+      logger.info('[Inventory] Saving fabric:', fabric);
 
       if (fabric.id) {
         // Update existing fabric
-        await updateFabric(fabric.id, {
-          ...fabricData,
-          updatedAt: new Date().toISOString(),
-        });
-
-        // Update batches if they exist
-        if (batches && batches.length > 0) {
-          for (const batch of batches) {
-            if (batch.id && batch.id.startsWith("b")) {
-              // This is a temporary ID, create new batch
-              const { id, ...batchData } = batch;
-              await addFabricBatch({
-                ...batchData,
-                fabricId: fabric.id,
-                createdAt: new Date().toISOString(),
-              });
-            } else {
-              // This is an existing batch, update it
-              await updateFabricBatch(batch.id, {
-                ...batch,
-                fabricId: fabric.id,
-                updatedAt: new Date().toISOString(),
-              });
-            }
-          }
-        }
-
-        toast({
-          title: "Success",
-          description: "Fabric updated successfully",
+        await updateFabricMutation.mutateAsync({
+          fabricId: fabric.id,
+          updatedData: {
+            ...fabric,
+            updatedAt: new Date().toISOString(),
+          },
         });
       } else {
-        // Add new fabric
-        const fabricId = await addFabric({
-          ...fabricData,
+        // Add new fabric - include batches if they exist
+        const fabricToAdd = {
+          ...fabric,
+          batches: fabric.batches || {},
           createdAt: new Date().toISOString(),
-        });
-
-        // Add batches if they exist
-        if (batches && batches.length > 0) {
-          for (const batch of batches) {
-            const { id, ...batchData } = batch;
-            await addFabricBatch({
-              ...batchData,
-              fabricId: fabricId,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        }
-
-        toast({
-          title: "Success",
-          description: "Fabric added successfully",
-        });
+        };
+        
+        logger.info('[Inventory] Adding new fabric:', fabricToAdd);
+        await addFabricMutation.mutateAsync(fabricToAdd);
       }
+      
       setIsDialogOpen(false);
       setEditingFabric(null);
     } catch (error) {
-      logger.error("Error saving fabric:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save fabric. Please try again.",
-        variant: "destructive",
-      });
+      logger.error("[Inventory] Error saving fabric:", error);
     }
   };
 
@@ -247,7 +229,7 @@ export default function InventoryPage() {
                     <TableCell>{fabric.code}</TableCell>
                     <TableCell>{fabric.category}</TableCell>
                     <TableCell className="text-right">
-                      {calculateTotalQuantity(fabric).toFixed(2)}{" "}
+                      {fabric.batches ? calculateTotalQuantity(fabric).toFixed(2) : '0.00'}{" "}
                       {fabric.unit || "pieces"}
                     </TableCell>
                     <TableCell className="text-right">

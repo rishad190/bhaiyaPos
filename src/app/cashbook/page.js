@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import logger from "@/utils/logger";
-import { useData } from "@/app/data-context";
+import { useAllDailyCashTransactions, useAddDailyCashTransaction, useUpdateDailyCashTransaction, useDeleteDailyCashTransaction } from "@/hooks/useDailyCash";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -52,13 +52,15 @@ import { DataErrorBoundary } from "@/components/ErrorBoundary";
 import { Pagination } from "@/components/Pagination";
 
 export default function CashBookPage() {
-  const {
-    dailyCashTransactions,
-    addDailyCashTransaction,
-    updateDailyCashTransaction,
-    deleteDailyCashTransaction,
-  } = useData();
   const { toast } = useToast();
+  
+  // Fetch data with React Query
+  const { data: dailyCashTransactions = [], isLoading } = useAllDailyCashTransactions();
+  
+  // Mutations
+  const addMutation = useAddDailyCashTransaction();
+  const updateMutation = useUpdateDailyCashTransaction();
+  const deleteMutation = useDeleteDailyCashTransaction();
   const [searchTerm, setSearchTerm] = useState("");
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -70,59 +72,10 @@ export default function CashBookPage() {
   const [pdfEndDate, setPdfEndDate] = useState(date);
 
   const [editingTransaction, setEditingTransaction] = useState(null);
-  const [loadingState, setLoadingState] = useState({
-    initial: true,
-    transactions: false,
-    actions: false,
-  });
   const [activeTab, setActiveTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [openingBalance, setOpeningBalance] = useState(0);
-
-  // Add useEffect to handle initial loading state
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Wait for dailyCashTransactions to be available
-        if (dailyCashTransactions !== undefined) {
-          setLoadingState((prev) => ({ ...prev, initial: false }));
-        }
-      } catch (error) {
-        logger.error("Error loading initial data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please refresh the page.",
-          variant: "destructive",
-        });
-        setLoadingState((prev) => ({ ...prev, initial: false }));
-      }
-    };
-
-    initializeData();
-  }, [dailyCashTransactions, toast]);
-
-  // Add useEffect to handle initial loading state
-  useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Wait for dailyCashTransactions to be available
-        if (dailyCashTransactions !== undefined) {
-          setLoadingState((prev) => ({ ...prev, initial: false }));
-        }
-      } catch (error) {
-        logger.error("Error loading initial data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please refresh the page.",
-          variant: "destructive",
-        });
-        setLoadingState((prev) => ({ ...prev, initial: false }));
-      }
-    };
-
-    initializeData();
-  }, [dailyCashTransactions, toast]);
   useEffect(() => {
     if (date && dailyCashTransactions) {
       const previousDay = new Date(date);
@@ -136,16 +89,7 @@ export default function CashBookPage() {
     }
   }, [date, dailyCashTransactions]);
 
-  // Remove debug logging in production
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
-      logger.info("Loading state:", loadingState);
-      logger.info(
-        "Daily cash transactions count:",
-        dailyCashTransactions?.length || 0
-      );
-    }
-  }, [loadingState, dailyCashTransactions]);
+
 
   // Memoize calculations for better performance with defensive programming
   const { dailyCash, financials, monthlyTotals } = useMemo(() => {
@@ -287,42 +231,18 @@ export default function CashBookPage() {
   };
 
   const handleAddTransaction = async (transaction) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await addDailyCashTransaction(transaction);
-      toast({
-        title: "Success",
-        description: "Transaction added successfully",
-      });
+      await addMutation.mutateAsync(transaction);
     } catch (error) {
       logger.error("Error adding transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
   const handleEditTransaction = async (transactionId, updatedData) => {
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await updateDailyCashTransaction(transactionId, updatedData);
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      });
+      await updateMutation.mutateAsync({ transactionId, updatedData });
     } catch (error) {
       logger.error("Error updating transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
@@ -331,22 +251,10 @@ export default function CashBookPage() {
       return;
     }
 
-    setLoadingState((prev) => ({ ...prev, actions: true }));
     try {
-      await deleteDailyCashTransaction(transactionId);
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      });
+      await deleteMutation.mutateAsync(transactionId);
     } catch (error) {
       logger.error("Error deleting transaction:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete transaction. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingState((prev) => ({ ...prev, actions: false }));
     }
   };
 
@@ -495,7 +403,7 @@ export default function CashBookPage() {
     </Card>
   );
 
-  if (loadingState.initial) {
+  if (isLoading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
         {/* Header Skeleton */}
@@ -545,7 +453,7 @@ export default function CashBookPage() {
           <AddCashTransactionDialog onAddTransaction={handleAddTransaction}>
             <Button
               className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white"
-              disabled={loadingState.actions}
+              disabled={addMutation.isPending}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
@@ -556,7 +464,7 @@ export default function CashBookPage() {
               <Button
                 className="w-full md:w-auto"
                 variant="outline"
-                disabled={loadingState.actions}
+                disabled={isLoading}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 {pdfStartDate && pdfEndDate
@@ -604,7 +512,7 @@ export default function CashBookPage() {
             onClick={handleExportCSV}
             className="w-full md:w-auto"
             variant="outline"
-            disabled={loadingState.actions}
+            disabled={isLoading}
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV

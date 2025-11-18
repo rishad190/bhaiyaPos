@@ -2,8 +2,6 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import ClientRoot from "@/components/ClientRoot";
 import { Suspense } from "react";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import GlobalErrorFallback from "@/components/GlobalErrorFallback";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -29,11 +27,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={geist.className}>
       <body>
-        <ErrorBoundary fallback={<GlobalErrorFallback />}>
-          <Suspense fallback={<div>Loading...</div>}>
-            <ClientRoot>{children}</ClientRoot>
-          </Suspense>
-        </ErrorBoundary>
+        <Suspense fallback={<div>Loading...</div>}>
+          <ClientRoot>{children}</ClientRoot>
+        </Suspense>
       </body>
     </html>
   );

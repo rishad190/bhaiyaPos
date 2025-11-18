@@ -2,6 +2,8 @@
 
 import { ClientLayout } from "@/components/ClientLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import GlobalErrorFallback from "@/components/GlobalErrorFallback";
 import dynamic from "next/dynamic";
 
 const DynamicNavbar = dynamic(
@@ -15,14 +17,22 @@ const DynamicNavbar = dynamic(
 const DynamicToaster = dynamic(
   () => import("@/components/ui/toaster").then((mod) => mod.Toaster),
   {
-    loading: () => null, // Added loading component
+    loading: () => null,
     ssr: false,
   }
 );
 
 export default function ClientRoot({ children }) {
   return (
-    <>
+    <ErrorBoundary 
+      fallback={({ error, errorInfo, onRetry }) => (
+        <GlobalErrorFallback 
+          error={error} 
+          errorInfo={errorInfo} 
+          onRetry={onRetry} 
+        />
+      )}
+    >
       <ClientLayout>
         <ProtectedRoute>
           <div className="min-h-screen flex flex-col">
@@ -32,6 +42,6 @@ export default function ClientRoot({ children }) {
         </ProtectedRoute>
       </ClientLayout>
       <DynamicToaster />
-    </>
+    </ErrorBoundary>
   );
 }
