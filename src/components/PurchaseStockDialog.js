@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Minus, Package } from "lucide-react";
+import logger from "@/utils/logger";
 
 export function PurchaseStockDialog({
   fabrics = [],
@@ -96,7 +97,7 @@ export function PurchaseStockDialog({
         items: [{ colorName: "", quantity: "" }],
       });
     } catch (error) {
-      console.error("Error purchasing stock:", error);
+      logger.error("Error purchasing stock:", error);
       alert("Failed to purchase stock. Please try again.");
     } finally {
       setLoading(false);

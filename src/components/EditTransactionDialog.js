@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
+import logger from "@/utils/logger";
+import { STORES } from "@/lib/constants";
 
 export function EditTransactionDialog({
   transaction,
@@ -125,7 +127,7 @@ export function EditTransactionDialog({
       });
       setOpen(false);
     } catch (error) {
-      console.error("Error updating transaction:", error);
+      logger.error("Error updating transaction:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update transaction",
@@ -245,9 +247,13 @@ export function EditTransactionDialog({
                 }`}
                 value={formData.storeId}
                 onChange={handleInputChange}
+                disabled={loading}
               >
-                <option value="STORE1">Store 1</option>
-                <option value="STORE2">Store 2</option>
+                {STORES.map((store) => (
+                  <option key={store.value} value={store.value}>
+                    {store.label}
+                  </option>
+                ))}
               </select>
               {errors.storeId && (
                 <p className="text-red-500 text-sm">{errors.storeId}</p>

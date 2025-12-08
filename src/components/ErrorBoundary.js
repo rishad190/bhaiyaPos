@@ -3,6 +3,7 @@ import { Component } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw, Home, FileText, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
+import logger from "@/utils/logger";
 
 // Enhanced base error boundary with better error handling and recovery options
 export class ErrorBoundary extends Component {
@@ -208,7 +209,7 @@ export const useErrorHandler = () => {
 
   return {
     handleError: (error, context = "") => {
-      console.error(`Error in ${context}:`, error);
+      logger.error(`Error in ${context}:`, error);
 
       // In production, send to error reporting service
       if (process.env.NODE_ENV === "production") {
@@ -225,7 +226,7 @@ export const useErrorHandler = () => {
 
     navigateToError: (error) => {
       // Could navigate to a dedicated error page
-      console.error("Navigation error:", error);
+      logger.error("Navigation error:", error);
     },
   };
 };

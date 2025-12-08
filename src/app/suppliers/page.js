@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import logger from "@/utils/logger";
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function SuppliersPage() {
     try {
       await addSupplierMutation.mutateAsync(supplierData);
     } catch (error) {
-      console.error("Error adding supplier:", error);
+      logger.error("Error adding supplier:", error);
     }
   };
 
@@ -88,7 +89,7 @@ export default function SuppliersPage() {
     try {
       await deleteSupplierMutation.mutateAsync(supplierId);
     } catch (error) {
-      console.error("Error deleting supplier:", error);
+      logger.error("Error deleting supplier:", error);
     }
   };
 
@@ -97,7 +98,7 @@ export default function SuppliersPage() {
       await updateSupplierMutation.mutateAsync({ supplierId, updatedData });
       setEditingSupplier(null);
     } catch (error) {
-      console.error("Error updating supplier:", error);
+      logger.error("Error updating supplier:", error);
     }
   };
 

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import logger from "@/utils/logger";
 
 export function ProtectedRoute({ children }) {
   const router = useRouter();
@@ -19,7 +20,7 @@ export function ProtectedRoute({ children }) {
           router.push("/login");
         }
       } catch (error) {
-        console.error("Auth check error:", error);
+        logger.error("Auth check error:", error);
         router.push("/login");
       } finally {
         setIsLoading(false);

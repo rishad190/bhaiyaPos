@@ -9,36 +9,42 @@ import {
 } from "@/components/ui/dialog";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import logger from "@/utils/logger";
+import { STORES, DEFAULT_STORE } from "@/lib/constants";
 
 export function AddSupplierDialog({ onAddSupplier }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
-    address: "", // Add address field
-    storeId: "STORE1",
+    address: "",
+    storeId: DEFAULT_STORE,
     totalDue: 0,
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       await onAddSupplier({
         ...formData,
-        // Generate a unique ID
       });
       setFormData({
         name: "",
         phone: "",
         email: "",
-        address: "", // Add address field
-        storeId: "STORE1",
+        address: "",
+        storeId: DEFAULT_STORE,
         totalDue: 0,
       });
       setOpen(false);
     } catch (error) {
-      console.error("Error adding supplier:", error);
+      logger.error("Error adding supplier:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,9 +114,13 @@ export function AddSupplierDialog({ onAddSupplier }) {
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
               }
+              disabled={loading}
             >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
+              {STORES.map((store) => (
+                <option key={store.value} value={store.value}>
+                  {store.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -119,10 +129,20 @@ export function AddSupplierDialog({ onAddSupplier }) {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit">Add Supplier</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Supplier"
+              )}
+            </Button>
           </div>
         </form>
         </FormErrorBoundary>

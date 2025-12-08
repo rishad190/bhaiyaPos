@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import logger from "@/utils/logger";
 
 import {
   Select,
@@ -22,6 +24,7 @@ import {
 
 export function AddCashTransactionDialog({ onAddTransaction, children }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
@@ -37,6 +40,7 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
       return;
     }
 
+    setLoading(true);
     try {
       await onAddTransaction({
         ...formData,
@@ -52,8 +56,10 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
         cashOut: "",
       });
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      logger.error("Error adding transaction:", error);
       alert("Failed to add transaction. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,10 +151,20 @@ export function AddCashTransactionDialog({ onAddTransaction, children }) {
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(false)}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button type="submit">Add Transaction</Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Transaction"
+                )}
+              </Button>
             </div>
           </form>
         </FormErrorBoundary>

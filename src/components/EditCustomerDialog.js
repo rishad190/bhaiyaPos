@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
+import logger from "@/utils/logger";
+import { STORES, DEFAULT_STORE } from "@/lib/constants";
 
 export function EditCustomerDialog({
   customer,
@@ -20,7 +22,7 @@ export function EditCustomerDialog({
     phone: "",
     address: "",
     email: "",
-    storeId: "STORE1",
+    storeId: DEFAULT_STORE,
   });
 
   // Use useEffect to update form data when customer changes
@@ -31,7 +33,7 @@ export function EditCustomerDialog({
         phone: customer.phone || "",
         address: customer.address || "",
         email: customer.email || "",
-        storeId: customer.storeId || "STORE1",
+        storeId: customer.storeId || DEFAULT_STORE,
       });
     }
   }, [customer]);
@@ -42,7 +44,7 @@ export function EditCustomerDialog({
       await onEditCustomer(customer.id, formData);
       onClose();
     } catch (error) {
-      console.error("Error updating customer:", error);
+      logger.error("Error updating customer:", error);
     }
   };
 
@@ -105,9 +107,13 @@ export function EditCustomerDialog({
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
               }
+              className="w-full border rounded-md px-3 py-2"
             >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
+              {STORES.map((store) => (
+                <option key={store.value} value={store.value}>
+                  {store.label}
+                </option>
+              ))}
             </select>
           </div>
 

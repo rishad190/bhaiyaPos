@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Edit, Trash2 } from "lucide-react";
+import logger from "@/utils/logger";
 
 export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
   const [open, setOpen] = useState(false);
@@ -66,7 +67,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
       await onSave(fabric.id, formData);
       setOpen(false);
     } catch (error) {
-      console.error("Error updating fabric:", error);
+      logger.error("Error updating fabric:", error);
       alert("Failed to update fabric. Please try again.");
     } finally {
       setLoading(false);
@@ -87,7 +88,7 @@ export function EditFabricDialog({ fabric, onSave, onDelete, children }) {
       await onDelete(fabric.id);
       setOpen(false);
     } catch (error) {
-      console.error("Error deleting fabric:", error);
+      logger.error("Error deleting fabric:", error);
       alert("Failed to delete fabric. Please try again.");
     } finally {
       setLoading(false);

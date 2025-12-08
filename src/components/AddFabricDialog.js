@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
+import logger from "@/utils/logger";
 
 export function AddFabricDialog({ onAddFabric, children }) {
   const [open, setOpen] = useState(false);
@@ -74,7 +75,7 @@ export function AddFabricDialog({ onAddFabric, children }) {
         unit: "piece",
       });
     } catch (error) {
-      console.error("Error adding fabric:", error);
+      logger.error("Error adding fabric:", error);
       alert("Failed to add fabric. Please try again.");
     } finally {
       setLoading(false);
@@ -191,7 +192,14 @@ export function AddFabricDialog({ onAddFabric, children }) {
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Adding..." : "Add Fabric"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Fabric"
+              )}
             </Button>
           </div>
         </form>

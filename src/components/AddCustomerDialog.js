@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { useAddCustomer } from "@/hooks/useCustomers";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+import { STORES, DEFAULT_STORE } from "@/lib/constants";
 
 export function AddCustomerDialog({ onClose }) {
   const addCustomerMutation = useAddCustomer();
@@ -23,8 +25,10 @@ export function AddCustomerDialog({ onClose }) {
     phone: "",
     email: "",
     address: "",
-    storeId: "STORE1", // Default value
+    storeId: DEFAULT_STORE,
   });
+
+  const loading = addCustomerMutation.isPending;
 
   const validate = () => {
     if (!formData.name || !formData.phone) {
@@ -142,9 +146,14 @@ export function AddCustomerDialog({ onClose }) {
               onChange={(e) =>
                 setFormData({ ...formData, storeId: e.target.value })
               }
+              disabled={loading}
+              className="w-full border rounded-md px-3 py-2"
             >
-              <option value="STORE1">Store 1</option>
-              <option value="STORE2">Store 2</option>
+              {STORES.map((store) => (
+                <option key={store.value} value={store.value}>
+                  {store.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -153,10 +162,21 @@ export function AddCustomerDialog({ onClose }) {
               type="button"
               variant="outline"
               aria-label="Cancel adding new customer"
+              onClick={() => setOpen(false)}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit" aria-label="Save new customer">Save Customer</Button>
+            <Button type="submit" aria-label="Save new customer" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Customer"
+              )}
+            </Button>
           </div>
         </form>
         </FormErrorBoundary>

@@ -10,9 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 export function AddExpenseDialog({ onAddExpense }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
@@ -32,24 +34,29 @@ export function AddExpenseDialog({ onAddExpense }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
-    onAddExpense({
-      id: Date.now().toString(),
-      date: formData.date,
-      description: formData.description,
-      cashIn: 0,
-      cashOut: parseFloat(formData.amount),
-    });
+    setLoading(true);
+    try {
+      await onAddExpense({
+        id: Date.now().toString(),
+        date: formData.date,
+        description: formData.description,
+        cashIn: 0,
+        cashOut: parseFloat(formData.amount),
+      });
 
-    setOpen(false);
-    setFormData({
-      date: new Date().toISOString().split("T")[0],
-      description: "",
-      amount: "",
-    });
+      setOpen(false);
+      setFormData({
+        date: new Date().toISOString().split("T")[0],
+        description: "",
+        amount: "",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -116,10 +123,20 @@ export function AddExpenseDialog({ onAddExpense }) {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit">Add Expense</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Expense"
+              )}
+            </Button>
           </div>
         </form>
         </FormErrorBoundary>

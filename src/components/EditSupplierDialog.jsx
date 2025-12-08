@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Label } from "@/components/ui/label";
+import logger from "@/utils/logger";
+import { STORES } from "@/lib/constants";
 
 export function EditSupplierDialog({
   supplier,
@@ -50,7 +52,7 @@ export function EditSupplierDialog({
       await onEditSupplier(supplier.id, formData);
       onClose();
     } catch (error) {
-      console.error("Error updating supplier:", error);
+      logger.error("Error updating supplier:", error);
     }
   };
 
@@ -122,8 +124,11 @@ export function EditSupplierDialog({
                   <SelectValue placeholder="Select store" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="STORE1">Store 1</SelectItem>
-                  <SelectItem value="STORE2">Store 2</SelectItem>
+                  {STORES.map((store) => (
+                    <SelectItem key={store.value} value={store.value}>
+                      {store.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

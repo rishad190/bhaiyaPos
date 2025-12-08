@@ -10,9 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import logger from "@/utils/logger";
+import { STORES, DEFAULT_STORE } from "@/lib/constants";
 
 export function AddTransactionDialog({ customerId, onAddTransaction }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const initialDate = useRef(new Date().toISOString().split("T")[0]);
   const [formData, setFormData] = useState({
     date: initialDate.current,
@@ -20,7 +24,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     details: "",
     total: "",
     deposit: "",
-    storeId: "STORE1",
+    storeId: DEFAULT_STORE,
   });
   const [errors, setErrors] = useState({});
 
@@ -53,6 +57,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
     e.preventDefault();
     if (!validate()) return;
 
+    setLoading(true);
     try {
       const totalAmount = parseFloat(formData.total) || 0;
       const depositAmount = parseFloat(formData.deposit) || 0;
@@ -76,12 +81,14 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
         details: "",
         total: "",
         deposit: "",
-        storeId: "STORE1",
+        storeId: DEFAULT_STORE,
       });
       setErrors({});
     } catch (error) {
-      console.error("Error submitting transaction:", error);
+      logger.error("Error submitting transaction:", error);
       setErrors({ submit: "Failed to add transaction. Please try again." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -186,12 +193,18 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               <label className="text-sm font-medium">Store</label>
               <select
                 aria-label="Select store"
+                value={formData.storeId}
                 onChange={(e) =>
                   setFormData({ ...formData, storeId: e.target.value })
                 }
+                disabled={loading}
+                className="w-full border rounded-md px-3 py-2"
               >
-                <option value="STORE1">Store 1</option>
-                <option value="STORE2">Store 2</option>
+                {STORES.map((store) => (
+                  <option key={store.value} value={store.value}>
+                    {store.label}
+                  </option>
+                ))}
               </select>
               {errors.storeId && (
                 <p className="text-red-500 text-sm">{errors.storeId}</p>
@@ -203,11 +216,20 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
                 type="button"
                 variant="outline"
                 aria-label="Cancel adding new transaction"
+                onClick={() => setOpen(false)}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button type="submit" aria-label="Save new transaction">
-                Save Transaction
+              <Button type="submit" aria-label="Save new transaction" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Transaction"
+                )}
               </Button>
             </div>
           </form>
