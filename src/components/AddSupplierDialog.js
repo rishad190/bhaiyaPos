@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,44 +14,47 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import logger from "@/utils/logger";
 import { STORES, DEFAULT_STORE } from "@/lib/constants";
+import { supplierSchema } from "@/lib/schemas";
 
 export function AddSupplierDialog({ onAddSupplier }) {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    storeId: DEFAULT_STORE,
-    totalDue: 0,
+  
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(supplierSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+      storeId: DEFAULT_STORE,
+      totalDue: 0,
+    },
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const onSubmit = async (data) => {
     try {
-      await onAddSupplier({
-        ...formData,
-      });
-      setFormData({
-        name: "",
-        phone: "",
-        email: "",
-        address: "",
-        storeId: DEFAULT_STORE,
-        totalDue: 0,
-      });
+      await onAddSupplier(data);
       setOpen(false);
+      reset(); // Reset form to default values
     } catch (error) {
       logger.error("Error adding supplier:", error);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      reset(); // Reset form when closed manually
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>+ Add Supplier</Button>
       </DialogTrigger>
@@ -58,93 +63,91 @@ export function AddSupplierDialog({ onAddSupplier }) {
           <DialogTitle>Add New Supplier</DialogTitle>
         </DialogHeader>
         <FormErrorBoundary>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name *</label>
-            <Input
-              required
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="Enter supplier name"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Phone *</label>
-            <Input
-              required
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-              placeholder="Enter phone number"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              placeholder="Enter email address"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Address</label>
-            <Input
-              value={formData.address}
-              onChange={(e) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
-              placeholder="Enter supplier address"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Store</label>
-            <select
-              className="w-full border rounded-md px-3 py-2"
-              value={formData.storeId}
-              onChange={(e) =>
-                setFormData({ ...formData, storeId: e.target.value })
-              }
-              disabled={loading}
-            >
-              {STORES.map((store) => (
-                <option key={store.value} value={store.value}>
-                  {store.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                "Add Supplier"
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name *</label>
+              <Input
+                {...register("name")}
+                placeholder="Enter supplier name"
+                className={errors.name ? "border-red-500" : ""}
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm">{errors.name.message}</p>
               )}
-            </Button>
-          </div>
-        </form>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone *</label>
+              <Input
+                {...register("phone")}
+                placeholder="Enter phone number"
+                className={errors.phone ? "border-red-500" : ""}
+              />
+              {errors.phone && (
+                <p className="text-red-500 text-sm">{errors.phone.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                {...register("email")}
+                placeholder="Enter email address"
+                className={errors.email ? "border-red-500" : ""}
+              />
+              {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Address</label>
+              <Input
+                {...register("address")}
+                placeholder="Enter supplier address"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Store</label>
+              <select
+                {...register("storeId")}
+                className="w-full border rounded-md px-3 py-2"
+                disabled={isSubmitting}
+              >
+                {STORES.map((store) => (
+                  <option key={store.value} value={store.value}>
+                    {store.label}
+                  </option>
+                ))}
+              </select>
+              {errors.storeId && (
+                <p className="text-red-500 text-sm">{errors.storeId.message}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Supplier"
+                )}
+              </Button>
+            </div>
+          </form>
         </FormErrorBoundary>
       </DialogContent>
     </Dialog>

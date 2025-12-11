@@ -1,5 +1,6 @@
 "use client";
 import { backupService } from "./backupService";
+import logger from "@/utils/logger";
 
 class BackupScheduler {
   constructor() {
@@ -29,7 +30,7 @@ class BackupScheduler {
 
 
     } catch (error) {
-      console.error("Error initializing backup scheduler:", error);
+      logger.error("Error initializing backup scheduler:", error);
     }
   }
 
@@ -51,7 +52,7 @@ class BackupScheduler {
       // Schedule the backup
       await this.scheduleBackup(config);
     } catch (error) {
-      console.error("Error starting backup scheduler:", error);
+      logger.error("Error starting backup scheduler:", error);
       this.isRunning = false;
     }
   }
@@ -70,7 +71,7 @@ class BackupScheduler {
       this.isRunning = false;
 
     } catch (error) {
-      console.error("Error stopping backup scheduler:", error);
+      logger.error("Error stopping backup scheduler:", error);
     }
   }
 
@@ -93,13 +94,13 @@ class BackupScheduler {
             await this.scheduleBackup(config);
           }
         } catch (error) {
-          console.error("Error executing scheduled backup:", error);
+          logger.error("Error executing scheduled backup:", error);
         }
       }, delay);
 
       this.scheduledBackups.set("main", timeoutId);
     } catch (error) {
-      console.error("Error scheduling backup:", error);
+      logger.error("Error scheduling backup:", error);
     }
   }
 
@@ -189,7 +190,7 @@ class BackupScheduler {
 
       return result;
     } catch (error) {
-      console.error("Error executing scheduled backup:", error);
+      logger.error("Error executing scheduled backup:", error);
 
       // Log backup failure
       const backupLog = {
@@ -219,7 +220,7 @@ class BackupScheduler {
 
       localStorage.setItem("backupLogs", JSON.stringify(logs));
     } catch (error) {
-      console.error("Error logging backup:", error);
+      logger.error("Error logging backup:", error);
     }
   }
 
@@ -231,7 +232,7 @@ class BackupScheduler {
       const logs = localStorage.getItem("backupLogs");
       return logs ? JSON.parse(logs) : [];
     } catch (error) {
-      console.error("Error getting backup logs:", error);
+      logger.error("Error getting backup logs:", error);
       return [];
     }
   }
@@ -252,7 +253,7 @@ class BackupScheduler {
       localStorage.setItem("backupLogs", JSON.stringify(recentLogs));
 
     } catch (error) {
-      console.error("Error cleaning up old backups:", error);
+      logger.error("Error cleaning up old backups:", error);
     }
   }
 
@@ -265,7 +266,7 @@ class BackupScheduler {
       localStorage.setItem("backupSettings", JSON.stringify(config));
 
     } catch (error) {
-      console.error("Error saving backup settings:", error);
+      logger.error("Error saving backup settings:", error);
     }
   }
 
@@ -277,7 +278,7 @@ class BackupScheduler {
       const settings = localStorage.getItem("backupSettings");
       return settings ? JSON.parse(settings) : this.defaultSettings;
     } catch (error) {
-      console.error("Error loading backup settings:", error);
+      logger.error("Error loading backup settings:", error);
       return this.defaultSettings;
     }
   }
@@ -297,7 +298,7 @@ class BackupScheduler {
         await this.startScheduler(newSettings);
       }
     } catch (error) {
-      console.error("Error updating backup settings:", error);
+      logger.error("Error updating backup settings:", error);
     }
   }
 
@@ -349,7 +350,7 @@ class BackupScheduler {
 
       return result;
     } catch (error) {
-      console.error("Error executing immediate backup:", error);
+      logger.error("Error executing immediate backup:", error);
       throw error;
     }
   }

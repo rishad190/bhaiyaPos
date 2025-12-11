@@ -7,6 +7,7 @@
 
 import { ref, get, set, update, remove } from "firebase/database";
 import { db } from "./firebase";
+import logger from "@/utils/logger";
 
 // Collection references
 const COLLECTION_REFS = {
@@ -143,7 +144,7 @@ export const migrateToFlattenedStructure = async () => {
       backupPath: "fabrics_flattened",
     };
   } catch (error) {
-    console.error("[Migration] Error during migration:", error);
+    logger.error("[Migration] Error during migration:", error);
     throw new Error(`Migration failed: ${error.message}`);
   }
 };
@@ -177,7 +178,7 @@ export const verifyMigration = async () => {
       sample: Object.values(flattenedData)[0], // Return first fabric as sample
     };
   } catch (error) {
-    console.error("[Migration] Verification error:", error);
+    logger.error("[Migration] Verification error:", error);
     return { success: false, error: error.message };
   }
 };
@@ -213,7 +214,7 @@ export const finalizeMigration = async () => {
 
     return { success: true };
   } catch (error) {
-    console.error("[Migration] Finalization error:", error);
+    logger.error("[Migration] Finalization error:", error);
     throw new Error(`Finalization failed: ${error.message}`);
   }
 };
@@ -232,7 +233,7 @@ export const rollbackMigration = async () => {
 
     return { success: true };
   } catch (error) {
-    console.error("[Migration] Rollback error:", error);
+    logger.error("[Migration] Rollback error:", error);
     return { success: false, error: error.message };
   }
 };
@@ -263,7 +264,7 @@ export const getMigrationStatus = async () => {
       migrationComplete: hasOldFabrics && !hasOldBatches && !hasFlattened,
     };
   } catch (error) {
-    console.error("[Migration] Status check error:", error);
+    logger.error("[Migration] Status check error:", error);
     return { error: error.message };
   }
 };

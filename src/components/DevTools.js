@@ -4,6 +4,7 @@ import { useOnlineStatus } from "./OfflineIndicator";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "./ui/button";
 import { Settings, Trash2, RefreshCw, Database } from "lucide-react";
+import logger from "@/utils/logger";
 
 export function DevTools() {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,7 +25,7 @@ export function DevTools() {
         loadingQueries: queries.filter(q => q.state.status === 'pending').length,
       });
     } catch (error) {
-      console.error('Failed to get cache info', error);
+      logger.error('Failed to get cache info', error);
     }
   };
 
@@ -46,7 +47,7 @@ export function DevTools() {
         // Reload
         window.location.reload();
       } catch (error) {
-        console.error('Failed to clear cache', error);
+        logger.error('Failed to clear cache', error);
         alert('Failed to clear cache. Check console for details.');
       }
     }

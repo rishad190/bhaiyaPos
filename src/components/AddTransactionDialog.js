@@ -1,5 +1,7 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
   DialogContent,
@@ -13,97 +15,58 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import logger from "@/utils/logger";
 import { STORES, DEFAULT_STORE } from "@/lib/constants";
+import { transactionSchema } from "@/lib/schemas";
 
 export function AddTransactionDialog({ customerId, onAddTransaction }) {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const initialDate = useRef(new Date().toISOString().split("T")[0]);
-  const [formData, setFormData] = useState({
-    date: initialDate.current,
-    memoNumber: "",
-    details: "",
-    total: "",
-    deposit: "",
-    storeId: DEFAULT_STORE,
+  
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      date: new Date().toISOString().split("T")[0],
+      memoNumber: "",
+      details: "",
+      total: "",
+      deposit: "",
+      storeId: DEFAULT_STORE,
+    },
   });
-  const [errors, setErrors] = useState({});
 
-  const validate = () => {
-    const newErrors = {};
-
-    // Required field validations
-    if (!formData.date) newErrors.date = "Date is required";
-
-    // Validate date is not in the future
-
-    if (!formData.memoNumber?.trim())
-      newErrors.memoNumber = "Memo number is required";
-
-    const totalAmount = parseFloat(formData.total) || 0;
-    const depositAmount = parseFloat(formData.deposit) || 0;
-
-    if (totalAmount <= 0 && depositAmount <= 0) {
-      newErrors.total =
-        "Either Total Bill or Deposit must be a positive number.";
-      newErrors.deposit =
-        "Either Total Bill or Deposit must be a positive number.";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    setLoading(true);
+  const onSubmit = async (data) => {
     try {
-      const totalAmount = parseFloat(formData.total) || 0;
-      const depositAmount = parseFloat(formData.deposit) || 0;
-
       const newTransaction = {
-        ...formData,
-        memoNumber: formData.memoNumber.trim(),
+        ...data,
+        memoNumber: data.memoNumber?.trim() || "",
         customerId,
-        total: totalAmount,
-        deposit: depositAmount,
-        due: totalAmount - depositAmount,
+        // Numbers are already coerced by Zod, but let's be safe with calculation
+        due: (data.total || 0) - (data.deposit || 0),
         createdAt: new Date().toISOString(),
       };
 
       await onAddTransaction(newTransaction);
       setOpen(false);
-      // Reset form
-      setFormData({
-        date: new Date().toISOString().split("T")[0],
-        memoNumber: "",
-        details: "",
-        total: "",
-        deposit: "",
-        storeId: DEFAULT_STORE,
-      });
-      setErrors({});
+      reset(); // Reset form to default values
     } catch (error) {
       logger.error("Error submitting transaction:", error);
-      setErrors({ submit: "Failed to add transaction. Please try again." });
-    } finally {
-      setLoading(false);
+      // We could set a form-level error here if needed, but for now logger is enough
+      // typically react-hook-form uses setError('root', ...)
     }
   };
 
-  const handleDateChange = (e) => {
-    const selectedDate = e.target.value;
-    if (selectedDate) {
-      setFormData((prev) => ({
-        ...prev,
-        date: selectedDate,
-      }));
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      reset(); // Reset form when dialog is closed/cancelled manually
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button aria-label="Add new transaction">Add Transaction</Button>
       </DialogTrigger>
@@ -112,18 +75,17 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
           <DialogTitle>New Transaction</DialogTitle>
         </DialogHeader>
         <FormErrorBoundary>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Date *</label>
               <Input
                 type="date"
-                value={formData.date}
-                onChange={handleDateChange}
+                {...register("date")}
                 aria-label="Transaction date"
                 className={errors.date ? "border-red-500" : ""}
               />
               {errors.date && (
-                <p className="text-red-500 text-sm">{errors.date}</p>
+                <p className="text-red-500 text-sm">{errors.date.message}</p>
               )}
             </div>
 
@@ -131,14 +93,11 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               <label className="text-sm font-medium">Memo Number *</label>
               <Input
                 aria-label="Memo number"
-                value={formData.memoNumber}
-                onChange={(e) =>
-                  setFormData({ ...formData, memoNumber: e.target.value })
-                }
+                {...register("memoNumber")}
                 className={errors.memoNumber ? "border-red-500" : ""}
               />
               {errors.memoNumber && (
-                <p className="text-red-500 text-sm">{errors.memoNumber}</p>
+                <p className="text-red-500 text-sm">{errors.memoNumber.message}</p>
               )}
             </div>
 
@@ -146,10 +105,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               <label className="text-sm font-medium">Details</label>
               <Input
                 aria-label="Transaction details"
-                value={formData.details}
-                onChange={(e) =>
-                  setFormData({ ...formData, details: e.target.value })
-                }
+                {...register("details")}
               />
             </div>
 
@@ -160,14 +116,11 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
                 min="0"
                 step="0.01"
                 aria-label="Total bill amount"
-                value={formData.total}
-                onChange={(e) =>
-                  setFormData({ ...formData, total: e.target.value })
-                }
+                {...register("total")}
                 className={errors.total ? "border-red-500" : ""}
               />
               {errors.total && (
-                <p className="text-red-500 text-sm">{errors.total}</p>
+                <p className="text-red-500 text-sm">{errors.total.message}</p>
               )}
             </div>
 
@@ -178,14 +131,11 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
                 min="0"
                 step="0.01"
                 aria-label="Deposit amount"
-                value={formData.deposit}
-                onChange={(e) =>
-                  setFormData({ ...formData, deposit: e.target.value })
-                }
+                {...register("deposit")}
                 className={errors.deposit ? "border-red-500" : ""}
               />
               {errors.deposit && (
-                <p className="text-red-500 text-sm">{errors.deposit}</p>
+                <p className="text-red-500 text-sm">{errors.deposit.message}</p>
               )}
             </div>
 
@@ -193,11 +143,8 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
               <label className="text-sm font-medium">Store</label>
               <select
                 aria-label="Select store"
-                value={formData.storeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, storeId: e.target.value })
-                }
-                disabled={loading}
+                {...register("storeId")}
+                disabled={isSubmitting}
                 className="w-full border rounded-md px-3 py-2"
               >
                 {STORES.map((store) => (
@@ -207,7 +154,7 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
                 ))}
               </select>
               {errors.storeId && (
-                <p className="text-red-500 text-sm">{errors.storeId}</p>
+                <p className="text-red-500 text-sm">{errors.storeId.message}</p>
               )}
             </div>
 
@@ -216,13 +163,13 @@ export function AddTransactionDialog({ customerId, onAddTransaction }) {
                 type="button"
                 variant="outline"
                 aria-label="Cancel adding new transaction"
-                onClick={() => setOpen(false)}
-                disabled={loading}
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" aria-label="Save new transaction" disabled={loading}>
-                {loading ? (
+              <Button type="submit" aria-label="Save new transaction" disabled={isSubmitting}>
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...

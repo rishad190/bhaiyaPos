@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportToCSV, exportToPDF } from "@/utils/export";
 import { useToast } from "@/hooks/use-toast";
+import logger from "@/utils/logger";
 
 export default function SupplierDetail() {
   const params = useParams();
@@ -174,7 +175,7 @@ export default function SupplierDetail() {
       queryClient.invalidateQueries({ queryKey: ['supplierTransactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
     } catch (error) {
-      console.error("Error deleting supplier transaction:", error);
+      logger.error("Error deleting supplier transaction:", error);
       throw error;
     }
   };
@@ -217,7 +218,7 @@ export default function SupplierDetail() {
         description: "Transaction added successfully",
       });
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      logger.error("Error adding transaction:", error);
       toast({
         title: "Error",
         description: "Failed to add transaction",
@@ -245,7 +246,7 @@ export default function SupplierDetail() {
         });
       }
     } catch (error) {
-      console.error("Error deleting transaction:", error);
+      logger.error("Error deleting transaction:", error);
       toast({
         title: "Error",
         description: "Failed to delete transaction",
@@ -273,7 +274,7 @@ export default function SupplierDetail() {
         description: "Transaction updated successfully",
       });
     } catch (error) {
-      console.error("Error updating transaction:", error);
+      logger.error("Error updating transaction:", error);
       toast({
         title: "Error",
         description: "Failed to update transaction",

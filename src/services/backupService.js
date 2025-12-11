@@ -2,6 +2,7 @@
 import { get, ref } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { formatDate } from "@/lib/utils";
+import logger from "@/utils/logger";
 
 // Collection references for backup
 const COLLECTION_REFS = {
@@ -57,7 +58,7 @@ class BackupService {
             };
           }
         } catch (error) {
-          console.error(`Error exporting ${collectionName}:`, error);
+          logger.error(`Error exporting ${collectionName}:`, error);
           backupData.collections[collectionName] = {
             count: 0,
             data: {},
@@ -79,7 +80,7 @@ class BackupService {
       
       return backupData;
     } catch (error) {
-      console.error("Error during data export:", error);
+      logger.error("Error during data export:", error);
       throw new Error(`Failed to export data: ${error.message}`);
     }
   }
@@ -112,7 +113,7 @@ class BackupService {
         recordCount: backupData.metadata.totalRecords,
       };
     } catch (error) {
-      console.error("Error exporting to JSON:", error);
+      logger.error("Error exporting to JSON:", error);
       throw error;
     }
   }
@@ -157,7 +158,7 @@ class BackupService {
         totalFiles: csvFiles.length,
       };
     } catch (error) {
-      console.error("Error exporting to CSV:", error);
+      logger.error("Error exporting to CSV:", error);
       throw error;
     }
   }
@@ -242,7 +243,7 @@ class BackupService {
         compressed: true,
       };
     } catch (error) {
-      console.error("Error creating compressed backup:", error);
+      logger.error("Error creating compressed backup:", error);
       throw error;
     }
   }
@@ -267,7 +268,7 @@ class BackupService {
         ),
       };
     } catch (error) {
-      console.error("Error getting backup stats:", error);
+      logger.error("Error getting backup stats:", error);
       throw error;
     }
   }
@@ -322,7 +323,7 @@ class BackupService {
         collections: Object.keys(backupData.collections),
       };
     } catch (error) {
-      console.error("Error parsing backup file:", error);
+      logger.error("Error parsing backup file:", error);
       throw error;
     }
   }
