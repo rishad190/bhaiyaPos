@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,60 +11,57 @@ import {
 } from "@/components/ui/dialog";
 import { FormErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import { supplierTransactionSchema } from "@/lib/schemas";
 
 export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    invoiceNumber: "",
-    details: "",
-    totalAmount: 0,
-    paidAmount: 0,
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(supplierTransactionSchema),
+    defaultValues: {
+      date: new Date().toISOString().split("T")[0],
+      invoiceNumber: "",
+      details: "",
+      totalAmount: 0,
+      paidAmount: 0,
+    },
   });
-  const [errors, setErrors] = useState({});
 
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.invoiceNumber?.trim()) {
-      newErrors.invoiceNumber = "Invoice number is required";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
+  const onSubmit = async (data) => {
     try {
       const transaction = {
-        ...formData,
+        ...data,
         supplierId,
-        totalAmount: parseFloat(formData.totalAmount) || 0,
-        paidAmount: parseFloat(formData.paidAmount) || 0,
+        totalAmount: parseFloat(data.totalAmount) || 0,
+        paidAmount: parseFloat(data.paidAmount) || 0,
         due:
-          parseFloat(formData.totalAmount) -
-            (parseFloat(formData.paidAmount) || 0) || 0,
+          (parseFloat(data.totalAmount) || 0) -
+            (parseFloat(data.paidAmount) || 0),
         createdAt: new Date().toISOString(),
       };
 
       await onAddTransaction(transaction);
       setOpen(false);
-      setFormData({
-        date: new Date().toISOString().split("T")[0],
-        invoiceNumber: "",
-        details: "",
-        totalAmount: 0,
-        paidAmount: 0,
-      });
+      reset(); // Reset form state
     } catch (error) {
-      setErrors({ submit: error.message });
+      // Typically errors are handled by React Query mutation but we can set generic here
+    }
+  };
+
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      reset(); // ensure clean slate
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>Add Transaction</Button>
       </DialogTrigger>
@@ -71,40 +70,35 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
           <DialogTitle>Add Supplier Transaction</DialogTitle>
         </DialogHeader>
         <FormErrorBoundary>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Date</label>
               <Input
                 type="date"
-                value={formData.date}
-                onChange={(e) =>
-                  setFormData({ ...formData, date: e.target.value })
-                }
+                {...register("date")}
+                className={errors.date ? "border-red-500" : ""}
               />
+              {errors.date && (
+                <p className="text-sm text-red-500">{errors.date.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Invoice Number *</label>
               <Input
-                value={formData.invoiceNumber}
-                onChange={(e) =>
-                  setFormData({ ...formData, invoiceNumber: e.target.value })
-                }
+                {...register("invoiceNumber")}
                 className={errors.invoiceNumber ? "border-red-500" : ""}
                 placeholder="Enter invoice number"
               />
               {errors.invoiceNumber && (
-                <p className="text-sm text-red-500">{errors.invoiceNumber}</p>
+                <p className="text-sm text-red-500">{errors.invoiceNumber.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Details</label>
               <Input
-                value={formData.details}
-                onChange={(e) =>
-                  setFormData({ ...formData, details: e.target.value })
-                }
+                {...register("details")}
                 placeholder="Enter transaction details"
               />
             </div>
@@ -116,15 +110,12 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.totalAmount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, totalAmount: e.target.value })
-                  }
+                  {...register("totalAmount")}
                   className={errors.totalAmount ? "border-red-500" : ""}
                   placeholder="Enter total amount"
                 />
                 {errors.totalAmount && (
-                  <p className="text-sm text-red-500">{errors.totalAmount}</p>
+                  <p className="text-sm text-red-500">{errors.totalAmount.message}</p>
                 )}
               </div>
 
@@ -134,32 +125,35 @@ export function AddSupplierTransactionDialog({ supplierId, onAddTransaction }) {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.paidAmount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, paidAmount: e.target.value })
-                  }
+                  {...register("paidAmount")}
                   className={errors.paidAmount ? "border-red-500" : ""}
                   placeholder="Enter paid amount"
                 />
                 {errors.paidAmount && (
-                  <p className="text-sm text-red-500">{errors.paidAmount}</p>
+                  <p className="text-sm text-red-500">{errors.paidAmount.message}</p>
                 )}
               </div>
             </div>
-
-            {errors.submit && (
-              <p className="text-sm text-red-500">{errors.submit}</p>
-            )}
 
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit">Add Transaction</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                     Adding...
+                  </>
+                ) : (
+                  "Add Transaction"
+                )}
+              </Button>
             </div>
           </form>
         </FormErrorBoundary>

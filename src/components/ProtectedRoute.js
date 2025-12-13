@@ -2,40 +2,22 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useAuth } from "@/contexts/AuthContext";
 import logger from "@/utils/logger";
 
 export function ProtectedRoute({ children }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const auth = localStorage.getItem("isAuthenticated");
-        setIsAuthenticated(auth === "true");
-
-        if (!auth && pathname !== "/login") {
-          router.push("/login");
-        }
-      } catch (error) {
-        logger.error("Auth check error:", error);
-        router.push("/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Listen for storage changes
-    window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
-  }, [router, pathname]);
+    if (!loading && !isAuthenticated && pathname !== "/login") {
+      router.push("/login");
+    }
+  }, [loading, isAuthenticated, pathname, router]);
 
   // Show loading spinner while checking auth
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />

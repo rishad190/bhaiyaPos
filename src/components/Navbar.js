@@ -64,9 +64,10 @@ const navItems = [
 ];
 
 import { useSettings } from "@/hooks/useSettings";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, logout } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const router = useRouter();
   const pathname = usePathname();
@@ -81,34 +82,17 @@ export function Navbar() {
     },
   };
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const auth = localStorage.getItem("isAuthenticated");
-      setIsAuthenticated(auth === "true");
-      if (auth !== "true" && pathname !== "/login") {
-        router.push("/login");
-      }
-    };
-
-    checkAuth();
-    window.addEventListener("storage", checkAuth);
-
-    return () => {
-      window.removeEventListener("storage", checkAuth);
-    };
-  }, [router, pathname]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    setIsAuthenticated(false);
+  // Auth check is now handled by ProtectedRoute and AuthContext
+  
+  const handleLogout = async () => {
+    await logout();
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
     });
-    router.push("/login");
   };
 
-  if (!isAuthenticated) {
+  if (!user) {
     return null;
   }
 

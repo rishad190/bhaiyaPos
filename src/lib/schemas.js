@@ -62,3 +62,39 @@ export const fabricSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
   description: z.string().optional(),
 });
+
+export const purchaseStockSchema = z.object({
+  fabricId: z.string().min(1, "Fabric is required"),
+  containerNo: z.string().min(1, "Container number is required"),
+  purchaseDate: z.string().optional(),
+  costPerPiece: z.coerce
+    .number({ invalid_type_error: "Cost must be a number" })
+    .min(0, "Cost must be 0 or greater"),
+  supplierId: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        colorName: z.string().min(1, "Color name is required"),
+        quantity: z.coerce
+          .number({ invalid_type_error: "Quantity must be a number" })
+          .min(0.01, "Quantity must be greater than 0"),
+      })
+    )
+    .min(1, "At least one color item is required"),
+});
+
+export const supplierTransactionSchema = z.object({
+  date: z.string().min(1, "Date is required"),
+  invoiceNumber: z.string().min(1, "Invoice number is required"),
+  details: z.string().optional(),
+  totalAmount: z.coerce
+    .number({ invalid_type_error: "Amount must be a number" })
+    .min(0, "Total amount must be 0 or greater"),
+  paidAmount: z.coerce
+    .number({ invalid_type_error: "Amount must be a number" })
+    .min(0, "Paid amount must be 0 or greater"),
+});
+
+export const loginSchema = z.object({
+  password: z.string().min(1, "Password is required"),
+});

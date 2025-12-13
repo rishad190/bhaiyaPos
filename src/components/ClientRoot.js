@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import GlobalErrorFallback from "@/components/GlobalErrorFallback";
 import dynamic from "next/dynamic";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const DynamicNavbar = dynamic(
   () => import("@/components/Navbar").then((mod) => mod.Navbar),
@@ -49,17 +50,19 @@ export default function ClientRoot({ children }) {
         />
       )}
     >
-      <ClientLayout>
-        <ProtectedRoute>
-          <div className="min-h-screen flex flex-col">
-            <DynamicNavbar />
-            <main className="flex-1">{children}</main>
-          </div>
-        </ProtectedRoute>
-      </ClientLayout>
-      <DynamicToaster />
-      <DynamicOfflineIndicator />
-      <DynamicDevTools />
+      <AuthProvider>
+        <ClientLayout>
+          <ProtectedRoute>
+            <div className="min-h-screen flex flex-col">
+              <DynamicNavbar />
+              <main className="flex-1">{children}</main>
+            </div>
+          </ProtectedRoute>
+        </ClientLayout>
+        <DynamicToaster />
+        <DynamicOfflineIndicator />
+        <DynamicDevTools />
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
