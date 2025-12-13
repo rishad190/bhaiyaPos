@@ -120,6 +120,8 @@ export default function Dashboard() {
     }
   };
 
+  const isLoading = customersLoading || transactionsLoading || fabricsLoading || suppliersLoading;
+
   if (isLoading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
