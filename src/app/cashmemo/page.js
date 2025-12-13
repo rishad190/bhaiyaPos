@@ -7,8 +7,8 @@ import { useAddTransaction } from "@/hooks/useTransactions";
 import { useAddDailyCashTransaction } from "@/hooks/useDailyCash";
 import { useFabrics } from "@/hooks/useFabrics";
 import { useReduceInventory } from "@/hooks/useInventoryTransaction";
-import { CashMemoPrint } from "@/components/CashMemoPrint";
-import { TransactionErrorBoundary } from "@/components/ErrorBoundary";
+import { CashMemoPrint } from "@/components/transactions/CashMemoPrint";
+import { TransactionErrorBoundary } from "@/components/shared/ErrorBoundary";
 import logger from "@/utils/logger";
 
 import {

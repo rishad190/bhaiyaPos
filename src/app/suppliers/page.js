@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AddSupplierDialog } from "@/components/AddSupplierDialog";
-import { EditSupplierDialog } from "@/components/EditSupplierDialog";
+import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
+import { EditSupplierDialog } from "@/components/suppliers/EditSupplierDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +30,7 @@ import {
   ArrowDownRight,
   RefreshCw,
 } from "lucide-react";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
   DropdownMenu,
   DropdownMenuContent,

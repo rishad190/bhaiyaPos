@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { supplierTransactionSchema } from "@/lib/schemas";

@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { Loader2 } from "lucide-react";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useToast } from "@/hooks/use-toast";
 import logger from "@/utils/logger";
 import { STORES } from "@/lib/constants";

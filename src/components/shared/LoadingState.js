@@ -10,4 +10,4 @@ export {
   LoadingSpinner,
   OverlayLoading,
   ButtonLoading,
-} from "@/components/LoadingSystem";
+} from "./LoadingSystem";

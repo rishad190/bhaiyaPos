@@ -1,6 +1,6 @@
 import { Geist } from "next/font/google";
 import "./globals.css";
-import ClientRoot from "@/components/ClientRoot";
+import ClientRoot from "@/components/layout/ClientRoot";
 import { Suspense } from "react";
 
 const geist = Geist({

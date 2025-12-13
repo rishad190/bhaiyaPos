@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import logger from "@/utils/logger";

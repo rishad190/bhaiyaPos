@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useOnlineStatus } from "./OfflineIndicator";
 import { queryClient } from "@/lib/queryClient";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { Settings, Trash2, RefreshCw, Database } from "lucide-react";
 import logger from "@/utils/logger";
 

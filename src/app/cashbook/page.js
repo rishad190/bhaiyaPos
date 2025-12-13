@@ -12,8 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
-import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
-import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
+import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
+import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,8 +48,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
-import { Pagination } from "@/components/Pagination";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { Pagination } from "@/components/shared/Pagination";
 
 export default function CashBookPage() {
   const { toast } = useToast();

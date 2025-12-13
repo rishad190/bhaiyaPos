@@ -1,14 +1,14 @@
 "use client";
 
-import { ClientLayout } from "@/components/ClientLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import GlobalErrorFallback from "@/components/GlobalErrorFallback";
+import { ClientLayout } from "@/components/layout/ClientLayout";
+import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import GlobalErrorFallback from "@/components/shared/GlobalErrorFallback";
 import dynamic from "next/dynamic";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 const DynamicNavbar = dynamic(
-  () => import("@/components/Navbar").then((mod) => mod.Navbar),
+  () => import("@/components/layout/Navbar").then((mod) => mod.Navbar),
   {
     loading: () => <div className="h-16 bg-background border-b" />,
     ssr: false,
@@ -24,7 +24,7 @@ const DynamicToaster = dynamic(
 );
 
 const DynamicOfflineIndicator = dynamic(
-  () => import("@/components/OfflineIndicator").then((mod) => mod.OfflineIndicator),
+  () => import("@/components/shared/OfflineIndicator").then((mod) => mod.OfflineIndicator),
   {
     loading: () => null,
     ssr: false,
@@ -32,7 +32,7 @@ const DynamicOfflineIndicator = dynamic(
 );
 
 const DynamicDevTools = dynamic(
-  () => import("@/components/DevTools").then((mod) => mod.DevTools),
+  () => import("@/components/shared/DevTools").then((mod) => mod.DevTools),
   {
     loading: () => null,
     ssr: false,

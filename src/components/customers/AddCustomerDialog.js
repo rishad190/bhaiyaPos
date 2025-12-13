@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useAddCustomer } from "@/hooks/useCustomers";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";

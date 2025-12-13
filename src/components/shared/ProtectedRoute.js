@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 import logger from "@/utils/logger";
 

@@ -1,4 +1,4 @@
-import { CashMemoLoading } from "@/components/LoadingSystem";
+import { CashMemoLoading } from "@/components/shared/LoadingSystem";
 
 export default function CashMemoLoadingPage() {
   return <CashMemoLoading />;

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
 import { cashTransactionSchema } from "@/lib/schemas";
 

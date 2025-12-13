@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -7,75 +7,68 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import logger from "@/utils/logger";
 import { STORES, DEFAULT_STORE } from "@/lib/constants";
-import { customerSchema } from "@/lib/schemas";
+import { supplierSchema } from "@/lib/schemas";
 
-export function EditCustomerDialog({
-  customer,
-  onEditCustomer,
-  isOpen,
-  onClose,
-}) {
+export function AddSupplierDialog({ onAddSupplier }) {
+  const [open, setOpen] = useState(false);
+  
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm({
-    resolver: zodResolver(customerSchema),
+    resolver: zodResolver(supplierSchema),
     defaultValues: {
       name: "",
       phone: "",
-      address: "",
       email: "",
+      address: "",
       storeId: DEFAULT_STORE,
+      totalDue: 0,
     },
   });
 
-  // Use useEffect to update form data when customer changes
-  useEffect(() => {
-    if (customer) {
-      reset({
-        name: customer.name || "",
-        phone: customer.phone || "",
-        address: customer.address || "",
-        email: customer.email || "",
-        storeId: customer.storeId || DEFAULT_STORE,
-      });
-    }
-  }, [customer, reset]);
-
   const onSubmit = async (data) => {
     try {
-      await onEditCustomer(customer.id, data);
-      onClose();
+      await onAddSupplier(data);
+      setOpen(false);
+      reset(); // Reset form to default values
     } catch (error) {
-      logger.error("Error updating customer:", error);
+      logger.error("Error adding supplier:", error);
     }
   };
 
-  const handleOpenChange = (open) => {
-    if (!open) onClose();
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      reset(); // Reset form when closed manually
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button>+ Add Supplier</Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Customer</DialogTitle>
+          <DialogTitle>Add New Supplier</DialogTitle>
         </DialogHeader>
         <FormErrorBoundary>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name *</label>
               <Input
-                aria-label="Customer name"
                 {...register("name")}
+                placeholder="Enter supplier name"
                 className={errors.name ? "border-red-500" : ""}
               />
               {errors.name && (
@@ -86,29 +79,21 @@ export function EditCustomerDialog({
             <div className="space-y-2">
               <label className="text-sm font-medium">Phone *</label>
               <Input
-                aria-label="Customer phone number"
                 {...register("phone")}
+                placeholder="Enter phone number"
                 className={errors.phone ? "border-red-500" : ""}
               />
-               {errors.phone && (
+              {errors.phone && (
                 <p className="text-red-500 text-sm">{errors.phone.message}</p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Address</label>
-              <Input
-                aria-label="Customer address"
-                {...register("address")}
-              />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
               <Input
                 type="email"
-                aria-label="Customer email address"
                 {...register("email")}
+                placeholder="Enter email address"
                 className={errors.email ? "border-red-500" : ""}
               />
               {errors.email && (
@@ -117,13 +102,18 @@ export function EditCustomerDialog({
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm font-medium">Address</label>
+              <Input
+                {...register("address")}
+                placeholder="Enter supplier address"
+              />
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">Store</label>
               <select
-                aria-label="Select store"
                 {...register("storeId")}
-                className={`w-full border rounded-md px-3 py-2 ${
-                  errors.storeId ? "border-red-500" : ""
-                }`}
+                className="w-full border rounded-md px-3 py-2"
                 disabled={isSubmitting}
               >
                 {STORES.map((store) => (
@@ -132,23 +122,28 @@ export function EditCustomerDialog({
                   </option>
                 ))}
               </select>
-               {errors.storeId && (
+              {errors.storeId && (
                 <p className="text-red-500 text-sm">{errors.storeId.message}</p>
               )}
             </div>
 
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel editing customer" disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button type="submit" aria-label="Update customer details" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
-                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                     Updating...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
                   </>
                 ) : (
-                  "Update Customer"
+                  "Add Supplier"
                 )}
               </Button>
             </div>

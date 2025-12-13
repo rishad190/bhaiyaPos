@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useFabrics, useAddFabric, useUpdateFabric, useDeleteFabric } from "@/hooks/useFabrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { InventoryErrorBoundary } from "@/components/ErrorBoundary";
+import { InventoryErrorBoundary } from "@/components/shared/ErrorBoundary";
 import logger from "@/utils/logger";
 import {
   Table,
@@ -34,7 +34,7 @@ import { Plus, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 
 // Dynamically import heavy components
-const FabricForm = dynamic(() => import("@/components/FabricForm"), {
+const FabricForm = dynamic(() => import("@/components/inventory/FabricForm"), {
   loading: () => (
     <div className="p-8 text-center">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>

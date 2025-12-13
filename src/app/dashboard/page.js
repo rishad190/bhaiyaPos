@@ -9,7 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { ErrorBoundary, DataErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary, DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useFabrics } from "@/hooks/useFabrics";
@@ -34,7 +34,7 @@ import dynamic from "next/dynamic";
 
 // Dynamically import heavy components
 const QuickStatCard = dynamic(
-  () => import("@/components/QuickStatCard").then((mod) => mod.QuickStatCard),
+  () => import("@/components/dashboard/QuickStatCard").then((mod) => mod.QuickStatCard),
   {
     loading: () => (
       <Card className="border-none shadow-md">
@@ -53,7 +53,7 @@ const QuickStatCard = dynamic(
 
 const RecentTransactions = dynamic(
   () =>
-    import("@/components/RecentTransactions").then(
+    import("@/components/dashboard/RecentTransactions").then(
       (mod) => mod.RecentTransactions
     ),
   {

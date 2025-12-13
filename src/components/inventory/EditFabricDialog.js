@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FormErrorBoundary } from "@/components/ErrorBoundary";
+import { FormErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Edit, Trash2, Loader2 } from "lucide-react";
 import logger from "@/utils/logger";
 import { fabricSchema } from "@/lib/schemas";

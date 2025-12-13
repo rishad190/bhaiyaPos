@@ -7,13 +7,13 @@ import {
   CardContent,
   CardHeader,
 } from "@/components/ui/card";
-import { AddCustomerDialog } from "@/components/AddCustomerDialog";
-import { EditCustomerDialog } from "@/components/EditCustomerDialog";
-import { CustomerTable } from "@/components/CustomerTable";
-import { CustomerSearch } from "@/components/CustomerSearch";
-import { Pagination } from "@/components/Pagination";
-import { TableSkeleton } from "@/components/LoadingState";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
+import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
+import { CustomerTable } from "@/components/customers/CustomerTable";
+import { CustomerSearch } from "@/components/customers/CustomerSearch";
+import { Pagination } from "@/components/shared/Pagination";
+import { TableSkeleton } from "@/components/shared/LoadingState";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { useCustomersWithDues } from "@/hooks/useCustomersWithDues";
 import {
   useAddCustomer,

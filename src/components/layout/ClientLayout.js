@@ -1,7 +1,7 @@
 "use client";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { useState, useEffect } from "react";
-import { LoadingSpinner } from "./LoadingSpinner";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export function ClientLayout({ children }) {
   const [mounted, setMounted] = useState(false);
