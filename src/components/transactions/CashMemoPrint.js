@@ -36,7 +36,7 @@ export const CashMemoPrint = React.memo(function CashMemoPrint({ memoData, produ
         <thead>
           <tr>
             <th>Product</th>
-            <th className="text-right">Quality</th>
+            <th className="text-right">Quantity</th>
             <th className="text-right">Price</th>
             <th className="text-right">Total</th>
           </tr>
@@ -45,7 +45,7 @@ export const CashMemoPrint = React.memo(function CashMemoPrint({ memoData, produ
           {products.map((product, index) => (
             <tr key={index}>
               <td>{product.name}</td>
-              <td className="text-right">{product.quality}</td>
+              <td className="text-right">{product.quantity}</td>
               <td className="text-right">
                 ৳{parseFloat(product.price).toLocaleString()}
               </td>

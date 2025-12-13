@@ -96,11 +96,9 @@ export default function CashMemoPage() {
         <div className="hidden">
           <div id="print-section">
             <CashMemoPrint
-              data={memoData}
-              items={products}
-              total={grandTotal}
-              deposit={memoData.deposit}
-              due={grandTotal - (Number(memoData.deposit) || 0)}
+              memoData={memoData}
+              products={products}
+              grandTotal={grandTotal}
               isOriginal={true}
             />
           </div>
