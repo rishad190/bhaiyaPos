@@ -10,11 +10,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"; // Kept for Skeleton usage if needed, or remove if skeleton moves
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddSupplierDialog } from "@/components/suppliers/AddSupplierDialog";
 import { EditSupplierDialog } from "@/components/suppliers/EditSupplierDialog";
+import { SupplierTable } from "@/components/suppliers/SupplierTable";
+import { SupplierFilters } from "@/components/suppliers/SupplierFilters";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -330,117 +333,21 @@ export default function SuppliersPage() {
       </div>
 
       {/* Search Section */}
-      <Card className="mb-8 border-none shadow-md">
-        <CardContent className="p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search suppliers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-full"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SupplierFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
 
       {/* Suppliers Table */}
       <Card className="border-none shadow-md">
         <CardContent className="p-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Supplier Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Store</TableHead>
-                <TableHead className="text-right">Total Due</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSuppliers.map((supplier) => (
-                <TableRow
-                  key={supplier.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => router.push(`/suppliers/${supplier.id}`)}
-                >
-                  <TableCell>
-                    <div className="font-medium">{supplier.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{supplier.phone}</div>
-                    <div className="text-sm text-gray-500">
-                      {supplier.email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div
-                      className="truncate max-w-[200px]"
-                      title={supplier.address}
-                    >
-                      {supplier.address}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{supplier.storeId}</Badge>
-                  </TableCell>
-                  <TableCell
-                    className={`text-right ${
-                      (supplier.totalDue || 0) > 0 ? "text-red-500" : "text-green-500"
-                    }`}
-                  >
-                    ৳{(Number(supplier.totalDue) || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingSupplier(supplier);
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/suppliers/${supplier.id}`);
-                            }}
-                          >
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500"
-                            onClick={(e) =>
-                              handleDeleteSupplier(e, supplier.id)
-                            }
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!filteredSuppliers.length && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    No suppliers found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <SupplierTable
+            suppliers={filteredSuppliers}
+            onEdit={(supplier) => {
+              setEditingSupplier(supplier);
+            }}
+            onDelete={handleDeleteSupplier}
+          />
         </CardContent>
       </Card>
 

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { backupService } from "@/services/backupService";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 import dynamic from "next/dynamic";
 
 // Dynamically import heavy components
@@ -86,60 +87,19 @@ export default function Dashboard() {
   const { data: fabricsData, isLoading: fabricsLoading } = useFabrics({ page: 1, limit: 10000 });
   const { data: suppliersData, isLoading: suppliersLoading } = useSuppliers({ page: 1, limit: 10000 });
 
-  const isLoading = customersLoading || transactionsLoading || fabricsLoading || suppliersLoading;
+  const { displayStats, rawStats: stats } = useDashboardStats({
+    customers: customersData?.data || [],
+    transactions: transactionsData?.data || [],
+    fabrics: fabricsData?.data || [],
+    suppliers: suppliersData?.data || [],
+  });
 
-  const stats = useMemo(() => {
-    const customers = customersData?.data || [];
-    const transactions = transactionsData?.data || [];
-    const fabrics = fabricsData?.data || [];
-    const suppliers = suppliersData?.data || [];
-
-    if (!customers.length || !transactions.length) {
-      return {
-        totalBill: 0,
-        totalDeposit: 0,
-        totalDue: 0,
-        totalCustomers: 0,
-        totalFabrics: 0,
-        totalSuppliers: 0,
-        recentTransactions: [],
-      };
-    }
-
-    const totals = customers.reduce(
-      (acc, customer) => {
-        const customerTransactions = transactions.filter((t) => t.customerId === customer.id);
-        const customerTotal = customerTransactions.reduce(
-          (sum, t) => sum + (Number(t.total) || 0),
-          0
-        );
-        const customerDeposit = customerTransactions.reduce(
-          (sum, t) => sum + (Number(t.deposit) || 0),
-          0
-        );
-        const customerDue = customerTotal - customerDeposit;
-
-        return {
-          totalBill: acc.totalBill + customerTotal,
-          totalDeposit: acc.totalDeposit + customerDeposit,
-          totalDue: acc.totalDue + customerDue,
-        };
-      },
-      { totalBill: 0, totalDeposit: 0, totalDue: 0 }
-    );
-
-    const recentTransactions = [...transactions]
+  // Calculate recent transactions for display
+  const recentTransactions = useMemo(() => {
+     return [...(transactionsData?.data || [])]
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
       .slice(0, 5);
-
-    return {
-      ...totals,
-      totalCustomers: customers.length,
-      totalFabrics: fabrics.length,
-      totalSuppliers: suppliers.length,
-      recentTransactions,
-    };
-  }, [customersData, transactionsData, fabricsData, suppliersData]);
+  }, [transactionsData?.data]);
 
   const handleQuickBackup = async () => {
     setBackupLoading(true);
@@ -249,21 +209,21 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <QuickStatCard
             title="Total Customers"
-            value={stats.totalCustomers}
+            value={displayStats.customers}
             icon={Users}
             trend="up"
             trendValue="12%"
           />
           <QuickStatCard
             title="Total Fabrics"
-            value={stats.totalFabrics}
+            value={stats.totalStock}
             icon={Package}
             trend="up"
             trendValue="8%"
           />
           <QuickStatCard
             title="Total Suppliers"
-            value={stats.totalSuppliers}
+            value={stats.totalSuppliers} // Falls back to 0 if undefined/not calculated in hook (needs check)
             icon={Users}
             trend="up"
             trendValue="5%"
@@ -292,7 +252,7 @@ export default function Dashboard() {
                   <DollarSign className="h-4 w-4 text-blue-800" />
                 </div>
                 <div className="text-2xl font-bold text-blue-900">
-                  Taka {formatLargeNumber(stats.totalBill)}
+                  {displayStats.bill}
                 </div>
                 <div className="flex items-center mt-2 text-sm text-blue-800">
                   <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -310,7 +270,7 @@ export default function Dashboard() {
                   <DollarSign className="h-4 w-4 text-green-800" />
                 </div>
                 <div className="text-2xl font-bold text-green-900">
-                  Taka {formatLargeNumber(stats.totalDeposit)}
+                  {displayStats.deposit}
                 </div>
                 <div className="flex items-center mt-2 text-sm text-green-800">
                   <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -328,7 +288,7 @@ export default function Dashboard() {
                   <DollarSign className="h-4 w-4 text-red-800" />
                 </div>
                 <div className="text-2xl font-bold text-red-900">
-                  Taka {formatLargeNumber(stats.totalDue)}
+                  {displayStats.due}
                 </div>
                 <div className="flex items-center mt-2 text-sm text-red-800">
                   <ArrowDownRight className="h-4 w-4 mr-1" />
@@ -342,7 +302,7 @@ export default function Dashboard() {
         {/* Recent Activity and Low Stock */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <RecentTransactions
-            transactions={stats.recentTransactions}
+            transactions={recentTransactions}
             customers={customersData?.data || []}
           />
         </div>

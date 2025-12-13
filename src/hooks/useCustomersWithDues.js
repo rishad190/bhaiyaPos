@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { customerService, transactionService } from '@/services/firebaseService';
+import { customerService } from '@/services/customerService';
+import { transactionService } from '@/services/transactionService';
 import { useMemo } from 'react';
 
 // Hook to fetch customers with their due amounts calculated

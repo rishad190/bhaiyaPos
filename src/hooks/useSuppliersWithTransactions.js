@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supplierService } from '@/services/firebaseService';
-import { ref, get } from 'firebase/database';
-import { db } from '@/lib/firebase';
+import { supplierService } from '@/services/supplierService';
 import { useMemo } from 'react';
 
 // Hook to fetch suppliers with their transaction totals
@@ -9,15 +7,7 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
   // Fetch all supplier transactions
   const { data: allSupplierTransactions = [], isLoading: transactionsLoading } = useQuery({
     queryKey: ['supplierTransactions', 'all'],
-    queryFn: async () => {
-      const transactionsRef = ref(db, 'supplierTransactions');
-      const snapshot = await get(transactionsRef);
-      if (!snapshot.exists()) return [];
-      return Object.entries(snapshot.val()).map(([id, value]) => ({
-        id,
-        ...value,
-      }));
-    },
+    queryFn: () => supplierService.getSupplierTransactions(),
   });
 
   // Fetch suppliers

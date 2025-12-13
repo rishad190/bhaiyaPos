@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supplierService } from '@/services/firebaseService';
+import { supplierService } from '@/services/supplierService';
 import { useToast } from '@/hooks/use-toast';
 import logger from '@/utils/logger';
 

@@ -1,7 +1,7 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ref, get, update } from "firebase/database";
-import { db } from "@/lib/firebase";
+
+import { settingsService } from '@/services/settingsService';
 import logger from "@/utils/logger";
 
 // Default settings structure
@@ -38,11 +38,9 @@ export function useSettings() {
     queryKey: ["settings"],
     queryFn: async () => {
       try {
-        const settingsRef = ref(db, "settings");
-        const snapshot = await get(settingsRef);
+        const data = await settingsService.getSettings();
         
-        if (snapshot.exists()) {
-          const data = snapshot.val();
+        if (data) {
           // Merge with defaults to ensure all fields exist
           return {
             store: { ...DEFAULT_SETTINGS.store, ...(data.store || {}) },
@@ -55,7 +53,6 @@ export function useSettings() {
         return DEFAULT_SETTINGS;
       } catch (error) {
         logger.error(`Failed to fetch settings: ${error.message}`, "Settings");
-        // Return defaults on error instead of throwing
         return DEFAULT_SETTINGS;
       }
     },
@@ -73,8 +70,7 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: async (newSettings) => {
       try {
-        const settingsRef = ref(db, "settings");
-        await update(settingsRef, newSettings);
+        await settingsService.updateSettings(newSettings);
         return newSettings;
       } catch (error) {
         logger.error(`Failed to update settings: ${error.message}`, "Settings");

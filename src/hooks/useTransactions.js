@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { transactionService } from '@/services/firebaseService';
+import { transactionService } from '@/services/transactionService';
 import { useToast } from '@/hooks/use-toast';
 import logger from '@/utils/logger';
 
@@ -114,10 +114,6 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       
-      // Invalidate Firebase service cache
-      const { customerService } = require('@/services/firebaseService');
-      customerService.invalidateTransactionsCache();
-      
       if (variables.customerId) {
         queryClient.invalidateQueries({
           queryKey: transactionKeys.customerTransactions(variables.customerId),
@@ -147,10 +143,6 @@ export function useUpdateTransaction() {
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
-      
-      // Invalidate Firebase service cache
-      const { customerService } = require('@/services/firebaseService');
-      customerService.invalidateTransactionsCache();
       
       if (variables.updatedData.customerId) {
         queryClient.invalidateQueries({
@@ -187,9 +179,7 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({ queryKey: ['transactions', 'all'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       
-      // Invalidate Firebase service cache
-      const { customerService } = require('@/services/firebaseService');
-      customerService.invalidateTransactionsCache();
+      queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate customers to refresh dues
       
       toast({
         title: 'Success',

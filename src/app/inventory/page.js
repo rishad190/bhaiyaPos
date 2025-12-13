@@ -8,19 +8,8 @@ import { Input } from "@/components/ui/input";
 import { InventoryErrorBoundary } from "@/components/shared/ErrorBoundary";
 import logger from "@/utils/logger";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -28,6 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { InventoryTable } from "@/components/inventory/InventoryTable";
+import { InventoryActions } from "@/components/inventory/InventoryActions";
 import { calculateTotalQuantity } from "@/lib/inventory-utils";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search } from "lucide-react";
@@ -162,132 +153,18 @@ export default function InventoryPage() {
     <InventoryErrorBoundary>
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
         <Card className="border-none shadow-md">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <CardTitle className="text-3xl font-bold tracking-tight">
-                  Fabric Inventory
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  Manage your fabric stock here.
-                </CardDescription>
-              </div>
-              <Button
-                onClick={handleAddClick}
-                className="bg-primary hover:bg-primary/90 text-white w-full md:w-auto"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Fabric
-              </Button>
-            </div>
-
-            <div className="mt-4">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, code, or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-          </CardHeader>
+          <InventoryActions
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onAddClick={handleAddClick}
+          />
 
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Current Stock</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFabrics.map((fabric) => (
-                  <TableRow
-                    key={fabric.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
-                      logger.info(
-                        "Row clicked - Navigating to fabric:",
-                        fabric.id
-                      );
-                      router.push(`/inventory/${fabric.id}`);
-                    }}
-                  >
-                    <TableCell className="font-medium">
-                      <div>{fabric.name}</div>
-                      {fabric.description && (
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {fabric.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{fabric.code}</TableCell>
-                    <TableCell>{fabric.category}</TableCell>
-                    <TableCell className="text-right">
-                      {fabric.batches ? calculateTotalQuantity(fabric).toFixed(2) : '0.00'}{" "}
-                      {fabric.unit || "pieces"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from firing
-                            logger.info(
-                              "View button clicked - Navigating to fabric:",
-                              fabric.id
-                            );
-                            router.push(`/inventory/${fabric.id}`);
-                          }}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from firing
-                            logger.info("Edit button clicked");
-                            handleEditClick(fabric);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click from firing
-                            logger.info("Delete button clicked");
-                            handleDeleteClick(fabric.id);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-
-                {!filteredFabrics.length && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      No fabrics found.{" "}
-                      {searchTerm && "Try adjusting your search terms."}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <InventoryTable
+              fabrics={filteredFabrics}
+              onEdit={handleEditClick}
+              onDelete={handleDeleteClick}
+            />
           </CardContent>
         </Card>
 
