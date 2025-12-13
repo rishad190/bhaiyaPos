@@ -2,6 +2,7 @@
 import { set, ref } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { formatDate } from "@/lib/utils";
+import logger from "@/utils/logger";
 
 // Collection references for restore
 const COLLECTION_REFS = {
@@ -65,7 +66,7 @@ class RestoreService {
           }
 
           if (collectionData.error) {
-            console.error(
+            logger.error(
               `Error in backup for ${collectionName}:`,
               collectionData.error
             );
@@ -115,7 +116,7 @@ class RestoreService {
           results.summary.totalCollections++;
           results.summary.totalRecords += collectionData.count;
         } catch (error) {
-          console.error(`Error restoring ${collectionName}:`, error);
+          logger.error(`Error restoring ${collectionName}:`, error);
           results.errors[collectionName] = error.message;
           results.summary.errors++;
         }
@@ -126,7 +127,7 @@ class RestoreService {
 
       return results;
     } catch (error) {
-      console.error("Error during data restore:", error);
+      logger.error("Error during data restore:", error);
       throw new Error(`Failed to restore data: ${error.message}`);
     }
   }
@@ -141,7 +142,7 @@ class RestoreService {
       const snapshot = await get(collectionRef);
       return snapshot.exists() ? snapshot.val() : {};
     } catch (error) {
-      console.error(`Error getting existing data from ${path}:`, error);
+      logger.error(`Error getting existing data from ${path}:`, error);
       return {};
     }
   }
@@ -207,7 +208,7 @@ class RestoreService {
         message: "This is a preview. No data will be modified.",
       };
     } catch (error) {
-      console.error("Error generating restore preview:", error);
+      logger.error("Error generating restore preview:", error);
       throw error;
     }
   }
@@ -224,7 +225,7 @@ class RestoreService {
 
       return results;
     } catch (error) {
-      console.error("Error restoring specific collections:", error);
+      logger.error("Error restoring specific collections:", error);
       throw error;
     }
   }
@@ -316,7 +317,7 @@ class RestoreService {
         message: "Restore report downloaded successfully",
       };
     } catch (error) {
-      console.error("Error downloading restore report:", error);
+      logger.error("Error downloading restore report:", error);
       throw error;
     }
   }

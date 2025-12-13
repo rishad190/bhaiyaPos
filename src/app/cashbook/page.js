@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import logger from "@/utils/logger";
 import { useAllDailyCashTransactions, useAddDailyCashTransaction, useUpdateDailyCashTransaction, useDeleteDailyCashTransaction } from "@/hooks/useDailyCash";
 import { Button } from "@/components/ui/button";
+import { useCashbookStats } from "@/hooks/useCashbookStats";
 import {
   Table,
   TableBody,
@@ -12,8 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
-import { AddCashTransactionDialog } from "@/components/AddCashTransactionDialog";
-import { EditCashTransactionDialog } from "@/components/EditCashTransactionDialog";
+import { AddCashTransactionDialog } from "@/components/transactions/AddCashTransactionDialog";
+import { EditCashTransactionDialog } from "@/components/transactions/EditCashTransactionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,8 +49,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
-import { Pagination } from "@/components/Pagination";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { Pagination } from "@/components/shared/Pagination";
 
 export default function CashBookPage() {
   const { toast } = useToast();
@@ -75,152 +76,14 @@ export default function CashBookPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [openingBalance, setOpeningBalance] = useState(0);
-  useEffect(() => {
-    if (date && dailyCashTransactions) {
-      const previousDay = new Date(date);
-      previousDay.setDate(previousDay.getDate() - 1);
-      const previousDayISO = previousDay.toISOString().split("T")[0];
-
-      const balance = dailyCashTransactions
-        .filter((t) => t.date <= previousDayISO)
-        .reduce((acc, t) => acc + (t.cashIn || 0) - (t.cashOut || 0), 0);
-      setOpeningBalance(balance);
-    }
-  }, [date, dailyCashTransactions]);
-
-
-
-  // Memoize calculations for better performance with defensive programming
-  const { dailyCash, financials, monthlyTotals } = useMemo(() => {
-    if (
-      !Array.isArray(dailyCashTransactions) ||
-      dailyCashTransactions.length === 0
-    ) {
-      return {
-        dailyCash: [],
-        financials: { totalCashIn: 0, totalCashOut: 0, availableCash: 0 },
-        monthlyTotals: [],
-      };
-    }
-
-    const dailySummary = dailyCashTransactions.reduce((acc, item) => {
-      if (!item?.date) return acc;
-
-      const date = item.date;
-      if (!acc[date]) {
-        acc[date] = {
-          date,
-          cashIn: 0,
-          cashOut: 0,
-          balance: 0,
-          dailyCash: [],
-        };
-      }
-
-      const cashIn = Number(item.cashIn) || 0;
-      const cashOut = Number(item.cashOut) || 0;
-
-      acc[date].cashIn += cashIn;
-      acc[date].cashOut += cashOut;
-      acc[date].balance = acc[date].cashIn - acc[date].cashOut;
-      acc[date].dailyCash.push(item);
-
-      return acc;
-    }, {});
-
-    const dailyCash = Object.values(dailySummary).sort(
-      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
-    );
-
-    const financials = {
-      totalCashIn: dailyCashTransactions.reduce(
-        (sum, t) => sum + (Number(t.cashIn) || 0),
-        0
-      ),
-      totalCashOut: dailyCashTransactions.reduce(
-        (sum, t) => sum + (Number(t.cashOut) || 0),
-        0
-      ),
-      availableCash: dailyCashTransactions.reduce(
-        (sum, t) => sum + ((Number(t.cashIn) || 0) - (Number(t.cashOut) || 0)),
-        0
-      ),
-    };
-
-    const monthly = dailyCashTransactions.reduce((acc, transaction) => {
-      if (!transaction?.date) return acc;
-
-      const month = transaction.date.substring(0, 7);
-      if (!acc[month]) {
-        acc[month] = { cashIn: 0, cashOut: 0 };
-      }
-      acc[month].cashIn += Number(transaction.cashIn) || 0;
-      acc[month].cashOut += Number(transaction.cashOut) || 0;
-      return acc;
-    }, {});
-
-    const monthlyTotals = Object.entries(monthly)
-      .map(([month, totals]) => ({
-        month,
-        ...totals,
-        balance: totals.cashIn - totals.cashOut,
-      }))
-      .sort((a, b) => b.month.localeCompare(a.month));
-
-    return { dailyCash, financials, monthlyTotals };
-  }, [dailyCashTransactions]);
-
-  const { groupedEntries, sortedDates } = useMemo(() => {
-    if (!Array.isArray(dailyCashTransactions)) {
-      return { groupedEntries: {}, sortedDates: [] };
-    }
-
-    let filteredTransactions = dailyCashTransactions;
-
-    if (date) {
-      filteredTransactions = filteredTransactions.filter(
-        (transaction) => transaction.date === date
-      );
-    }
-
-    if (searchTerm) {
-      filteredTransactions = filteredTransactions.filter((transaction) =>
-        transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    const grouped = filteredTransactions.reduce((acc, entry) => {
-      const entryDate = entry.date;
-      if (!acc[entryDate]) {
-        acc[entryDate] = { income: [], expense: [] };
-      }
-      if (entry.cashIn > 0) {
-        acc[entryDate].income.push({ ...entry, amount: entry.cashIn });
-      }
-      if (entry.cashOut > 0) {
-        acc[entryDate].expense.push({ ...entry, amount: entry.cashOut });
-      }
-      return acc;
-    }, {});
-
-    const sorted = Object.keys(grouped).sort(
-      (a, b) => new Date(b) - new Date(a)
-    );
-
-    let runningBalance = openingBalance;
-    sorted.forEach((date) => {
-      const { income, expense } = grouped[date];
-      [...income, ...expense]
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-        .forEach((entry) => {
-          runningBalance += (entry.cashIn || 0) - (entry.cashOut || 0);
-          entry.balance = runningBalance;
-        });
-    });
-
-    return { groupedEntries: grouped, sortedDates: sorted };
-  }, [dailyCashTransactions, date, searchTerm, openingBalance]);
+  const { 
+    openingBalance, 
+    dailyCash, 
+    financials, 
+    monthlyTotals, 
+    groupedEntries, 
+    sortedDates 
+  } = useCashbookStats({ dailyCashTransactions, date, searchTerm });
 
   const handleEditClick = (entry) => {
     setEditingTransaction(entry);

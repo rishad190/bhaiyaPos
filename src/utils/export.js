@@ -1,6 +1,6 @@
-import { formatDate } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import logger from "@/utils/logger";
 
 export const formatCurrencyForPDF = (amount) => {
   try {
@@ -11,7 +11,7 @@ export const formatCurrencyForPDF = (amount) => {
     }
     return `${numAmount.toFixed(2)}`;
   } catch (error) {
-    console.error("Error formatting currency:", error);
+    logger.error("Error formatting currency:", error);
     return "৳0.00";
   }
 };
@@ -67,7 +67,7 @@ export const exportToCSV = (data, filename) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   } catch (error) {
-    console.error("Error exporting CSV:", error);
+    logger.error("Error exporting CSV:", error);
     alert("Failed to export data. Please try again.");
   }
 };
@@ -321,7 +321,7 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.save(fileName);
     return fileName;
   } catch (error) {
-    console.error("Error exporting PDF:", error);
+    logger.error("Error exporting PDF:", error);
     alert("Failed to export PDF. Please try again.");
     return null;
   }
@@ -332,7 +332,7 @@ export const addImageToPDF = (doc, imgData, x, y, width, height) => {
     doc.addImage(imgData, "PNG", x, y, width, height);
     return true;
   } catch (error) {
-    console.error("Error adding image to PDF:", error);
+    logger.error("Error adding image to PDF:", error);
     return false;
   }
 };
@@ -672,7 +672,7 @@ export const exportCashbookToPDF = (data) => {
     doc.save(filename);
     return true;
   } catch (error) {
-    console.error("Error generating cashbook PDF:", error);
+    logger.error("Error generating cashbook PDF:", error);
     return false;
   }
 };

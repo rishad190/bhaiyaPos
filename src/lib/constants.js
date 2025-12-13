@@ -36,3 +36,11 @@ export const TRANSACTION_CONSTANTS = {
     STORE2: "STORE2",
   },
 };
+
+// Centralized store configuration for dropdown menus
+export const STORES = [
+  { value: "STORE1", label: "Store 1" },
+  { value: "STORE2", label: "Store 2" },
+];
+
+export const DEFAULT_STORE = "STORE1";

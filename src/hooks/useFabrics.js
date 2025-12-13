@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fabricService } from '@/services/firebaseService';
+import { fabricService } from '@/services/inventoryService';
 import { useToast } from '@/hooks/use-toast';
 import logger from '@/utils/logger';
 

@@ -1,59 +1,73 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { loginSchema } from "@/lib/schemas";
+
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
 
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      password: "",
+    },
+  });
+
   useEffect(() => {
-    const checkAuth = () => {
-      const isAuth = localStorage.getItem("isAuthenticated") === "true";
-      if (isAuth) {
-        router.push("/");
-      } else {
-        setIsLoading(false);
-      }
-    };
-    checkAuth();
-  }, [router]);
+    if (isAuthenticated) {
+      router.push("/");
+    } else {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, router]);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-
+  const onSubmit = async (data) => {
     try {
       if (loginAttempts >= 5) {
-        setError("Too many failed attempts. Please try again later.");
+        setError("root", { 
+          message: "Too many failed attempts. Please try again later." 
+        });
         return;
       }
 
-      if (password === "admin123") {
-        setIsLoading(true);
-        localStorage.setItem("isAuthenticated", "true");
+      const result = await login(data.password);
+      
+      if (result.success) {
+        setIsLoading(true); // Transition state
         await router.push("/");
       } else {
         setLoginAttempts((prev) => prev + 1);
-        setError(`Invalid password. ${5 - loginAttempts} attempts remaining.`);
+        setError("root", {
+           message: `Invalid password. ${5 - (loginAttempts + 1)} attempts remaining.`
+        });
+        setError("password", { message: "Invalid password" });
       }
     } catch (error) {
       logger.error("Login error:", error);
-      setError("An error occurred during login");
-      setIsLoading(false);
+      setError("root", { message: "An error occurred during login" });
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !isSubmitting) { // Show initial loader or transition loader
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -83,10 +97,10 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {errors.root && (
             <div className="bg-red-50 p-4 rounded-md">
-              <p className="text-red-600 text-sm text-center">{error}</p>
+              <p className="text-red-600 text-sm text-center">{errors.root.message}</p>
             </div>
           )}
 
@@ -94,10 +108,8 @@ export default function LoginPage() {
             <Input
               type={showPassword ? "text" : "password"}
               placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pr-10"
-              required
+              {...register("password")}
+              className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
             />
             <button
               type="button"
@@ -111,13 +123,16 @@ export default function LoginPage() {
               )}
             </button>
           </div>
+          {errors.password && (
+             <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
+          )}
 
           <Button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 transition-colors"
-            disabled={isLoading || loginAttempts >= 5}
+            disabled={isSubmitting || loginAttempts >= 5 || isLoading}
           >
-            {isLoading ? (
+            {isSubmitting || isLoading ? (
               <div className="flex items-center justify-center gap-2">
                 <LoadingSpinner size="sm" />
                 <span>Signing in...</span>

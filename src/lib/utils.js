@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import logger from "@/utils/logger";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -29,7 +30,7 @@ export const formatDate = (dateString) => {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   } catch (error) {
-    console.error("Error formatting date:", error);
+    logger.error("Error formatting date:", error);
     return "Invalid Date";
   }
 };
@@ -44,7 +45,7 @@ export const formatCurrency = (amount) => {
     }
     return `৳${formatLargeNumber(numAmount)}`;
   } catch (error) {
-    console.error("Error formatting currency:", error);
+    logger.error("Error formatting currency:", error);
     return "৳0";
   }
 };
@@ -52,13 +53,13 @@ export const formatCurrency = (amount) => {
 export const printElement = (elementId, title = "Print") => {
   const printContent = document.getElementById(elementId);
   if (!printContent) {
-    console.error("Print Error: Element to print not found");
+    logger.error("Print Error: Element to print not found");
     return;
   }
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    console.error("Print Error: Could not open print window");
+    logger.error("Print Error: Could not open print window");
     return;
   }
 

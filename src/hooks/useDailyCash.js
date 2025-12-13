@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { dailyCashService } from '@/services/firebaseService';
+import { dailyCashService } from '@/services/dailyCashService';
 import { useToast } from '@/hooks/use-toast';
 import logger from '@/utils/logger';
 

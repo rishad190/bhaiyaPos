@@ -29,10 +29,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddTransactionDialog } from "@/components/AddTransactionDialog";
-import { EditTransactionDialog } from "@/components/EditTransactionDialog";
-import { LoadingState, TableSkeleton } from "@/components/LoadingState";
-import { DataErrorBoundary } from "@/components/ErrorBoundary";
+import { AddTransactionDialog } from "@/components/transactions/AddTransactionDialog";
+import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
+import { LoadingState, TableSkeleton } from "@/components/shared/LoadingState";
+import { DataErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
   ArrowLeft,
   Phone,
