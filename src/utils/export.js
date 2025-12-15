@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import logger from "@/utils/logger";
+import { formatDate } from "@/lib/utils";
 
 export const formatCurrencyForPDF = (amount) => {
   try {
@@ -321,7 +322,8 @@ export const exportToPDF = (entity, transactions, type) => {
     doc.save(fileName);
     return fileName;
   } catch (error) {
-    logger.error("Error exporting PDF:", error);
+    logger.error(`Error exporting PDF: ${error.message}`, error);
+    console.error("Full PDF Export Error:", error);
     alert("Failed to export PDF. Please try again.");
     return null;
   }
