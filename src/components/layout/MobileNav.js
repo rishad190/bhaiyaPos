@@ -2,7 +2,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet.jsx";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet.jsx";
 import {
   Menu,
   LayoutDashboard,
@@ -38,7 +38,7 @@ export function MobileNav({ handleLogout, router, pathname }) {
       <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm p-0">
         <div className="flex flex-col h-full">
           <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold">Menu</h2>
+            <SheetTitle className="text-lg font-semibold">Menu</SheetTitle>
           </div>
           <nav className="flex-1 p-4 space-y-2">
             {navItems.map((item) => {

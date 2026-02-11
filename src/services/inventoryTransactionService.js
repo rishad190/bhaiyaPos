@@ -48,15 +48,17 @@ export const inventoryTransactionService = {
 
       try {
         const result = await runTransaction(fabricRef, (currentFabric) => {
-          // If fabric doesn't exist, abort transaction
-          if (!currentFabric) {
-            logger.error(`[InventoryTransaction] Fabric not found: ${product.fabricId}`);
-            return; // Abort transaction
+          // If fabric doesn't exist or not loaded yet
+          if (currentFabric === null) {
+            // Return null to allow Firebase to check with server
+            // - If server has data: Transaction retries with data
+            // - If server has no data: Transaction completes with null (handled below)
+            return null;
           }
 
           // Check if fabric has batches
           if (!currentFabric.batches || Object.keys(currentFabric.batches).length === 0) {
-            logger.error(`[InventoryTransaction] No batches for fabric: ${product.name}`);
+            logger.warn(`[InventoryTransaction] No batches for fabric: ${product.name}`);
             return; // Abort transaction
           }
 
@@ -77,7 +79,7 @@ export const inventoryTransactionService = {
             if (remainingQuantity <= 0) break;
 
             if (!batch.items || !Array.isArray(batch.items)) {
-              logger.warn(`[InventoryTransaction] Batch ${batch.batchId} has no items`);
+              logger.debug(`[InventoryTransaction] Batch ${batch.batchId} has no items`);
               continue;
             }
 
@@ -105,7 +107,7 @@ export const inventoryTransactionService = {
                 item.quantity = availableQuantity - quantityToReduce;
                 remainingQuantity -= quantityToReduce;
 
-                logger.info(
+                logger.debug(
                   `[InventoryTransaction] Reducing ${quantityToReduce} from batch ${batch.batchId}`,
                   {
                     color: item.colorName || "no color",
@@ -126,7 +128,7 @@ export const inventoryTransactionService = {
 
           // Check if we have enough stock
           if (remainingQuantity > 0) {
-            logger.error(
+            logger.warn(
               `[InventoryTransaction] Insufficient stock for ${product.name}`,
               {
                 requested: product.quantity,
@@ -151,10 +153,11 @@ export const inventoryTransactionService = {
         // Check if transaction was committed
         if (!result.committed) {
           // Transaction was aborted
+          logger.info(`[InventoryTransaction] Transaction aborted for ${product.name}, checking reason...`);
           const fabricSnapshot = await get(fabricRef);
           
           if (!fabricSnapshot.exists()) {
-
+             logger.error(`[InventoryTransaction] Confirmation: Fabric ${product.fabricId} truly missing`);
             throw new Error(
               `Fabric "${product.name}" (ID: ${product.fabricId}) not found in database`
             );
@@ -287,7 +290,8 @@ export const inventoryTransactionService = {
         availability.push({
           productName: product.name,
           available: false,
-          reason: error.message,
+          reason: error.message || "Unknown error checking stock",
+          isError: true
         });
       }
     }

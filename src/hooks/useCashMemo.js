@@ -6,6 +6,7 @@ import { useAddTransaction } from "@/hooks/useTransactions";
 import { useAddDailyCashTransaction } from "@/hooks/useDailyCash";
 import { useFabrics } from "@/hooks/useFabrics";
 import { useReduceInventory } from "@/hooks/useInventoryTransaction";
+import { inventoryTransactionService } from "@/services/inventoryTransactionService";
 import { calculateFifoSale } from "@/lib/inventory-utils";
 import { formatProductWithColor } from "@/lib/color-utils";
 import logger from "@/utils/logger";
@@ -232,6 +233,22 @@ export function useCashMemo() {
     try {
       setIsSaving(true);
       
+      // Server-side validation: Check stock availability against live database
+      const stockCheck = await inventoryTransactionService.checkStockAvailability(products);
+      if (!stockCheck.allAvailable) {
+        const unavailableProduct = stockCheck.products.find(p => !p.available);
+        const errorMsg = unavailableProduct 
+          ? `Issue with "${unavailableProduct.productName}": ${unavailableProduct.reason}`
+          : "Some products are not available";
+          
+        toast({
+          title: "Product Issue",
+          description: errorMsg,
+          variant: "destructive"
+        });
+        setIsSaving(false);
+        return;
+      }      
       const transaction = {
         customerId,
         date: memoData.date,
@@ -282,7 +299,21 @@ export function useCashMemo() {
 
     } catch (error) {
       logger.error("Error saving memo:", error);
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      
+      // Check if this is a fabric not found error
+      if (error.message && error.message.includes("not found in database")) {
+        toast({
+          title: "Product No Longer Available",
+          description: error.message + ". Please remove the product and select it again from the current inventory.",
+          variant: "destructive"
+        });
+      } else {
+        toast({ 
+          title: "Error Saving Memo", 
+          description: error.message || "An unexpected error occurred. Please try again.", 
+          variant: "destructive" 
+        });
+      }
     } finally {
       setIsSaving(false);
     }

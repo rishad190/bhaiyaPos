@@ -97,10 +97,11 @@ export function ProductForm({
                             <span className="text-xs text-muted-foreground">
                               Code: {fabric.code} | Stock:{" "}
                               {fabric.batches
-                                ? Object.values(fabric.batches)
+                                ? fabric.batches
+                                    .flatMap((batch) => batch.items || [])
                                     .reduce(
-                                      (sum, b) =>
-                                        sum + (Number(b.quantity) || 0),
+                                      (sum, item) =>
+                                        sum + (Number(item.quantity) || 0),
                                       0
                                     )
                                     .toFixed(2)
