@@ -44,9 +44,9 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
     });
   }, [suppliersData, allSupplierTransactions]);
 
-  // Calculate financial summary from all transactions
+  // Calculate financial summary from visible suppliers to match the table
   const financialSummary = useMemo(() => {
-    if (!Array.isArray(allSupplierTransactions) || allSupplierTransactions.length === 0) {
+    if (!Array.isArray(suppliersWithTotals) || suppliersWithTotals.length === 0) {
       return {
         totalAmount: 0,
         paidAmount: 0,
@@ -54,20 +54,25 @@ export function useSuppliersWithTransactions({ page = 1, limit = 20, searchTerm 
       };
     }
 
-    const totals = allSupplierTransactions.reduce(
-      (acc, transaction) => ({
-        totalAmount: acc.totalAmount + (Number(transaction.totalAmount) || 0),
-        paidAmount: acc.paidAmount + (Number(transaction.paidAmount) || 0),
-      }),
-      { totalAmount: 0, paidAmount: 0 }
-    );
+    return suppliersWithTotals.reduce(
+      (acc, supplier) => {
+        // Find all transactions for this supplier again to get raw totals or we can recalculate 
+        // using the supplier's raw transactions, but it's simpler to just sum the totals
+        const supplierTxns = allSupplierTransactions.filter(
+          (t) => t.supplierId === supplier.id
+        );
+        const supplierTotalAmount = supplierTxns.reduce((sum, t) => sum + (Number(t.totalAmount) || 0), 0);
+        const supplierPaidAmount = supplierTxns.reduce((sum, t) => sum + (Number(t.paidAmount) || 0), 0);
 
-    return {
-      totalAmount: totals.totalAmount,
-      paidAmount: totals.paidAmount,
-      dueAmount: totals.totalAmount - totals.paidAmount,
-    };
-  }, [allSupplierTransactions]);
+        return {
+          totalAmount: acc.totalAmount + supplierTotalAmount,
+          paidAmount: acc.paidAmount + supplierPaidAmount,
+          dueAmount: acc.dueAmount + (Number(supplier.totalDue) || 0),
+        };
+      },
+      { totalAmount: 0, paidAmount: 0, dueAmount: 0 }
+    );
+  }, [suppliersWithTotals, allSupplierTransactions]);
 
   return {
     suppliers: suppliersWithTotals,

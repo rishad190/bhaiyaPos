@@ -37,7 +37,85 @@ import {
 import { backupService } from "@/services/backupService";
 import { restoreService } from "@/services/restoreService";
 import { backupScheduler } from "@/services/backupScheduler";
+import { useAuth } from "@/contexts/AuthContext";
 
+function PasswordChangeForm() {
+  const { changePassword } = useAuth();
+  const { toast } = useToast();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast({ title: "Error", description: "All fields are required", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "New passwords do not match", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await changePassword(currentPassword, newPassword);
+      if (result.success) {
+        toast({ title: "Success", description: "Password changed successfully." });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to change password", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
+      <div className="space-y-2">
+        <Label htmlFor="currentPassword">Current Password</Label>
+        <Input
+          id="currentPassword"
+          type="password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="newPassword">New Password</Label>
+        <Input
+          id="newPassword"
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+        <Input
+          id="confirmPassword"
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+      </div>
+      <Button type="submit" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Change Password
+      </Button>
+    </form>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -727,6 +805,19 @@ export default function SettingsPage() {
                   }
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Change Password Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>
+                Update your login password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+               <PasswordChangeForm />
             </CardContent>
           </Card>
         </TabsContent>
