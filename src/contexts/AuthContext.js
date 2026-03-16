@@ -8,7 +8,8 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { ref, get, set } from "firebase/database";
 import logger from "@/utils/logger";
 import { useRouter } from "next/navigation";
 
@@ -19,9 +20,28 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dbAdminPassword, setDbAdminPassword] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
+    const fetchAdminPassword = async () => {
+      try {
+        const passwordRef = ref(db, 'settings/adminPassword');
+        const snapshot = await get(passwordRef);
+        if (snapshot.exists()) {
+          setDbAdminPassword(snapshot.val());
+        } else {
+          // Fallback to default if not set in DB
+          setDbAdminPassword("admin123");
+        }
+      } catch (error) {
+        logger.error("Failed to fetch admin password:", error);
+        setDbAdminPassword("admin123"); // Safe fallback
+      }
+    };
+
+    fetchAdminPassword();
+
     // Check local storage first for immediate feedback (legacy support)
     const localAuth = localStorage.getItem("isAuthenticated") === "true";
     if (localAuth) {
@@ -48,9 +68,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (password, email = null) => {
     try {
-      // Legacy "admin123" support with custom password support
-      const storedPassword = localStorage.getItem("customAdminPassword") || "admin123";
-      if (password === storedPassword) {
+      // Legacy "admin123" support with cloud-based custom password support
+      const currentAdminPassword = dbAdminPassword || "admin123";
+      if (password === currentAdminPassword) {
         localStorage.setItem("isAuthenticated", "true");
         setUser({ uid: "local-admin", email: "admin@skyfabric.com" });
         return { success: true };
@@ -82,24 +102,22 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      // Legacy "admin123" support - password change isn't fully supported without 
-      // a proper backend for local users, but we can simulate it by updating local storage
-      // if we wanted to. For now, since admin123 is hardcoded in login(), changing it
-      // requires changing the code, OR we can store a custom password in localStorage.
-      
       const isLocallyAuth = localStorage.getItem("isAuthenticated") === "true" && (!user || user.uid === "local-admin");
       
       if (isLocallyAuth) {
-        // Since admin login is hardcoded to "admin123", we would need to update the login
-        // function to check localStorage for a custom password.
-        // Let's implement that.
-        const storedPassword = localStorage.getItem("customAdminPassword") || "admin123";
+        const currentAdminPassword = dbAdminPassword || "admin123";
         
-        if (currentPassword !== storedPassword) {
+        if (currentPassword !== currentAdminPassword) {
             throw new Error("Current password is incorrect");
         }
         
-        localStorage.setItem("customAdminPassword", newPassword);
+        // Save to Firebase Realtime Database
+        const passwordRef = ref(db, 'settings/adminPassword');
+        await set(passwordRef, newPassword);
+
+        // Update local state so user doesn't have to refresh
+        setDbAdminPassword(newPassword);
+
         return { success: true };
       }
 
