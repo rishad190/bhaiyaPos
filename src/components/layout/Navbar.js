@@ -21,9 +21,11 @@ import {
   Receipt,
   Bell,
   TrendingUp,
+  Calendar,
 } from "lucide-react";
 import { UserNav } from "./UserNav";
 import { MobileNav } from "./MobileNav";
+import { reminderService } from "@/services/reminderService";
 
 const navItems = [
   {
@@ -61,6 +63,11 @@ const navItems = [
     label: "Cash Memo",
     icon: Receipt,
   },
+  {
+    href: "/reminders",
+    label: "Reminders",
+    icon: Calendar,
+  },
 ];
 
 import { useSettings } from "@/hooks/useSettings";
@@ -72,6 +79,77 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+
+  // Request browser Notification permissions on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  // Subscribe to reminders and check for due/overdue items real-time
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = reminderService.subscribeToReminders((allReminders) => {
+      const now = new Date();
+      const activeNotifications = [];
+
+      allReminders.forEach((reminder) => {
+        if (reminder.status === "pending") {
+          const reminderDateTimeStr = `${reminder.dueDate}T${reminder.dueTime}`;
+          const reminderDateObj = new Date(reminderDateTimeStr);
+          const isDueOrPast = reminderDateObj <= now;
+
+          if (isDueOrPast) {
+            // If it hasn't been notified yet, notify and update DB
+            if (!reminder.notified) {
+              const msgTitle = `Payment Reminder (${reminder.type === "check" ? "Check" : "Cash"})`;
+              const msgBody = `It is time to collect payment from ${reminder.customerName}${reminder.amount ? ` of ৳${reminder.amount}` : ""}. Note: ${reminder.title}`;
+
+              // 1. Desktop Notification
+              if (
+                typeof window !== "undefined" &&
+                "Notification" in window &&
+                Notification.permission === "granted"
+              ) {
+                try {
+                  new Notification(msgTitle, {
+                    body: msgBody,
+                    icon: "/favicon.ico",
+                  });
+                } catch (e) {
+                  console.error("Error displaying desktop notification", e);
+                }
+              }
+
+              // 2. In-app Toast Alert
+              toast({
+                title: msgTitle,
+                description: msgBody,
+                duration: 10000,
+              });
+
+              // Mark notified: true in DB to prevent multiple alerts
+              reminderService.updateReminder(reminder.id, { notified: true });
+            }
+
+            // Add to notification list
+            activeNotifications.push({
+              id: reminder.id,
+              message: `${reminder.customerName}: ${reminder.type === "check" ? "Check" : "Cash"} payment of ৳${reminder.amount || 0} (${reminder.dueDate})`,
+            });
+          }
+        }
+      });
+
+      setNotifications(activeNotifications);
+    });
+
+    return () => unsubscribe();
+  }, [user, toast]);
   const { data: settings, isLoading: settingsLoading } = useSettings();
 
   // Provide default settings to prevent undefined errors

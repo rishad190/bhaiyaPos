@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  Calendar,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/inventory-profit", label: "Inventory Profit", icon: TrendingUp },
   { href: "/cashmemo", label: "Cash Memo", icon: Receipt },
+  { href: "/reminders", label: "Reminders", icon: Calendar },
 ];
 
 export function MobileNav({ handleLogout, router, pathname }) {

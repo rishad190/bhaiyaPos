@@ -98,3 +98,16 @@ export const supplierTransactionSchema = z.object({
 export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
+
+export const reminderSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  customerName: z.string().min(1, "Customer name is required"),
+  customerPhone: z.string().optional().default(""),
+  title: z.string().min(1, "Note/title is required"),
+  amount: z.coerce.number().optional().default(0),
+  type: z.enum(["cash", "check"]),
+  dueDate: z.string().min(1, "Due date is required"),
+  dueTime: z.string().min(1, "Due time is required"),
+  status: z.enum(["pending", "completed"]).default("pending"),
+  notified: z.boolean().default(false),
+});
