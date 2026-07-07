@@ -7,6 +7,7 @@ export const COLLECTIONS = {
   SUPPLIER_TRANSACTIONS: "supplierTransactions",
   FABRICS: "fabrics",
   SETTINGS: "settings",
+  REMINDERS: "reminders",
 };
 
 // Helper to convert Firebase snapshot to array

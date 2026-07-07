@@ -4,6 +4,9 @@ import logger from "@/utils/logger";
 import { useParams, useRouter } from "next/navigation";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useTransactions, useAddTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useTransactions";
+import { useReminders, useAddReminder, useUpdateReminder, useDeleteReminder } from "@/hooks/useReminders";
+import { ReminderDialog } from "@/components/customers/ReminderDialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,8 +47,13 @@ import {
   MoreVertical,
   ArrowUpDown,
   Plus,
+  Calendar,
+  Clock,
+  Edit,
+  Trash2,
+  CheckCircle,
 } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { exportToCSV, exportToPDF } from "@/utils/export";
 import { TRANSACTION_CONSTANTS, ERROR_MESSAGES } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +91,45 @@ export default function CustomerDetail() {
     key: "date",
     direction: "asc",
   });
+
+  // Reminders state & mutations
+  const [isAddingReminder, setIsAddingReminder] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState(null);
+  
+  const { data: reminders = [] } = useReminders();
+  const addReminderMutation = useAddReminder();
+  const updateReminderMutation = useUpdateReminder();
+  const deleteReminderMutation = useDeleteReminder();
+
+  const customerReminders = useMemo(() => {
+    return reminders.filter((r) => r.customerId === params.id);
+  }, [reminders, params.id]);
+
+  const handleAddOrEditReminder = async (formData) => {
+    if (selectedReminder) {
+      await updateReminderMutation.mutateAsync({
+        reminderId: selectedReminder.id,
+        updatedData: formData,
+      });
+    } else {
+      await addReminderMutation.mutateAsync(formData);
+    }
+  };
+
+  const handleReminderStatusChange = async (reminder, isCompleted) => {
+    await updateReminderMutation.mutateAsync({
+      reminderId: reminder.id,
+      updatedData: {
+        status: isCompleted ? "completed" : "pending",
+      },
+    });
+  };
+
+  const handleDeleteReminder = async (reminderId) => {
+    if (window.confirm("আপনি কি এই রিমাইন্ডারটি মুছে ফেলতে চান?")) {
+      await deleteReminderMutation.mutateAsync(reminderId);
+    }
+  };
 
   const customer = Array.isArray(customers) ? customers.find((c) => c.id === params.id) : null;
 
@@ -476,151 +523,332 @@ export default function CustomerDetail() {
           </Card>
         </div>
 
-        {/* Transactions Table */}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead
-                  className="whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("date")}
+        <Tabs defaultValue="transactions" className="w-full mt-6">
+          <TabsList className="mb-4">
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="reminders" className="flex items-center gap-1.5">
+              Reminders
+              {customerReminders.filter(r => r.status === 'pending').length > 0 && (
+                <Badge variant="destructive" className="h-5 px-1.5 min-w-5 flex items-center justify-center text-[10px] rounded-full">
+                  {customerReminders.filter(r => r.status === 'pending').length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="transactions" className="space-y-4">
+            {/* Transactions Table */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("date")}
+                    >
+                      Date <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead
+                      className="whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("memoNumber")}
+                    >
+                      Memo Number{" "}
+                      <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Details</TableHead>
+                    <TableHead
+                      className="text-right whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("total")}
+                    >
+                      Total Bill{" "}
+                      <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead
+                      className="text-right whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("deposit")}
+                    >
+                      Deposit <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead
+                      className="text-right whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("due")}
+                    >
+                      Due Amount{" "}
+                      <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead
+                      className="text-right whitespace-nowrap cursor-pointer"
+                      onClick={() => requestSort("cumulativeBalance")}
+                    >
+                      Balance <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Store</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingState.transactions ? (
+                    <TableSkeleton />
+                  ) : (
+                    customerTransactionsWithBalance.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {formatDate(transaction.date)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.memoNumber}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.details}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.total.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.deposit.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          ৳{transaction.due.toLocaleString()}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium whitespace-nowrap ${
+                            transaction.cumulativeBalance > 0
+                              ? "text-red-500"
+                              : "text-green-500"
+                          }`}
+                        >
+                          ৳{transaction.cumulativeBalance.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {transaction.storeId}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-[160px]"
+                              >
+                                <DropdownMenuItem asChild>
+                                  <EditTransactionDialog
+                                    transaction={transaction}
+                                    onEditTransaction={(updatedData) =>
+                                      handleEditTransaction(
+                                        transaction.id,
+                                        updatedData
+                                      )
+                                    }
+                                    isLoading={loadingState.action}
+                                  />
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-500 focus:text-red-500 focus:bg-red-50"
+                                  onClick={() =>
+                                    handleDeleteTransaction(transaction.id)
+                                  }
+                                  disabled={loadingState.action}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Footer Section */}
+            <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="text-sm text-gray-500">
+                Total Transactions: {customerTransactionsWithBalance.length}
+              </div>
+              <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
+                <span className="font-semibold">Current Balance: </span>
+                <span
+                  className={`font-bold ${
+                    totalDue > 0 ? "text-red-500" : "text-green-500"
+                  }`}
                 >
-                  Date <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead
-                  className="whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("memoNumber")}
-                >
-                  Memo Number{" "}
-                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead className="whitespace-nowrap">Details</TableHead>
-                <TableHead
-                  className="text-right whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("total")}
-                >
-                  Total Bill{" "}
-                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead
-                  className="text-right whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("deposit")}
-                >
-                  Deposit <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead
-                  className="text-right whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("due")}
-                >
-                  Due Amount{" "}
-                  <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead
-                  className="text-right whitespace-nowrap cursor-pointer"
-                  onClick={() => requestSort("cumulativeBalance")}
-                >
-                  Balance <ArrowUpDown className="inline-block ml-2 h-4 w-4" />
-                </TableHead>
-                <TableHead className="whitespace-nowrap">Store</TableHead>
-                <TableHead className="whitespace-nowrap">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingState.transactions ? (
-                <TableSkeleton />
-              ) : (
-                customerTransactionsWithBalance.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {formatDate(transaction.date)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.memoNumber}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.details}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.total.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.deposit.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      ৳{transaction.due.toLocaleString()}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-medium whitespace-nowrap ${
-                        transaction.cumulativeBalance > 0
-                          ? "text-red-500"
-                          : "text-green-500"
+                  ৳{totalDue.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reminders" className="space-y-4">
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <h3 className="text-lg font-bold">Payment Reminders</h3>
+                <p className="text-xs text-muted-foreground">Customer's check or cash payment schedules.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setSelectedReminder(null);
+                  setIsAddingReminder(true);
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Set Reminder
+              </Button>
+            </div>
+
+            {customerReminders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customerReminders.map((reminder) => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const isOverdue = reminder.dueDate < todayStr && reminder.status === "pending";
+                  const isToday = reminder.dueDate === todayStr && reminder.status === "pending";
+                  
+                  return (
+                    <Card
+                      key={reminder.id}
+                      className={`overflow-hidden border transition-all duration-300 ${
+                        reminder.status === "completed"
+                          ? "bg-gray-50/80 border-gray-200 opacity-80"
+                          : isOverdue
+                          ? "border-red-200 bg-red-50/10"
+                          : isToday
+                          ? "border-amber-200 bg-amber-50/10"
+                          : "border-gray-200"
                       }`}
                     >
-                      ৳{transaction.cumulativeBalance.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {transaction.storeId}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-[160px]"
-                          >
-                            <DropdownMenuItem asChild>
-                              <EditTransactionDialog
-                                transaction={transaction}
-                                onEditTransaction={(updatedData) =>
-                                  handleEditTransaction(
-                                    transaction.id,
-                                    updatedData
-                                  )
-                                }
-                                isLoading={loadingState.action}
-                              />
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-500 focus:text-red-500 focus:bg-red-50"
-                              onClick={() =>
-                                handleDeleteTransaction(transaction.id)
-                              }
-                              disabled={loadingState.action}
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <Badge
+                              variant={reminder.type === "check" ? "default" : "secondary"}
+                              className={`uppercase text-[10px] px-2 py-0.5 ${
+                                reminder.type === "check"
+                                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              }`}
                             >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                              {reminder.type === "check" ? "Check" : "Cash"}
+                            </Badge>
+                            {reminder.amount > 0 && (
+                              <span className="font-bold text-base ml-2 text-foreground">
+                                {formatCurrency(reminder.amount)}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {reminder.status === "completed" ? (
+                            <Badge className="bg-green-100 text-green-700 border-none text-[10px]">
+                              Completed
+                            </Badge>
+                          ) : isOverdue ? (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Overdue
+                            </Badge>
+                          ) : isToday ? (
+                            <Badge className="bg-amber-100 text-amber-700 border-none text-[10px]">
+                              Today
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-blue-100 text-blue-700 border-none text-[10px]">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
 
-        {/* Footer Section */}
-        <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="text-sm text-gray-500">
-            Total Transactions: {customerTransactionsWithBalance.length}
-          </div>
-          <div className="bg-gray-100 p-4 rounded-lg w-full md:w-auto">
-            <span className="font-semibold">Current Balance: </span>
-            <span
-              className={`font-bold ${
-                totalDue > 0 ? "text-red-500" : "text-green-500"
-              }`}
-            >
-              ৳{totalDue.toLocaleString()}
-            </span>
-          </div>
-        </div>
+                        <div className="text-sm font-medium text-gray-700 bg-gray-50 p-2 rounded border border-dashed">
+                          {reminder.title}
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            {formatDate(reminder.dueDate)} ({reminder.dueTime})
+                          </span>
+                          
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1 cursor-pointer select-none text-foreground font-semibold">
+                              <input
+                                type="checkbox"
+                                className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary"
+                                checked={reminder.status === "completed"}
+                                onChange={(e) => handleReminderStatusChange(reminder, e.target.checked)}
+                              />
+                              Completed
+                            </label>
+                            
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => {
+                                setSelectedReminder(reminder);
+                                setIsAddingReminder(true);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteReminder(reminder.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card className="border-dashed p-6 text-center bg-gray-50/50">
+                <CardContent className="flex flex-col items-center justify-center space-y-2">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm">No Reminders Scheduled</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      There are no scheduled payment reminders for this customer.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedReminder(null);
+                      setIsAddingReminder(true);
+                    }}
+                    className="mt-2 text-xs"
+                  >
+                    Create Reminder
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Reminder Dialog */}
+        <ReminderDialog
+          open={isAddingReminder}
+          onOpenChange={setIsAddingReminder}
+          customerId={params.id}
+          customerName={customer.name}
+          customerPhone={customer.phone}
+          reminder={selectedReminder}
+          onSubmitReminder={handleAddOrEditReminder}
+        />
       </div>
     </DataErrorBoundary>
   );
